@@ -265,8 +265,11 @@ export function applyOverride(spec: ChartSpec, o?: SpecOverride): ChartSpec {
   }
   // A different x field brings its own domain, format and label; the old ones
   // would leave an empty chart with the wrong ticks.
-  const xBase: AxisSpec = o.x?.field && o.x.field !== spec.x.field ? { field: o.x.field, scale: spec.x.scale, grid: spec.x.grid, format: fieldFormat(spec.data, o.x.field) } : spec.x;
+  const xChanged = !!o.x?.field && o.x.field !== spec.x.field;
+  const xBase: AxisSpec = xChanged ? { field: o.x!.field!, scale: spec.x.scale, grid: spec.x.grid, format: fieldFormat(spec.data, o.x!.field!) } : spec.x;
   const x = { ...xBase, ...(o.x ?? {}) };
+  // Annotations placed on the old x axis are in its units and no longer mean anything.
+  const baseAnnotations = xChanged ? (spec.annotations ?? []).filter((a) => a.x == null) : spec.annotations;
   const y = { ...spec.y, ...(o.y ?? {}) };
   // A log scale cannot start at or below zero.
   for (const ax of [x, y]) {
@@ -281,7 +284,7 @@ export function applyOverride(spec: ChartSpec, o?: SpecOverride): ChartSpec {
     height: o.height ?? spec.height,
     legend: o.legend ?? spec.legend,
     series,
-    annotations: o.hideAnnotations ? [] : (o.annotations ?? spec.annotations),
+    annotations: o.hideAnnotations ? [] : (o.annotations ?? baseAnnotations),
   };
 }
 

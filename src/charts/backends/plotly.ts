@@ -91,12 +91,15 @@ function trace(spec: ChartSpec, s: SeriesSpec, barWidth: number | undefined, cat
   }
 }
 
-function annotationLayout(spec: ChartSpec, xLog: boolean, yLog: boolean): { shapes: PLayout[]; annotations: PLayout[] } {
+function annotationLayout(spec: ChartSpec, x: ResolvedAxis, y: ResolvedAxis): { shapes: PLayout[]; annotations: PLayout[] } {
   const shapes: PLayout[] = [];
   const annotations: PLayout[] = [];
-  // Plotly annotations (unlike shapes) take log10 coordinates on a log axis.
-  const ax = (v: number) => (xLog ? Math.log10(v) : v);
-  const ay = (v: number) => (yLog ? Math.log10(v) : v);
+  const xLog = x.scale === "log";
+  const yLog = y.scale === "log";
+  // Plotly annotations (unlike shapes) take log10 coordinates on a log axis; a value
+  // at or below zero has no place there and sits at the axis start instead.
+  const ax = (v: number) => (xLog ? Math.log10(Math.max(v, x.min)) : v);
+  const ay = (v: number) => (yLog ? Math.log10(Math.max(v, y.min)) : v);
   for (const a of spec.annotations ?? []) {
     const color = roleColor(a.color ?? "muted");
     const dash = a.dash === false ? "solid" : "dot";
@@ -271,7 +274,7 @@ function build(spec: ChartSpec, widthPx: number): { data: PTrace[]; layout: PLay
   const plotPx = Math.max(200, widthPx - MARGIN.l - MARGIN.r);
   const barWidth = spec.barWidthPx && !cats && axes.x.scale === "linear" ? ((axes.x.max - axes.x.min) * spec.barWidthPx) / plotPx : undefined;
   const data = spec.series.map((s) => trace(spec, s, barWidth, cats));
-  const { shapes, annotations } = annotationLayout(spec, axes.x.scale === "log", axes.y.scale === "log");
+  const { shapes, annotations } = annotationLayout(spec, axes.x, axes.y);
   const many = spec.series.length > 8;
   return {
     data,

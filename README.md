@@ -38,10 +38,12 @@ be swapped without touching the others.
 
 ## Using the app
 
-- **Deck bar.** Anchored under the top bar on every page. Collapsed: the six inputs in
-  three groups (per event, per season, sizing) and two headline figures. Expanded
-  (Deck ▾): full inputs with help, every figure, the definitions, and the sweep presets.
-  A thin strip under it shows the active input's presets and run state.
+- **Deck.** Anchored under the top bar on every page, two rows when reduced: the
+  inputs in three groups set apart by distance (per event, per season, sizing), each
+  with its name and symbol; then the six figures as one status line, the sweep strip
+  for the active input, and the toggle. The full deck (Full deck ▾) is two columns:
+  inputs as titled sections with help and the sweep presets on the left, the figures
+  as a table and the definitions on the right.
 - **Tour** is the guided single page: each section has a functional title, a one-line
   lede, the claim it defends in a boxed aside, an inputs bar, two headline figures, the
   primary chart, secondary charts, and expanders for tables, notes and the
