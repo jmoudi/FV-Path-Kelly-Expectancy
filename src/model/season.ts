@@ -55,15 +55,28 @@ export function nightMean(nd: NightDist): number {
   return m;
 }
 
+/** Probability that one night wipes the tranche (a factor of 0). */
+export function nightRuin(nd: NightDist): number {
+  let r = 0;
+  for (let j = 0; j <= nd.k; j++) if (nd.factor[j] <= 0) r += nd.prob[j];
+  return r;
+}
+
 /**
- * Expected log multiplier of one night, with the ruin state (factor 0) dropped.
- * This matches the convention used in the discussion's growth tables; the ruin
- * probability is reported separately.
+ * Expected log multiplier of one night, conditional on the night not wiping the
+ * tranche. The unconditional expectation is −∞ whenever ruin has any probability,
+ * so growth is always reported together with the ruin probability. This matches the
+ * discussion's growth tables to within the (tiny) ruin mass they dropped.
  */
 export function nightLogGrowth(nd: NightDist): number {
   let g = 0;
-  for (let j = 0; j <= nd.k; j++) if (nd.factor[j] > 0) g += nd.prob[j] * Math.log(nd.factor[j]);
-  return g;
+  let mass = 0;
+  for (let j = 0; j <= nd.k; j++) {
+    if (nd.factor[j] <= 0) continue;
+    g += nd.prob[j] * Math.log(nd.factor[j]);
+    mass += nd.prob[j];
+  }
+  return mass > 0 ? g / mass : -Infinity;
 }
 
 export interface Outcome {
@@ -280,7 +293,7 @@ export interface Summary {
   pRuin: number;
   /** P(end value >= mean). */
   pAtOrAboveMean: number;
-  /** E[log end value] over non-ruined outcomes (not renormalized). */
+  /** E[log end value | not ruined]. */
   expLog: number;
   /** Highest possible end value (no losses at all). */
   max: number;
@@ -321,7 +334,7 @@ export function summarize(d: Distribution, threshold = 0.5): Summary {
     pBelow,
     pRuin,
     pAtOrAboveMean,
-    expLog,
+    expLog: pRuin < 1 ? expLog / (1 - pRuin) : -Infinity,
     max: last ? last.value : NaN,
     pMax: last ? last.prob : NaN,
     method: d.method,

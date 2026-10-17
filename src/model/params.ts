@@ -2,6 +2,7 @@
  * The single parameter object every scenario reads from, plus its schema.
  * The schema is what the UI renders; tiers decide how prominent an input is.
  */
+import type { Engine } from "./season";
 import type { MoveDistribution } from "./wing";
 
 export interface Params {
@@ -42,13 +43,14 @@ export interface Params {
   moveDist: MoveDistribution;
   tailDf: number;
   realizedRatio: number;
+  parallelTranches: number;
 
   // --- advanced ---
+  engine: Engine;
   mcPaths: number;
   seed: number;
   maxCompositions: number;
   fanPaths: number;
-  parallelTranches: number;
 }
 
 export const DEFAULT_PARAMS: Params = {
@@ -73,12 +75,13 @@ export const DEFAULT_PARAMS: Params = {
   moveDist: "normal",
   tailDf: 4,
   realizedRatio: 1.0,
+  parallelTranches: 400,
 
+  engine: "auto",
   mcPaths: 20_000,
   seed: 42,
-  maxCompositions: 250_000,
+  maxCompositions: 60_000,
   fanPaths: 40,
-  parallelTranches: 400,
 };
 
 export type Tier = "primary" | "secondary" | "advanced";
@@ -97,6 +100,8 @@ export interface ParamDef {
   section?: string;
   help: string;
   choices?: { value: string; label: string }[];
+  /** The input also changes the deck's policies, so every section moves with it. */
+  affectsAll?: boolean;
 }
 
 export const PARAM_DEFS: ParamDef[] = [
@@ -109,7 +114,7 @@ export const PARAM_DEFS: ParamDef[] = [
     max: 0.08,
     step: 0.0005,
     tier: "primary",
-    help: "Probability that one name hits max loss on one night. The binary abstraction treats every bad event as a full loss, so this is expected loss as a fraction of max loss (see section 4).",
+    help: "Probability that one name hits max loss on one night. The binary abstraction treats every bad event as a full loss, so this is expected loss as a fraction of max loss (section 4 derives it from a wing).",
   },
   {
     key: "gain",
@@ -136,17 +141,40 @@ export const PARAM_DEFS: ParamDef[] = [
   },
   { key: "seasons", label: "Seasons chained", short: "N", unit: "int", min: 1, max: 12, step: 1, tier: "primary", help: "Seasons played back to back without refilling the tranche." },
 
-  { key: "sharedOutcome", label: "Shared-outcome nights", short: "c", unit: "pct2", min: 0, max: 0.3, step: 0.0025, tier: "secondary", section: "correlation", help: "Share of nights on which all names effectively share one outcome because of a common cause." },
-  { key: "volShock", label: "Realized ÷ priced sigma", unit: "ratio", min: 1, max: 2.5, step: 0.05, tier: "secondary", section: "correlation", help: "On shocked nights the realized move is this many times what every chain priced." },
+  {
+    key: "sharedOutcome",
+    label: "Shared-outcome nights",
+    short: "c",
+    unit: "pct2",
+    min: 0,
+    max: 0.3,
+    step: 0.0025,
+    tier: "secondary",
+    section: "correlation",
+    affectsAll: true,
+    help: "Share of nights on which all names effectively share one outcome because of a common cause. It enters every diversified policy, so every section moves with it.",
+  },
+  { key: "volShock", label: "Realized ÷ priced sigma on shocked nights", unit: "ratio", min: 1, max: 2.5, step: 0.05, tier: "secondary", section: "correlation", help: "On shocked nights the realized move is this many times what every chain priced." },
   { key: "volShockShare", label: "Share of shocked nights", unit: "pct", min: 0, max: 1, step: 0.05, tier: "secondary", section: "correlation", help: "Fraction of nights that carry the shared volatility shock." },
   { key: "eventsPerYear", label: "Name-events per year", unit: "int", min: 10, max: 600, step: 10, tier: "secondary", section: "calibration", help: "How fast the track record grows." },
-  { key: "zSigma", label: "Separation demanded", unit: "sigma", min: 1, max: 4, step: 0.25, tier: "secondary", section: "calibration", help: "How many standard errors apart two loss rates must sit before you call them different." },
-  { key: "altLossRate", label: "Optimistic loss rate", unit: "pct2", min: 0.001, max: 0.08, step: 0.0005, tier: "secondary", section: "calibration", help: "The better rate you would like to be true. The question is how long it takes to tell it from the deck's rate." },
+  { key: "zSigma", label: "Separation demanded", unit: "sigma", min: 1, max: 4, step: 0.25, tier: "secondary", section: "calibration", help: "How many standard errors apart two loss rates must sit before you call them different. 2σ is a weak bar; a one-sided 5% test with 80% power needs about 1.6× as many events." },
+  {
+    key: "altLossRate",
+    label: "Optimistic loss rate",
+    unit: "pct2",
+    min: 0.001,
+    max: 0.08,
+    step: 0.0005,
+    tier: "secondary",
+    section: "calibration",
+    affectsAll: true,
+    help: "The better rate you would like to be true. Sections 3, 7 and 8 compare it with the deck's rate and with break-even.",
+  },
   { key: "singleNameShare", label: "Single-name nights", unit: "pct", min: 0, max: 1, step: 0.05, tier: "secondary", section: "diversification", help: "Share of a season's nights that offer only one name." },
-  { key: "thresholdBelow", label: "Drawdown threshold", unit: "x", min: 0.1, max: 0.95, step: 0.05, tier: "secondary", section: "diversification", help: "Tables report the probability of ending below this multiple of the starting tranche." },
+  { key: "thresholdBelow", label: "Drawdown threshold", unit: "x", min: 0.1, max: 0.95, step: 0.05, tier: "secondary", section: "diversification", affectsAll: true, help: "Tables and tiles report the probability of ending below this multiple of the starting tranche." },
   { key: "strikeDistance", label: "Short strike distance", unit: "sigma", min: 0.5, max: 4, step: 0.05, tier: "secondary", section: "wing", help: "Distance from spot to the short strike, in sigmas the chain priced." },
   { key: "wingWidth", label: "Wing width", unit: "sigma", min: 0.05, max: 2, step: 0.05, tier: "secondary", section: "wing", help: "Distance between the short and the long strike, in priced sigmas." },
-  { key: "creditFraction", label: "Credit ÷ width", unit: "pct2", min: 0.005, max: 0.3, step: 0.001, tier: "secondary", section: "wing", help: "Credit collected as a fraction of the wing width. Sets the gain per unit risked, b = c/(W−c)." },
+  { key: "creditFraction", label: "Credit ÷ width", unit: "pct2", min: 0.005, max: 0.3, step: 0.001, tier: "secondary", section: "wing", help: "Credit collected as a fraction of the wing width. Sets the gain per unit risked, b = c/(W−c), and the fair loss rate c/W." },
   {
     key: "moveDist",
     label: "Move distribution",
@@ -156,20 +184,37 @@ export const PARAM_DEFS: ParamDef[] = [
     step: 0,
     tier: "secondary",
     section: "wing",
-    help: "Shape of the realized move. The Student-t is rescaled so its standard deviation equals the priced sigma.",
+    help: "Shape of the realized move toward the short strike. The Student-t is rescaled so its standard deviation equals the priced sigma. Empirical uses the moves you imported.",
     choices: [
       { value: "normal", label: "Normal" },
       { value: "student", label: "Student-t" },
+      { value: "empirical", label: "Imported moves" },
     ],
   },
   { key: "tailDf", label: "Student-t degrees of freedom", unit: "ratio", min: 2.5, max: 30, step: 0.5, tier: "secondary", section: "wing", help: "Lower is fatter-tailed. 4 is a common fit for single-stock earnings moves." },
-  { key: "realizedRatio", label: "Realized ÷ priced sigma", unit: "ratio", min: 0.5, max: 2, step: 0.05, tier: "secondary", section: "wing", help: "Scales the whole realized distribution against what the chain priced." },
+  { key: "realizedRatio", label: "Realized ÷ priced sigma", unit: "ratio", min: 0.3, max: 2.5, step: 0.01, tier: "secondary", section: "wing", help: "Scales the whole realized distribution against what the chain priced. 1.00 means the chain was right on average." },
+  { key: "parallelTranches", label: "Parallel tranches sampled", unit: "int", min: 50, max: 5000, step: 50, tier: "secondary", section: "mean-median", help: "How many independent replays the pooling chart averages." },
 
-  { key: "mcPaths", label: "Monte Carlo paths", unit: "int", min: 2000, max: 200_000, step: 1000, tier: "advanced", help: "Used only when the exact enumeration would exceed the composition cap." },
+  {
+    key: "engine",
+    label: "Distribution engine",
+    unit: "choice",
+    min: 0,
+    max: 0,
+    step: 0,
+    tier: "advanced",
+    help: "Auto enumerates every nightly-outcome composition exactly while there are fewer than the cap, and otherwise runs a binned log-space recursion that matches the exact result to about 1e-4. Monte Carlo is a cross-check.",
+    choices: [
+      { value: "auto", label: "Auto (exact, then binned)" },
+      { value: "exact", label: "Exact only" },
+      { value: "binned", label: "Binned" },
+      { value: "montecarlo", label: "Monte Carlo" },
+    ],
+  },
+  { key: "maxCompositions", label: "Exact-enumeration cap", unit: "int", min: 5_000, max: 2_000_000, step: 5_000, tier: "advanced", help: "Above this many nightly-outcome compositions the auto engine switches to the binned recursion." },
+  { key: "mcPaths", label: "Monte Carlo paths", unit: "int", min: 2000, max: 200_000, step: 1000, tier: "advanced", help: "Used only when the engine is set to Monte Carlo." },
   { key: "seed", label: "Random seed", unit: "int", min: 1, max: 99_999, step: 1, tier: "advanced", help: "Seeds every sampled path and replay. Change it to see a different draw." },
-  { key: "maxCompositions", label: "Exact-enumeration cap", unit: "int", min: 10_000, max: 2_000_000, step: 10_000, tier: "advanced", help: "Above this many nightly-outcome compositions the engine switches to Monte Carlo." },
   { key: "fanPaths", label: "Paths in fan charts", unit: "int", min: 5, max: 200, step: 5, tier: "advanced", help: "How many sampled seasons the railroad charts draw." },
-  { key: "parallelTranches", label: "Parallel tranches sampled", unit: "int", min: 50, max: 5000, step: 50, tier: "advanced", help: "How many independent replays the mean-versus-median charts pool." },
 ];
 
 export const PARAM_BY_KEY: Record<string, ParamDef> = Object.fromEntries(PARAM_DEFS.map((d) => [d.key, d]));
@@ -189,6 +234,26 @@ export function sanitizeParams(input: unknown): Params {
       (out as unknown as Record<string, unknown>)[def.key] = def.unit === "int" ? Math.round(clamped) : clamped;
     }
   }
-  if (out.names * (out.riskPerNight / out.names) > 1) out.riskPerNight = 1;
+  return out;
+}
+
+/** Imported datasets: numbers only, kept beside the parameters. */
+export interface Datasets {
+  /** Per-event outcomes: 0/1 full losses, or P&L per unit of max loss. */
+  record: number[];
+  /** Realized moves in priced sigmas, positive toward the short strike. */
+  moves: number[];
+}
+
+export const EMPTY_DATASETS: Datasets = { record: [], moves: [] };
+
+export function sanitizeDatasets(input: unknown): Datasets {
+  const out: Datasets = { record: [], moves: [] };
+  if (!input || typeof input !== "object") return out;
+  const src = input as Record<string, unknown>;
+  for (const k of ["record", "moves"] as const) {
+    const v = src[k];
+    if (Array.isArray(v)) out[k] = v.filter((x): x is number => typeof x === "number" && Number.isFinite(x)).slice(0, 100_000);
+  }
   return out;
 }

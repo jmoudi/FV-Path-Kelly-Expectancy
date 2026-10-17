@@ -46,17 +46,25 @@ export function ParamInput({ k, compact }: { k: keyof Params; compact?: boolean 
   const [text, setText] = useState(() => (typeof value === "number" ? toDisplay(def, value) : String(value)));
   const [live, setLive] = useState<number | null>(null);
   const timer = useRef<number | null>(null);
+  const committed = useRef(text);
 
   useEffect(() => {
-    if (typeof value === "number") setText(toDisplay(def, value));
+    if (typeof value === "number") {
+      const t = toDisplay(def, value);
+      setText(t);
+      committed.current = t;
+    }
     setLive(null);
   }, [value, def]);
+
+  const badge = def.affectsAll ? <span className="badge-all" title="This input enters the deck's policies, so every section moves with it.">all sections</span> : null;
 
   if (def.unit === "choice") {
     return (
       <div className="param">
         <div className="param-label">
           <span>{def.label}</span>
+          {badge}
           <Help text={def.help} />
         </div>
         <select id={`param-${k}`} value={String(value)} onChange={(e) => setParam(k, e.target.value as Params[typeof k])}>
@@ -80,8 +88,10 @@ export function ParamInput({ k, compact }: { k: keyof Params; compact?: boolean 
     timer.current = window.setTimeout(() => commit(v), 140);
   };
   const onBlur = () => {
+    // Only commit when the typed text actually changed; re-rounding the display must not move the value.
+    if (text === committed.current) return;
     const v = fromDisplay(def, text);
-    if (v == null) setText(toDisplay(def, num));
+    if (v == null) setText(committed.current);
     else commit(v);
   };
 
@@ -90,6 +100,7 @@ export function ParamInput({ k, compact }: { k: keyof Params; compact?: boolean 
       <div className="param-label">
         <span>{def.label}</span>
         {def.short && <span className="sym">{def.short}</span>}
+        {badge}
         <Help text={def.help} />
       </div>
       <div className="param-row">

@@ -1,60 +1,58 @@
-import { f, table, type ChartSpec, type Row, type SeriesSpec } from "../../charts/spec";
-import { seasonLogGrowth } from "../../model/kelly";
-import type { Params } from "../../model/params";
+import { f, table, tableSpec, type ChartSpec, type Row, type SeriesSpec } from "../../charts/spec";
+import { seasonLogGrowth, seasonRuin } from "../../model/kelly";
+import type { Datasets, Params } from "../../model/params";
 import type { PolicyId } from "../../model/policies";
 import { samplePaths, scheduleDistribution, summarize } from "../../model/season";
-import { pct, pct1, signedPct1, smallPct, x2, type Derived } from "../derived";
+import { methodLabel, pct, pct1, signedPct1, smallPct, x2, type Derived } from "../derived";
 import type { ScenarioView } from "../types";
 
-export function buildDiversification(p: Params, d: Derived): ScenarioView {
+export function buildDiversification(p: Params, d: Derived, _data: Datasets): ScenarioView {
   const ids: PolicyId[] = ["A", "B", "C"];
-  const k = Math.max(1, Math.round(p.names));
+  const k = d.k;
   const A = d.season.A.summary;
   const B = d.season.B.summary;
+  const hi = Math.ceil(Math.max(d.cleanEnd * 1.05, 1.2) * 4) / 4;
 
-  // Distribution of the season end, linear bins. Outcomes are discrete, so bins are
-  // kept coarse enough that neighbouring bins do not alternate between full and empty.
-  const width = 0.1;
-  const hi = Math.max(1.3, Math.ceil((d.cleanEnd + 0.1) / width) * width);
-  const bins = Math.round(hi / width);
-  const massOf = (id: PolicyId) => {
-    const out = new Array<number>(bins).fill(0);
-    for (const o of d.season[id].dist.outcomes) {
-      let i = Math.floor(o.value / width);
-      if (i >= bins) i = bins - 1;
-      if (i < 0) i = 0;
-      out[i] += o.prob;
+  // Cumulative distribution of the season end: one row per distinct outcome.
+  const values = new Set<number>();
+  for (const id of ids) for (const o of d.season[id].dist.outcomes) values.add(Math.min(hi, Math.round(o.value * 1e6) / 1e6));
+  const grid = [...values].sort((a, b) => a - b);
+  const cdfRows: Row[] = [];
+  const cursors: Record<PolicyId, { i: number; acc: number }> = { A: { i: 0, acc: 0 }, B: { i: 0, acc: 0 }, C: { i: 0, acc: 0 } };
+  for (const v of grid) {
+    const r: Row = { end: v };
+    for (const id of ids) {
+      const outs = d.season[id].dist.outcomes;
+      const c = cursors[id];
+      while (c.i < outs.length && outs[c.i].value <= v + 1e-9) c.acc += outs[c.i++].prob;
+      r[id] = Math.min(1, c.acc);
     }
-    return out;
-  };
-  const masses = Object.fromEntries(ids.map((id) => [id, massOf(id)])) as Record<PolicyId, number[]>;
-  const histRows: Row[] = [];
-  for (let i = 0; i < bins; i++) histRows.push({ mid: (i + 0.5) * width, A: masses.A[i], B: masses.B[i], C: masses.C[i] });
+    cdfRows.push(r);
+  }
   const shape: ChartSpec = {
     id: "div-shape",
     title: "Same mean, different shape",
-    subtitle: `Probability by season-end bin. The coin is two spikes; ${k} names at 1/${k} each turn it into a hump with a long left tail; the reserve policy pulls the hump in.`,
+    subtitle: `Share of seasons ending at or below each value (${methodLabel(d.season.B.dist.method)}). The coin jumps from ${pct(1 - d.pClean)} straight to 100%; ${k} names at 1/${k} each climb through the middle; the reserve policy climbs steepest around 1×.`,
     kind: "xy",
-    data: table([f("mid", "Season end, tranche units", "x"), ...ids.map((id) => f(id, d.byId[id].label, "pct1"))], histRows),
-    mark: "bar",
-    x: { field: "mid", format: "x", domain: [0, hi] },
-    y: { field: "B", label: "Probability per bin", format: "pct" },
+    data: table([f("end", "Season end, tranche units", "x"), ...ids.map((id) => f(id, d.byId[id].label, "pct1"))], cdfRows),
+    mark: "step",
+    x: { field: "end", format: "x", domain: [0, hi] },
+    y: { field: "B", label: "P(season ends at or below)", format: "pct", domain: [0, 1] },
     series: [
       { field: "A", color: "a", label: d.byId.A.label },
       { field: "B", color: "b", label: d.byId.B.label, emphasis: "strong" },
       { field: "C", color: "c", label: d.byId.C.label },
     ],
-    barWidthPx: 9,
     height: 330,
     annotations: [
+      { kind: "hline", y: 0.5, text: "median line", color: "muted", at: "end" },
       { kind: "vline", x: A.mean, text: `mean of A and B ${A.mean.toFixed(2)}×`, color: "ink" },
-      { kind: "vline", x: B.median, text: `median B ${B.median.toFixed(2)}×`, color: "b", dash: false, at: "start" },
       { kind: "vline", x: p.thresholdBelow, text: `below ${p.thresholdBelow.toFixed(2)}×`, color: "loss", at: "start" },
     ],
     stories: [
       { id: "ab", label: "Only the coin against the diversified tranche", patch: { hiddenSeries: ["C"] } },
-      { id: "outline", label: "Outlines instead of bars", patch: { mark: "step" } },
-      { id: "logy", label: "Log probability to see the tails", patch: { y: { scale: "log", domain: [1e-5, 1] } } },
+      { id: "tail", label: "Zoom on the bad seasons", narrative: "How much mass sits below the drawdown threshold.", patch: { x: { domain: [0, 1] }, y: { domain: [0, 0.5] } } },
+      { id: "six", label: "What if it were six names a night?", narrative: "More names per night, same risk per night.", params: { names: 6 } },
     ],
   };
 
@@ -77,7 +75,7 @@ export function buildDiversification(p: Params, d: Derived): ScenarioView {
       data: table([f("night", "Night", "int"), ...paths.map((_, i) => f(`p${i}`, `Season ${i + 1}`, "x"))], rows),
       mark: "step",
       x: { field: "night", domain: [0, p.nights] },
-      y: { field: "p0", label: "Tranche, start = 1", domain: [0, d.cleanEnd * 1.08], format: "x" },
+      y: { field: "p0", label: "Tranche, start = 1", domain: [0, hi], format: "x" },
       series,
       legend: false,
       height: 240,
@@ -117,15 +115,15 @@ export function buildDiversification(p: Params, d: Derived): ScenarioView {
   const mix: ChartSpec = {
     id: "div-mix",
     title: "Names per game is the wrong measure",
-    subtitle: `Season ruin as single-name nights are mixed in. Rule 1 puts the whole tranche on a lone name; rule 2 caps every name at 1/${k} of the tranche and leaves the rest idle.`,
+    subtitle: `Season ruin as single-name nights are mixed in. Rule 1 puts the whole tranche on the lone name; rule 2 caps every name at 1/${k} of the tranche and leaves the rest idle.`,
     kind: "xy",
     data: table(
       [
         f("share", "Share of single-name nights", "pct"),
-        f("ruinFull", "Whole tranche on a lone name", "pct2"),
-        f("ruinCapped", `Capped at 1/${k} per name`, "pct3"),
-        f("meanFull", "Mean, whole tranche", "x"),
-        f("meanCapped", "Mean, capped", "x"),
+        f("ruinFull", "Rule 1: whole tranche on the lone name", "pct2"),
+        f("ruinCapped", `Rule 2: capped at 1/${k} per name`, "pct3"),
+        f("meanFull", "Mean, rule 1", "x"),
+        f("meanCapped", "Mean, rule 2", "x"),
       ],
       mixRows,
     ),
@@ -133,70 +131,68 @@ export function buildDiversification(p: Params, d: Derived): ScenarioView {
     x: { field: "share", format: "pct", domain: [0, 1] },
     y: { field: "ruinFull", label: "P(ruin) per season", format: "pct" },
     series: [
-      { field: "ruinFull", color: "a", label: "Whole tranche on a lone name" },
-      { field: "ruinCapped", color: "c", label: `Capped at 1/${k} per name` },
+      { field: "ruinFull", color: "ramp1", label: "Rule 1: whole tranche on the lone name" },
+      { field: "ruinCapped", color: "ramp3", label: `Rule 2: capped at 1/${k} per name` },
     ],
     height: 260,
     annotations: [{ kind: "vline", x: p.singleNameShare, text: `your mix ${pct(p.singleNameShare)}`, color: "ink", at: "end" }],
     stories: [
       { id: "logy", label: "Log ruin axis", patch: { y: { scale: "log", domain: [1e-5, 1] } } },
-      { id: "means", label: "Show the means instead", patch: { hiddenSeries: ["ruinFull", "ruinCapped"], extraSeries: [{ field: "meanFull", color: "a" }, { field: "meanCapped", color: "c" }], y: { label: "Mean season end", scale: "linear", domain: [0.9, 1.2] } } },
+      {
+        id: "means",
+        label: "Show the means instead",
+        narrative: "The idle capacity on single-name nights costs a little mean.",
+        patch: { hiddenSeries: ["ruinFull", "ruinCapped"], extraSeries: [{ field: "meanFull", color: "ramp1" }, { field: "meanCapped", color: "ramp3" }], y: { label: "Mean season end", scale: "linear", domain: [0.9, 1.2] } },
+      },
     ],
   };
 
-  const policyTbl: ChartSpec = {
+  const policyTbl = tableSpec({
     id: "div-table",
     title: "One season under each policy",
-    kind: "table",
     data: table(
-      [f("policy", "Policy"), f("mean", "Mean", "x"), f("median", "Median", "x"), f("pBelow", `P(below ${p.thresholdBelow.toFixed(2)}×)`, "pct1"), f("pRuin", "P(ruin)", "pct3"), f("pMax", "Clean season", "pct1"), f("growth", "Log growth per season", "pct1")],
+      [f("policy", "Policy"), f("mean", "Mean", "x"), f("median", "Median", "x"), f("pBelow", `P(below ${p.thresholdBelow.toFixed(2)}×)`, "pct1"), f("pRuin", "P(ruin)", "pct3"), f("pMax", "Clean season", "pct1"), f("growth", "Growth per season, surviving paths", "pct1")],
       ids.map((id) => {
         const s = d.season[id].summary;
         const pol = d.byId[id].policy;
         return { policy: d.byId[id].label, mean: s.mean, median: s.median, pBelow: s.pBelow, pRuin: s.pRuin, pMax: s.pMax, growth: seasonLogGrowth(pol.riskPerName * pol.names, pol.names, pol.lossRate, pol.gain, p.nights, pol.sharedOutcome) };
       }),
     ),
-    mark: "line",
-    x: { field: "policy" },
-    y: { field: "mean" },
-    series: [],
     columns: [{ field: "policy", emphasize: true }, { field: "mean" }, { field: "median" }, { field: "pBelow" }, { field: "pRuin", color: "loss" }, { field: "pMax" }, { field: "growth" }],
-  };
+    caption: "Growth is E[log end | the tranche survives]; read it together with the ruin column. For the coin, the survivors compound at the full clean rate while 45% of replays are gone.",
+  });
 
   const mixRow = mixRows.reduce((best, r) => (Math.abs((r.share as number) - p.singleNameShare) < Math.abs((best.share as number) - p.singleNameShare) ? r : best), mixRows[0]);
-  const mixTbl: ChartSpec = {
+  const mixTbl = tableSpec({
     id: "div-mix-table",
     title: "Mixing single-name nights in",
-    kind: "table",
     data: table(
-      [f("share", "Single-name nights", "pct"), f("ruinFull", "Ruin, whole tranche", "pct2"), f("meanFull", "Mean, whole tranche", "x"), f("ruinCapped", "Ruin, capped", "pct3"), f("meanCapped", "Mean, capped", "x")],
+      [f("share", "Single-name nights", "pct"), f("ruinFull", "Ruin, rule 1", "pct2"), f("meanFull", "Mean, rule 1", "x"), f("ruinCapped", "Ruin, rule 2", "pct3"), f("meanCapped", "Mean, rule 2", "x")],
       mixRows.filter((r) => Math.round((r.share as number) * 100) % 25 === 0 || r === mixRow),
     ),
-    mark: "line",
-    x: { field: "share" },
-    y: { field: "ruinFull" },
-    series: [],
     columns: [{ field: "share", emphasize: true }, { field: "ruinFull", color: "loss" }, { field: "meanFull" }, { field: "ruinCapped" }, { field: "meanCapped" }],
     highlightRow: { field: "share", value: mixRow.share },
     caption: "The idle capacity on single-name nights costs a little mean. That is the price of removing the coin flip.",
-  };
+  });
+
+  const growthB = seasonLogGrowth(1, k, p.lossRate, p.gain, p.nights, p.sharedOutcome);
+  const ruinB = seasonRuin(1, k, p.lossRate, p.gain, p.nights, p.sharedOutcome);
+  const degenerate = d.degenerate.singleName ? " With one name per night the diversified policy is the coin; raise names per night in the deck to open the gap." : "";
 
   return {
     id: "diversification",
     number: 5,
     eyebrow: "The free lunch",
-    title: "Three names on one night: the mean stays, the shape changes",
+    title: `${k === 1 ? "More" : k} names on one night: the mean stays, the shape changes`,
     question: `Is a season of ${p.nights} nights with ${k} names each the same bet as ${p.nights} spins of one all-in name?`,
-    lede: `No. Diversification leaves the expected outcome unchanged and changes everything else. The binary is gone, but the median paid for it: with ${k} names the clean season drops from ${pct(
-      d.pClean,
-    )} to ${pct1(B.pMax)}, the typical season ends with one or two partial hits, and ruin falls from ${pct(A.pRuin)} to ${smallPct(
-      B.pRuin,
-    )}. It does not make the typical season better. It makes the bad one survivable, which is what lets you replay the tranche.`,
+    lede: `No. Diversification leaves the expected outcome unchanged and changes everything else: with ${k} names the clean season drops from ${pct(d.pClean)} to ${pct1(
+      B.pMax,
+    )}, the typical season carries one or two partial hits, and ruin falls from ${pct(A.pRuin)} to ${smallPct(B.pRuin)}. It does not make the typical season better; it makes the bad one survivable, which is what lets you replay the tranche.${degenerate}`,
     kpis: [
-      { label: "Ruin, coin", value: pct(A.pRuin), sub: d.byId.A.label, color: "a" },
-      { label: "Ruin, diversified", value: smallPct(B.pRuin), sub: d.byId.B.label, color: "b" },
+      { label: "Ruin, coin → diversified", value: `${pct(A.pRuin)} → ${smallPct(B.pRuin)}`, sub: "one season", color: "b" },
       { label: "Median, coin → diversified", value: `${x2(A.median)} → ${x2(B.median)}`, sub: "mean unchanged" },
-      { label: "Log growth per season", value: signedPct1(seasonLogGrowth(1, k, p.lossRate, p.gain, p.nights, p.sharedOutcome)), sub: "whole tranche over k names", help: "Expected log of the season end, the rate the median compounds at. Ruin excluded." },
+      { label: "Growth per season, surviving paths", value: signedPct1(growthB), sub: `whole tranche over ${k} names · ruin ${smallPct(ruinB)}`, help: "Expected log of the season end given the tranche survives, the rate the median compounds at. Always read next to the ruin probability." },
+      { label: "Clean seasons, diversified", value: pct1(B.pMax), sub: `${k * p.nights} name-events must all win` },
     ],
     primary: [shape],
     secondary: [fan("A", 101), fan("B", 202), mix],

@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useStore } from "../state/store";
-import type { Note, ScenarioView } from "../viewmodel/types";
+import type { Action, KPI, Note, ScenarioView } from "../viewmodel/types";
 import { ChartHost } from "./ChartHost";
 import { Help } from "./Help";
 import { ParamInput } from "./ParamInput";
@@ -38,8 +39,57 @@ function Notes({ notes }: { notes: Note[] }) {
   );
 }
 
-export function Section({ view }: { view: ScenarioView }) {
+export function KpiTile({ k }: { k: KPI }) {
+  return (
+    <div className={`kpi${k.color ? ` role-${k.color}` : ""}`}>
+      <div className="l">
+        <span>{k.label}</span>
+        <Help text={k.help} />
+      </div>
+      <div className="v" title={k.value}>
+        {k.value}
+      </div>
+      {k.sub && <div className="s">{k.sub}</div>}
+    </div>
+  );
+}
+
+function ActionButton({ a }: { a: Action }) {
   const setParams = useStore((s) => s.setParams);
+  const [confirm, setConfirm] = useState(false);
+  if (a.warning && confirm) {
+    return (
+      <span className="actions" style={{ gap: 8 }}>
+        <span className="warn">{a.warning}</span>
+        <button
+          type="button"
+          className="btn small"
+          onClick={() => {
+            setParams(a.patch);
+            setConfirm(false);
+          }}
+        >
+          Do it anyway
+        </button>
+        <button type="button" className="btn small quiet" onClick={() => setConfirm(false)}>
+          Keep the deck
+        </button>
+      </span>
+    );
+  }
+  return (
+    <span className="actions" style={{ gap: 8 }}>
+      <button type="button" className="btn" onClick={() => (a.warning ? setConfirm(true) : setParams(a.patch))} title={a.hint}>
+        {a.label}
+      </button>
+      {a.hint && <span className="hint">{a.hint}</span>}
+    </span>
+  );
+}
+
+export function Section({ view }: { view: ScenarioView }) {
+  const head = view.kpis.slice(0, 2);
+  const more = view.kpis.slice(2);
   return (
     <section className="section" id={`s-${view.id}`} aria-labelledby={`h-${view.id}`}>
       <div className="section-head">
@@ -52,20 +102,23 @@ export function Section({ view }: { view: ScenarioView }) {
         <p className="lede">{view.lede}</p>
       </div>
 
-      {view.kpis.length > 0 && (
-        <div className="kpis">
-          {view.kpis.map((k) => (
-            <div key={k.label} className={`kpi${k.color ? ` role-${k.color}` : ""}`}>
-              <div className="l">
-                <span>{k.label}</span>
-                <Help text={k.help} />
+      {head.length > 0 && (
+        <div className="kpi-row">
+          <div className="kpis">
+            {head.map((k) => (
+              <KpiTile key={k.label} k={k} />
+            ))}
+          </div>
+          {more.length > 0 && (
+            <details className="kpi-more">
+              <summary>{more.length} more figure{more.length === 1 ? "" : "s"}</summary>
+              <div className="kpis">
+                {more.map((k) => (
+                  <KpiTile key={k.label} k={k} />
+                ))}
               </div>
-              <div className="v" title={k.value}>
-                {k.value}
-              </div>
-              {k.sub && <div className="s">{k.sub}</div>}
-            </div>
-          ))}
+            </details>
+          )}
         </div>
       )}
 
@@ -86,17 +139,14 @@ export function Section({ view }: { view: ScenarioView }) {
       {view.actions && view.actions.length > 0 && (
         <div className="actions">
           {view.actions.map((a) => (
-            <button key={a.label} type="button" className="btn primary" onClick={() => setParams(a.patch)} title={a.hint}>
-              {a.label}
-            </button>
+            <ActionButton key={a.label} a={a} />
           ))}
-          {view.actions[0]?.hint && <span className="hint">{view.actions[0].hint}</span>}
         </div>
       )}
 
       <div className="section-tail">
         {view.localParams.length > 0 && (
-          <details className="expander" open>
+          <details className="expander">
             <summary>Tune this section</summary>
             <div className="params-compact">
               {view.localParams.map((k) => (

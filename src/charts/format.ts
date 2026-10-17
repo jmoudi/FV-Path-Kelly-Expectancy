@@ -28,6 +28,22 @@ export function formatNumber(v: number | string | null | undefined, fmt: NumberF
   }
 }
 
+/** Drop trailing zeros after the decimal point ("1.50" -> "1.5", "2.00" -> "2"). */
+function trim(s: string): string {
+  return s.includes(".") ? s.replace(/\.?0+$/, "") : s;
+}
+
+/** Shortest exact decimal for a tick value, at most `maxDecimals` places. */
+function shortest(v: number, maxDecimals: number): string {
+  const a = Math.abs(v);
+  if (a === 0) return "0";
+  for (let d = 0; d <= maxDecimals; d++) {
+    const s = v.toFixed(d);
+    if (Math.abs(Number(s) - v) < 1e-9 * Math.max(1, a)) return trim(s);
+  }
+  return trim(v.toFixed(maxDecimals));
+}
+
 export function autoFormat(v: number): string {
   const a = Math.abs(v);
   if (a === 0) return "0";
@@ -41,21 +57,35 @@ export function autoFormat(v: number): string {
   return v.toExponential(1);
 }
 
-/** Compact percent for axis ticks: 3.4% or 0.05% depending on magnitude. */
+/** Tick label for a percentage: the shortest exact form, so 0.3%, 1.2%, 2.94%, 0.001%. */
 export function tickPercent(v: number): string {
   const p = v * 100;
   const a = Math.abs(p);
   if (a === 0) return "0%";
-  if (a >= 10) return `${p.toFixed(0)}%`;
-  if (a >= 1) return `${p.toFixed(1)}%`;
-  if (a >= 0.1) return `${p.toFixed(2)}%`;
-  if (a >= 0.001) return `${p.toFixed(3)}%`;
-  return `${p.toExponential(0)}%`;
+  if (a >= 1e5) return `${p.toExponential(0)}%`;
+  if (a < 1e-4) return `${p.toExponential(0)}%`;
+  return `${shortest(p, 5)}%`;
+}
+
+/** Tick label for a multiple: 0.5×, 1×, 1.5×, 2×. Negative multiples make no sense and stay blank. */
+export function tickMultiple(v: number): string {
+  if (v < 0) return "";
+  const a = Math.abs(v);
+  if (a >= 1000) return `${Math.round(v).toLocaleString("en-US")}×`;
+  return `${shortest(v, a < 0.1 ? 4 : 3)}×`;
+}
+
+export function tickPlain(v: number): string {
+  const a = Math.abs(v);
+  if (a >= 1e6) return v.toExponential(0);
+  if (a >= 1000) return Math.round(v).toLocaleString("en-US");
+  return shortest(v, a < 0.01 ? 5 : 3);
 }
 
 export function tickFormatter(fmt?: NumberFormat): (v: number) => string {
-  if (!fmt || fmt === "auto" || fmt === "num") return autoFormat;
+  if (!fmt || fmt === "auto" || fmt === "num" || fmt === "x2") return tickPlain;
   if (fmt.startsWith("pct")) return tickPercent;
-  if (fmt === "x") return (v) => (v < 0 ? "" : `${autoFormat(v)}×`);
+  if (fmt === "x") return tickMultiple;
+  if (fmt === "int") return (v) => Math.round(v).toLocaleString("en-US");
   return (v) => formatNumber(v, fmt);
 }

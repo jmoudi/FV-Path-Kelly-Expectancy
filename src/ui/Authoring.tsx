@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BACKEND_INFO } from "../charts/registry";
-import { numericFields, toCsv, type BackendId, type ChartSpec, type Emphasis, type MarkType, type ScaleType, type SpecOverride } from "../charts/spec";
+import { fieldFormat, numericFields, toCsv, type BackendId, type ChartSpec, type Emphasis, type MarkType, type NumberFormat, type ScaleType, type SpecOverride } from "../charts/spec";
 import { roleColor } from "../charts/theme";
 import { useStore } from "../state/store";
 import { copyText, saveText } from "./download";
@@ -16,6 +16,13 @@ interface Props {
   onClose: () => void;
 }
 
+/** Domain inputs speak the axis's own units: percent fields take percents. */
+function unitScale(fmt?: NumberFormat): { mul: number; suffix: string } {
+  if (fmt && fmt.startsWith("pct")) return { mul: 100, suffix: "%" };
+  if (fmt === "x") return { mul: 1, suffix: "×" };
+  return { mul: 1, suffix: "" };
+}
+
 /**
  * The in-GUI authoring layer. It edits the renderer-agnostic spec (axes, marks,
  * series, backend) and stores only the diff, so the base spec stays swappable.
@@ -25,11 +32,13 @@ export function Authoring({ base, spec, override, onClose }: Props) {
   const clearOverride = useStore((s) => s.clearOverride);
   const defaultBackend = useStore((s) => s.defaultBackend);
   const [flash, setFlash] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
+    rootRef.current?.querySelector<HTMLElement>("button, select, input")?.focus();
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   const patch = (p: SpecOverride) => setOverride(base.id, p);
@@ -42,27 +51,33 @@ export function Authoring({ base, spec, override, onClose }: Props) {
   const hidden = new Set(override?.hiddenSeries ?? []);
   const manySeries = base.series.length > 8;
   const addable = fields.filter((f) => !base.series.some((s) => s.field === f.name) && f.name !== base.x.field && !(override?.extraSeries ?? []).some((e) => e.field === f.name));
+
   const domainInput = (axis: "x" | "y", idx: 0 | 1) => {
+    const fmt = spec[axis].format ?? fieldFormat(spec.data, spec[axis].field);
+    const { mul, suffix } = unitScale(fmt);
     const cur = spec[axis].domain?.[idx];
     return (
-      <input
-        type="number"
-        step="any"
-        placeholder="auto"
-        value={cur ?? ""}
-        onChange={(e) => {
-          const v = e.target.value === "" ? null : Number(e.target.value);
-          const d: [number | null, number | null] = [spec[axis].domain?.[0] ?? null, spec[axis].domain?.[1] ?? null];
-          d[idx] = Number.isFinite(v as number) ? v : null;
-          patch({ [axis]: { ...(override?.[axis] ?? {}), domain: d } });
-        }}
-        aria-label={`${axis} ${idx === 0 ? "min" : "max"}`}
-      />
+      <span className="row" style={{ gap: 4 }}>
+        <input
+          type="number"
+          step="any"
+          placeholder="auto"
+          value={cur == null ? "" : Number((cur * mul).toPrecision(6))}
+          onChange={(e) => {
+            const raw = e.target.value === "" ? null : Number(e.target.value) / mul;
+            const d: [number | null, number | null] = [spec[axis].domain?.[0] ?? null, spec[axis].domain?.[1] ?? null];
+            d[idx] = raw != null && Number.isFinite(raw) ? raw : null;
+            patch({ [axis]: { ...(override?.[axis] ?? {}), domain: d } });
+          }}
+          aria-label={`${axis} ${idx === 0 ? "min" : "max"}`}
+        />
+        {suffix && <span style={{ color: "var(--muted)" }}>{suffix}</span>}
+      </span>
     );
   };
 
   return (
-    <div className="authoring" role="dialog" aria-label={`Chart definition: ${base.title}`}>
+    <div className="authoring" role="group" aria-label={`Chart definition: ${base.title}`} ref={rootRef}>
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h5>Chart definition</h5>
         <button type="button" className="btn small quiet" onClick={onClose}>
@@ -70,32 +85,19 @@ export function Authoring({ base, spec, override, onClose }: Props) {
         </button>
       </div>
 
-      {base.stories && base.stories.length > 0 && (
+      <div className="authoring-grid">
         <div>
-          <h5>Stories</h5>
-          <div className="stories" style={{ marginTop: 6 }}>
-            {base.stories.map((st) => (
-              <button key={st.id} type="button" className="btn small" onClick={() => patch(st.patch)}>
-                {st.label}
+          <h5>Backend</h5>
+          <div className="seg" style={{ marginTop: 6 }}>
+            {BACKENDS.filter((b) => base.kind !== "table" || b === "table").map((b) => (
+              <button key={b} type="button" className={activeBackend === b ? "on" : undefined} onClick={() => patch({ backend: b })} title={BACKEND_INFO[b].blurb}>
+                {BACKEND_INFO[b].label}
               </button>
             ))}
           </div>
         </div>
-      )}
 
-      <div>
-        <h5>Backend</h5>
-        <div className="seg" style={{ marginTop: 6 }}>
-          {BACKENDS.filter((b) => base.kind !== "table" || b === "table").map((b) => (
-            <button key={b} type="button" className={activeBackend === b ? "on" : undefined} onClick={() => patch({ backend: b })} title={BACKEND_INFO[b].blurb}>
-              {BACKEND_INFO[b].label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {base.kind === "xy" && (
-        <>
+        {base.kind === "xy" && (
           <div>
             <h5>Mark</h5>
             <div className="seg" style={{ marginTop: 6 }}>
@@ -106,13 +108,15 @@ export function Authoring({ base, spec, override, onClose }: Props) {
               ))}
             </div>
           </div>
+        )}
 
-          {(["x", "y"] as const).map((axis) => (
+        {base.kind === "xy" &&
+          (["x", "y"] as const).map((axis) => (
             <div key={axis}>
               <h5>{axis.toUpperCase()} axis</h5>
               <div className="row" style={{ marginTop: 6 }}>
                 <label htmlFor={`${base.id}-${axis}-scale`}>scale</label>
-                <div className="seg">
+                <div className="seg" id={`${base.id}-${axis}-scale`}>
                   {(["linear", "log"] as ScaleType[]).map((s) => (
                     <button key={s} type="button" className={(spec[axis].scale ?? "linear") === s ? "on" : undefined} onClick={() => patch({ [axis]: { ...(override?.[axis] ?? {}), scale: s } })}>
                       {s}
@@ -129,7 +133,7 @@ export function Authoring({ base, spec, override, onClose }: Props) {
               {axis === "x" && !base.x.categorical && fields.length > 1 && (
                 <div className="row" style={{ marginTop: 6 }}>
                   <label htmlFor={`${base.id}-xfield`}>field</label>
-                  <select id={`${base.id}-xfield`} value={spec.x.field} onChange={(e) => patch({ x: { ...(override?.x ?? {}), field: e.target.value, label: undefined } })}>
+                  <select id={`${base.id}-xfield`} value={spec.x.field} onChange={(e) => patch({ x: { ...(override?.x ?? {}), field: e.target.value } })}>
                     {fields.map((f) => (
                       <option key={f.name} value={f.name}>
                         {f.label}
@@ -141,10 +145,11 @@ export function Authoring({ base, spec, override, onClose }: Props) {
             </div>
           ))}
 
+        {base.kind === "xy" && (
           <div>
             <h5>Series</h5>
             {manySeries ? (
-              <p style={{ margin: "6px 0 0", color: "var(--muted)" }}>{base.series.length} sampled paths. Change the count in Settings → Paths in fan charts.</p>
+              <p style={{ margin: "6px 0 0", color: "var(--muted)" }}>{base.series.length} sampled paths. Change the count under Settings → Paths in fan charts.</p>
             ) : (
               <div className="series-list" style={{ marginTop: 6 }}>
                 {base.series.map((s) => {
@@ -167,13 +172,23 @@ export function Authoring({ base, spec, override, onClose }: Props) {
                         <span className="swatch" style={{ background: roleColor(s.color) }} />
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
                       </span>
-                      <select value={emph} onChange={(e) => patch({ seriesEmphasis: { ...(override?.seriesEmphasis ?? {}), [s.field]: e.target.value as Emphasis } })} aria-label={`${label} emphasis`}>
-                        {EMPH.map((e) => (
-                          <option key={e} value={e}>
-                            {e}
-                          </option>
-                        ))}
-                      </select>
+                      <span className="row" style={{ gap: 4 }}>
+                        <select value={override?.seriesMark?.[s.field] ?? s.mark ?? ""} onChange={(e) => patch({ seriesMark: { ...(override?.seriesMark ?? {}), [s.field]: (e.target.value || spec.mark) as MarkType } })} aria-label={`${label} mark`}>
+                          <option value="">chart mark</option>
+                          {MARKS.map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                        <select value={emph} onChange={(e) => patch({ seriesEmphasis: { ...(override?.seriesEmphasis ?? {}), [s.field]: e.target.value as Emphasis } })} aria-label={`${label} emphasis`}>
+                          {EMPH.map((e) => (
+                            <option key={e} value={e}>
+                              {e}
+                            </option>
+                          ))}
+                        </select>
+                      </span>
                     </div>
                   );
                 })}
@@ -211,20 +226,37 @@ export function Authoring({ base, spec, override, onClose }: Props) {
                 )}
               </div>
             )}
+            <div className="row" style={{ marginTop: 8 }}>
+              <label>
+                <input type="checkbox" checked={!override?.hideAnnotations} onChange={(e) => patch({ hideAnnotations: !e.target.checked })} /> reference lines and labels
+              </label>
+              <label>
+                <input type="checkbox" checked={spec.legend !== false} onChange={(e) => patch({ legend: e.target.checked })} /> legend
+              </label>
+            </div>
           </div>
+        )}
 
-          <div className="row">
-            <label>
-              <input type="checkbox" checked={!override?.hideAnnotations} onChange={(e) => patch({ hideAnnotations: !e.target.checked })} /> reference lines and labels
-            </label>
+        <div>
+          <h5>Size</h5>
+          <div className="row" style={{ marginTop: 6 }}>
+            <label htmlFor={`${base.id}-h`}>height</label>
+            <input
+              id={`${base.id}-h`}
+              type="number"
+              min={120}
+              max={800}
+              step={10}
+              defaultValue={spec.height ?? 300}
+              onBlur={(e) => {
+                const v = Number(e.target.value);
+                if (Number.isFinite(v) && v >= 120 && v <= 800) patch({ height: v });
+                else e.target.value = String(spec.height ?? 300);
+              }}
+            />
+            <span style={{ color: "var(--muted)" }}>px</span>
           </div>
-        </>
-      )}
-
-      <div className="row">
-        <label htmlFor={`${base.id}-h`}>height</label>
-        <input id={`${base.id}-h`} type="number" min={120} max={800} step={10} value={spec.height ?? 300} onChange={(e) => patch({ height: Number(e.target.value) })} />
-        <span style={{ color: "var(--muted)" }}>px</span>
+        </div>
       </div>
 
       <div className="foot">

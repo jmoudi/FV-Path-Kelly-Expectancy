@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { lossRateFromPClean } from "../model/binary";
-import { seasonLogGrowth } from "../model/kelly";
 import { PARAM_DEFS } from "../model/params";
 import { useStore } from "../state/store";
-import { pct, pct1, signedPct1, smallPct, x2, type Derived } from "../viewmodel/derived";
+import { pct, pct1, signedPct1, smallPct, x2, type DeckView } from "../viewmodel/derived";
 import { Help } from "./Help";
 import { ParamInput } from "./ParamInput";
+import { KpiTile } from "./Section";
 
 /** Editing P(clean season) back-solves the per-name loss rate. */
 function LinkedPClean({ pClean }: { pClean: number }) {
@@ -24,6 +24,7 @@ function LinkedPClean({ pClean }: { pClean: number }) {
         value={`${text}%`}
         onChange={(e) => setText(e.target.value.replace(/%/g, ""))}
         onBlur={() => {
+          if (text === (pClean * 100).toFixed(1)) return;
           const v = Number(text) / 100;
           if (Number.isFinite(v) && v > 0 && v < 1) setParam("lossRate", lossRateFromPClean(v, nights));
           else setText((pClean * 100).toFixed(1));
@@ -36,12 +37,10 @@ function LinkedPClean({ pClean }: { pClean: number }) {
   );
 }
 
-export function ControlDeck({ derived }: { derived: Derived }) {
+export function ControlDeck({ deck, pending }: { deck: DeckView | null; pending: boolean }) {
   const params = useStore((s) => s.params);
   const primary = PARAM_DEFS.filter((d) => d.tier === "primary");
-  const growthC = seasonLogGrowth(params.riskPerNight, params.names, params.lossRate, params.gain, params.nights, params.sharedOutcome);
-  const C = derived.chained.C.summary;
-  const B = derived.season.B.summary;
+  const pClean = deck?.pClean ?? Math.pow(1 - params.lossRate, params.nights);
   return (
     <div className="deck" id="deck">
       <div className="deck-head">
@@ -52,65 +51,23 @@ export function ControlDeck({ derived }: { derived: Derived }) {
         {primary.map((d) => (
           <div key={d.key} style={{ display: "grid", gap: 4 }}>
             <ParamInput k={d.key} />
-            {d.key === "lossRate" && <LinkedPClean pClean={derived.pClean} />}
+            {d.key === "lossRate" && <LinkedPClean pClean={pClean} />}
           </div>
         ))}
       </div>
-      <div className="kpis">
-        <div className="kpi role-a">
-          <div className="l">
-            <span>Clean season</span>
-            <Help text="Probability that a single all-in name survives the whole season. The one number the coin reduces to." />
-          </div>
-          <div className="v">{pct(derived.pClean)}</div>
-          <div className="s">1 name, whole tranche</div>
-        </div>
-        <div className="kpi">
-          <div className="l">
-            <span>Mean season</span>
-            <Help text="Expected season end in tranche units. The same for the coin and for the diversified tranche." />
-          </div>
-          <div className="v">{x2(derived.meanSeason)}</div>
-          <div className="s">≈ 2p − 1 = {signedPct1(2 * derived.pClean - 1)}</div>
-        </div>
-        <div className="kpi role-b">
-          <div className="l">
-            <span>Median, diversified</span>
-            <Help text="Typical season end with the names split over the whole tranche. Where the free lunch is paid for." />
-          </div>
-          <div className="v">{x2(B.median)}</div>
-          <div className="s">
-            {params.names} names, all-in · ruin {smallPct(B.pRuin)}
-          </div>
-        </div>
-        <div className="kpi role-c">
-          <div className="l">
-            <span>Kelly per name</span>
-            <Help text="Growth-optimal fraction of the tranche per name: p − q/b at the deck's loss rate." />
-          </div>
-          <div className="v">{pct1(derived.kelly)}</div>
-          <div className="s">you risk {pct1(params.riskPerNight / params.names)} per name</div>
-        </div>
-        <div className="kpi role-c">
-          <div className="l">
-            <span>Growth per season</span>
-            <Help text="Expected log of the season end under your policy, ruin excluded. The rate the median compounds at." />
-          </div>
-          <div className="v">{signedPct1(growthC)}</div>
-          <div className="s">
-            {params.names} names, {pct(params.riskPerNight)} at risk
-          </div>
-        </div>
-        <div className="kpi role-c">
-          <div className="l">
-            <span>Median after {params.seasons} seasons</span>
-            <Help text="Where the typical path of your policy stands after the seasons chained in the deck." />
-          </div>
-          <div className="v">{x2(C.median)}</div>
-          <div className="s">
-            P(below {params.thresholdBelow.toFixed(2)}×) {pct(C.pBelow)}
-          </div>
-        </div>
+      <div className="kpis deck-kpis" style={{ opacity: pending ? 0.7 : 1 }}>
+        {deck ? (
+          <>
+            <KpiTile k={{ label: "Clean season", value: pct(deck.pClean), sub: "1 name, whole tranche", color: "a", help: "Probability that a single all-in name survives the whole season. The one number the coin reduces to." }} />
+            <KpiTile k={{ label: "Edge per season", value: signedPct1(deck.meanSeason - 1), sub: `mean ${x2(deck.meanSeason)} · ≈ 2p − 1`, help: "Mean season end minus one. The same for the coin and for the diversified tranche." }} />
+            <KpiTile k={{ label: "Median, diversified", value: x2(deck.seasonB.median), sub: `${params.names} name${params.names === 1 ? "" : "s"}, all-in · ruin ${smallPct(deck.seasonB.pRuin)}`, color: "b", help: "Typical season end with the names split over the whole tranche. Where the free lunch is paid for." }} />
+            <KpiTile k={{ label: "Robust risk per night", value: pct(deck.robust.risk), sub: `you risk ${pct(params.riskPerNight)} · Kelly ${pct1(deck.kelly)} per name`, color: "c", help: `The risk per night that maximises growth averaged over a loss rate drawn ${deck.bandLabel}. Section 8 derives it.` }} />
+            <KpiTile k={{ label: "Growth per season", value: signedPct1(deck.growthC), sub: `${pct(params.riskPerNight)} at risk · ruin ${smallPct(deck.ruinC)}`, color: "c", help: "Expected log of the season end under your policy, conditional on surviving. The rate the median compounds at." }} />
+            <KpiTile k={{ label: `Median after ${params.seasons} season${params.seasons === 1 ? "" : "s"}`, value: x2(deck.chainedC.median), sub: `P(below ${params.thresholdBelow.toFixed(2)}×) ${pct(deck.chainedC.pBelow)}`, color: "c", help: "Where the typical path of your policy stands after the seasons chained in the deck." }} />
+          </>
+        ) : (
+          <div className="caption">Computing…</div>
+        )}
       </div>
     </div>
   );

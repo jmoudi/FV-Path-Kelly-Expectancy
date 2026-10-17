@@ -1,12 +1,16 @@
-import { f, table, type ChartSpec, type Row } from "../../charts/spec";
+import { f, table, tableSpec, type ChartSpec, type Row } from "../../charts/spec";
 import { crossoverSharedOutcome, jointLossProb, ruinPerSeason, ruinWithShock, shockedLossRate } from "../../model/correlation";
-import type { Params } from "../../model/params";
+import type { Datasets, Params } from "../../model/params";
 import { linspace, logspace } from "../../model/stats";
 import { pct, pct1, pct2, smallPct, type Derived } from "../derived";
 import type { ScenarioView } from "../types";
 
-export function buildCorrelation(p: Params, _d: Derived): ScenarioView {
-  const k = Math.max(1, Math.round(p.names));
+function power(k: number): string {
+  return k === 1 ? "" : k === 2 ? "²" : k === 3 ? "³" : `^${k}`;
+}
+
+export function buildCorrelation(p: Params, d: Derived, _data: Datasets): ScenarioView {
+  const k = d.k;
   const q = p.lossRate;
   const n = p.nights;
   const c = p.sharedOutcome;
@@ -15,17 +19,20 @@ export function buildCorrelation(p: Params, _d: Derived): ScenarioView {
   const pJoint = jointLossProb(q, k, c);
   const ruinIndep = ruinPerSeason(pIndep, n);
   const ruinJoint = ruinPerSeason(pJoint, n);
+  const single = k === 1;
 
   const cs = logspace(1e-5, 0.3, 120);
   const cRows: Row[] = cs.map((cc) => ({ c: cc, joint: jointLossProb(q, k, cc), ruin: ruinPerSeason(jointLossProb(q, k, cc), n), indep: ruinIndep }));
   const curve: ChartSpec = {
     id: "cor-curve",
     title: "Season ruin against how often the names share a cause",
-    subtitle: `P(all ${k} names lose on one night) ≈ c·q + q^${k}. The correlation term dominates as soon as c exceeds q^${k - 1}.`,
+    subtitle: single
+      ? "With one name per night there is nothing to share: the joint loss is q itself. Raise names per night in the deck."
+      : `P(all ${k} names lose on one night) ≈ c·q + q${power(k)}. The correlation term dominates as soon as c exceeds q${power(k - 1)}.`,
     kind: "xy",
     data: table([f("c", "Share of nights with one shared outcome, c", "pct2"), f("ruin", "Ruin per season", "pct2"), f("indep", "Ruin if independent", "pct3"), f("joint", "Joint loss per night", "pct3")], cRows),
     mark: "line",
-    x: { field: "c", scale: "log", format: "pct2" },
+    x: { field: "c", scale: "log", format: "pct2", domain: [1e-5, 0.3] },
     y: { field: "ruin", scale: "log", format: "pct1", label: "P(ruin) per season" },
     series: [
       { field: "ruin", color: "loss", label: "With shared causes", emphasis: "strong" },
@@ -33,10 +40,13 @@ export function buildCorrelation(p: Params, _d: Derived): ScenarioView {
     ],
     height: 320,
     annotations: [
-      { kind: "vline", x: cross, text: `c = q^${k - 1} = ${smallPct(cross)}: shared cause takes over`, color: "ink", at: "start" },
-      { kind: "point", x: Math.max(c, 1e-5), y: ruinJoint, text: `your c ${pct2(c)}: ruin ${smallPct(ruinJoint)}`, color: "a", at: "end" },
+      ...(single ? [] : [{ kind: "vline" as const, x: cross, text: `c = q${power(k - 1)} = ${smallPct(cross)}: shared cause takes over`, color: "ink" as const, at: "start" as const }]),
+      { kind: "point", x: Math.max(c, 1e-5), y: ruinJoint, text: `your c ${pct2(c)}: ruin ${smallPct(ruinJoint)}`, color: "ink", at: "end" },
     ],
-    stories: [{ id: "linear", label: "Linear axes", patch: { x: { scale: "linear", domain: [0, 0.3] }, y: { scale: "linear" } } }],
+    stories: [
+      { id: "linear", label: "Linear axes", patch: { x: { scale: "linear", domain: [0, 0.3] }, y: { scale: "linear" } } },
+      { id: "two", label: "What if 2% of evenings share a cause?", narrative: "Two memory names reporting the same evening is already more than that.", params: { sharedOutcome: 0.02 } },
+    ],
   };
 
   const steps = [0, 0.02, 0.05, 0.2];
@@ -63,20 +73,18 @@ export function buildCorrelation(p: Params, _d: Derived): ScenarioView {
   const convexity: ChartSpec = {
     id: "cor-shock",
     title: "Shared volatility is convex",
-    subtitle: `If realized moves run above what every chain priced, the per-name loss rate rises by a factor m and the all-${k}-names loss by m^${k}.`,
+    subtitle: `If realized moves run above what every chain priced, the per-name loss rate rises by a factor m and the all-${k}-names loss by m${power(k)}.`,
     kind: "xy",
     data: table([f("scale", "Realized ÷ priced sigma", "x2"), f("single", "Per-name loss rate multiplier", "x2"), f("joint", `All ${k} names at once`, "num")], shockRows),
     mark: "line",
-    x: { field: "scale", format: "x2" },
+    x: { field: "scale", format: "x2", domain: [1, 2.5] },
     y: { field: "single", scale: "log", label: "Multiplier on the loss rate", format: "num" },
     series: [
       { field: "single", color: "ramp2", label: "One name" },
       { field: "joint", color: "loss", label: `All ${k} names at once` },
     ],
     height: 260,
-    annotations: [
-      { kind: "vline", x: p.volShock, text: `your shock ${p.volShock.toFixed(2)}×: ${mNow.toFixed(1)}× and ${Math.pow(mNow, k).toFixed(0)}×`, color: "ink", at: "start" },
-    ],
+    annotations: [{ kind: "vline", x: p.volShock, text: `your shock ${p.volShock.toFixed(2)}×: ${mNow.toFixed(1)}× and ${Math.pow(mNow, k).toFixed(0)}×`, color: "ink", at: "start" }],
   };
 
   const sharesList = linspace(0, 1, 21);
@@ -95,10 +103,9 @@ export function buildCorrelation(p: Params, _d: Derived): ScenarioView {
     annotations: [{ kind: "vline", x: p.volShockShare, text: `your share ${pct(p.volShockShare)}`, color: "ink", at: "end" }],
   };
 
-  const tbl: ChartSpec = {
+  const tbl = tableSpec({
     id: "cor-table",
     title: "Shared causes, shared volatility, and ruin per season",
-    kind: "table",
     data: table(
       [f("case", "Case"), f("perNight", "Joint loss per night", "pct3"), f("ruin", "Ruin per season", "pct2")],
       [
@@ -112,28 +119,28 @@ export function buildCorrelation(p: Params, _d: Derived): ScenarioView {
         },
       ],
     ),
-    mark: "line",
-    x: { field: "case" },
-    y: { field: "ruin" },
-    series: [],
     columns: [{ field: "case", emphasize: true }, { field: "perNight" }, { field: "ruin", color: "loss" }],
     highlightRow: { field: "case", value: `Your c = ${pct2(c)}` },
-  };
+  });
 
   return {
     id: "correlation",
     number: 6,
     eyebrow: "Shared causes",
     title: "A triple loss is rare only if the names are strangers",
-    question: `Three names at max loss on the same night has probability q³ ≈ ${smallPct(Math.pow(q, 3))} if they are independent. How much correlation does it take to swamp that?`,
-    lede: `Very little. If on a fraction c of evenings the names share one outcome, the triple loss is about c·q + q³, and the correlation term wins as soon as c exceeds q² ≈ ${smallPct(
-      cross,
-    )}. So the chance of a joint loss is not set by how rare tails are. It is set by how often the names share a cause. Shared volatility is the same convexity working against you, but at the season level it is milder: shared direction is first-order, shared volatility second-order.`,
+    question: single
+      ? "With one name per night there is no joint loss to speak of. How does the picture change with several?"
+      : `${k} names at max loss on the same night has probability q${power(k)} ≈ ${smallPct(Math.pow(q, k))} if they are independent. How much correlation does it take to swamp that?`,
+    lede: single
+      ? "Shared causes only matter once a night carries several names. Set names per night above one in the deck and this section comes alive: a small share of evenings with a common cause then dominates the independent tail."
+      : `Very little. If on a fraction c of evenings the names share one outcome, the joint loss is about c·q + q${power(k)}, and the correlation term wins as soon as c exceeds q${power(k - 1)} ≈ ${smallPct(
+          cross,
+        )}. The chance of a joint loss is not set by how rare tails are but by how often the names share a cause. Shared volatility is the same convexity, but at the season level it is second-order next to shared direction.`,
     kpis: [
-      { label: "Joint loss per night, independent", value: smallPct(pIndep), sub: `q^${k}` },
-      { label: "Joint loss per night, your c", value: smallPct(pJoint), sub: `c·q + (1 − c)·q^${k}`, color: "loss" },
+      { label: "Joint loss per night", value: `${smallPct(pIndep)} → ${smallPct(pJoint)}`, sub: `independent → your c ${pct2(c)}`, color: "loss" },
       { label: "Ruin per season", value: `${smallPct(ruinIndep)} → ${smallPct(ruinJoint)}`, sub: "independent → your c" },
-      { label: "Crossover c", value: smallPct(cross), sub: `q^${k - 1}`, help: "Above this share of shared-outcome nights the correlation term dominates the independent one." },
+      { label: "Crossover c", value: single ? "—" : smallPct(cross), sub: `q${power(k - 1)}`, help: "Above this share of shared-outcome nights the correlation term dominates the independent one." },
+      { label: "Vol shock multiplier", value: `${mNow.toFixed(1)}× / ${Math.pow(mNow, k).toFixed(0)}×`, sub: `one name / all ${k} at ${p.volShock.toFixed(2)}× sigma` },
     ],
     primary: [curve],
     secondary: [bars, convexity, shareChart],
@@ -146,7 +153,7 @@ export function buildCorrelation(p: Params, _d: Derived): ScenarioView {
       },
       {
         title: "How the shock is modelled",
-        body: "The per-name loss rate q implies a two-sided threshold of z = Φ⁻¹(1 − q/2) priced sigmas. On a shocked night the realized sigma is the shock multiple of the priced one, so the loss rate becomes 2(1 − Φ(z/shock)). Directions stay independent; the share of shocked nights and the multiple are both yours to set.",
+        body: "The per-name loss rate q implies a two-sided threshold of z = Φ⁻¹(1 − q/2) priced sigmas, a condor where either wing can breach. On a shocked night the realized sigma is the shock multiple of the priced one, so the loss rate becomes 2(1 − Φ(z/shock)). Directions stay independent; the share of shocked nights and the multiple are both yours to set.",
       },
     ],
     sourceFigures: [

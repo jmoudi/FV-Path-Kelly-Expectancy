@@ -1,21 +1,23 @@
-import { f, table, type ChartSpec, type Row } from "../../charts/spec";
-import type { Params } from "../../model/params";
+import { f, table, tableSpec, type ChartSpec, type Row } from "../../charts/spec";
+import type { Datasets, Params } from "../../model/params";
 import type { PolicyId } from "../../model/policies";
 import { sampleFromDistribution, weightedQuantile } from "../../model/season";
-import { pct, pct1, x2, type Derived } from "../derived";
+import { methodLabel, pct, pct1, x2, type Derived } from "../derived";
 import type { ScenarioView } from "../types";
 
-export function buildMeanMedian(p: Params, d: Derived): ScenarioView {
+export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): ScenarioView {
   const ids: PolicyId[] = ["A", "B", "C"];
+  const k = d.k;
   const A = d.season.A.summary;
   const B = d.season.B.summary;
   const C = d.season.C.summary;
+  const yTop = Math.ceil(Math.max(d.cleanEnd * 1.05, 1.2) * 4) / 4;
 
-  // Quantile plot: what share of replays end at or below each value.
+  // Quantile function: what share of replays end at or below each value.
   const pcts: number[] = [];
   for (let x = 0; x <= 100; x += 0.5) pcts.push(x);
   const qRows: Row[] = pcts.map((x) => {
-    const r: Row = { pctile: x };
+    const r: Row = { pctile: x / 100 };
     for (const id of ids) r[id] = weightedQuantile(d.season[id].dist.outcomes, Math.min(0.9999, Math.max(0.0001, x / 100)));
     return r;
   });
@@ -24,10 +26,10 @@ export function buildMeanMedian(p: Params, d: Derived): ScenarioView {
     title: "Every replay sorted from worst to best",
     subtitle: "Read the median at the 50% mark. The mean is the average height of the whole curve, which is why it can sit where no replay ends.",
     kind: "xy",
-    data: table([f("pctile", "Share of replays ending at or below", "pct"), ...ids.map((id) => f(id, d.byId[id].label, "x"))], qRows.map((r) => ({ ...r, pctile: (r.pctile as number) / 100 }))),
-    mark: "line",
+    data: table([f("pctile", "Share of replays ending at or below", "pct"), ...ids.map((id) => f(id, d.byId[id].label, "x"))], qRows),
+    mark: "step",
     x: { field: "pctile", format: "pct", domain: [0, 1] },
-    y: { field: "B", label: "Season end, tranche units", format: "x", domain: [0, Math.max(d.cleanEnd * 1.05, 1.2)] },
+    y: { field: "B", label: "Season end, tranche units", format: "x", domain: [0, yTop] },
     series: ids.map((id) => ({ field: id, color: d.byId[id].color, label: d.byId[id].label, emphasis: id === "A" ? "normal" : "strong" })),
     height: 330,
     annotations: [
@@ -36,8 +38,8 @@ export function buildMeanMedian(p: Params, d: Derived): ScenarioView {
       { kind: "hline", y: C.mean, text: `mean of C ${C.mean.toFixed(2)}×`, color: "c", at: "end" },
     ],
     stories: [
-      { id: "onlyAB", label: "Just the coin against the diversified tranche", patch: { hiddenSeries: ["C"] } },
-      { id: "vega", label: "Render in Vega-Lite", patch: { backend: "vega" } },
+      { id: "onlyAB", label: "Just the coin against the diversified tranche", narrative: "Same mean, two very different curves.", patch: { hiddenSeries: ["C"] } },
+      { id: "vega", label: "Render in Vega-Lite", narrative: "The same definition through another backend.", patch: { backend: "vega" } },
     ],
   };
 
@@ -62,60 +64,65 @@ export function buildMeanMedian(p: Params, d: Derived): ScenarioView {
     data: table([f("count", "Tranches pooled", "int"), ...ids.map((id) => f(id, d.byId[id].label, "x"))], runRows),
     mark: "line",
     x: { field: "count", scale: "log", domain: [1, N] },
-    y: { field: "A", label: "Average end of the pool", format: "x", domain: [0, Math.max(d.cleanEnd * 1.05, 1.2)] },
+    y: { field: "A", label: "Average end of the pool", format: "x", domain: [0, yTop] },
     series: ids.map((id) => ({ field: id, color: d.byId[id].color, label: d.byId[id].label })),
     height: 290,
     annotations: [{ kind: "hline", y: A.mean, text: `mean ${A.mean.toFixed(2)}×`, color: "ink", at: "end" }],
-    stories: [{ id: "linear", label: "Linear count axis", patch: { x: { scale: "linear" } } }],
+    stories: [
+      { id: "linear", label: "Linear count axis", patch: { x: { scale: "linear" } } },
+      { id: "seed", label: "Another draw of replays", narrative: "The early wobble differs; the limit does not.", params: { seed: (p.seed % 90_000) + 29 } },
+    ],
   };
 
-  // Histogram of policy B (and C) on linear bins, coarse enough for discrete outcomes.
-  const width = 0.1;
-  const hi = Math.max(1.3, Math.ceil((d.cleanEnd + 0.1) / width) * width);
-  const bins = Math.round(hi / width);
-  const histRows: Row[] = [];
-  const mass = (id: PolicyId) => {
-    const out = new Array<number>(bins).fill(0);
+  // Stems at the exact outcomes of policy B (and C by story): the balance point.
+  const stemRows = new Map<number, Row>();
+  const addStems = (id: PolicyId) => {
     for (const o of d.season[id].dist.outcomes) {
-      let i = Math.floor(o.value / width);
-      if (i >= bins) i = bins - 1;
-      if (i < 0) i = 0;
-      out[i] += o.prob;
+      if (o.prob < 2e-4) continue;
+      const key = Math.round(o.value * 1e6) / 1e6;
+      const r = stemRows.get(key) ?? { end: key, B: null, C: null };
+      r[id] = o.prob;
+      stemRows.set(key, r);
     }
-    return out;
   };
-  const mB = mass("B");
-  const mC = mass("C");
-  for (let i = 0; i < bins; i++) histRows.push({ mid: (i + 0.5) * width, B: mB[i], C: mC[i] });
-  const hist: ChartSpec = {
-    id: "mm-hist",
+  addStems("B");
+  addStems("C");
+  const stems: ChartSpec = {
+    id: "mm-stems",
     title: "The balance point",
-    subtitle: "Probability by season-end bin. Put a fulcrum under the bars and they balance at the mean; half of the mass sits left of the median.",
+    subtitle: `Probability of each exact outcome of ${d.byId.B.label} (${methodLabel(d.season.B.dist.method)}). A fulcrum under the stems balances at the mean; half of the mass sits left of the median.`,
     kind: "xy",
-    data: table([f("mid", "Season end, tranche units", "x"), f("B", d.byId.B.label, "pct1"), f("C", d.byId.C.label, "pct1")], histRows),
+    data: table([f("end", "Season end, tranche units", "x"), f("B", d.byId.B.label, "pct1"), f("C", d.byId.C.label, "pct1")], [...stemRows.values()].sort((a, b) => (a.end as number) - (b.end as number))),
     mark: "bar",
-    x: { field: "mid", format: "x", domain: [0, hi] },
-    y: { field: "B", label: "Probability per bin", format: "pct" },
-    series: [
-      { field: "B", color: "b", label: d.byId.B.label },
-      { field: "C", color: "c", label: d.byId.C.label, emphasis: "muted" },
-    ],
-    barWidthPx: 10,
+    x: { field: "end", format: "x", domain: [0, yTop] },
+    y: { field: "B", label: "Probability of the outcome", format: "pct" },
+    series: [{ field: "B", color: "b", label: d.byId.B.label }],
+    barWidthPx: 3,
     height: 290,
     annotations: [
       { kind: "vline", x: B.mean, text: `mean ${B.mean.toFixed(2)}×`, color: "ink" },
       { kind: "vline", x: B.median, text: `median ${B.median.toFixed(2)}×`, color: "b", dash: false, at: "start" },
     ],
     stories: [
-      { id: "onlyB", label: "Only the diversified tranche", patch: { hiddenSeries: ["C"] } },
-      { id: "outline", label: "Outlines instead of bars", patch: { mark: "step" } },
+      {
+        id: "withC",
+        label: "Add the reserve policy",
+        narrative: "The reserve pulls the stems toward 1× and lifts the median.",
+        patch: {
+          extraSeries: [{ field: "C", color: "c" }],
+          annotations: [
+            { kind: "vline", x: B.median, text: `median B ${B.median.toFixed(2)}×`, color: "b", dash: false, at: "start" },
+            { kind: "vline", x: C.median, text: `median C ${C.median.toFixed(2)}×`, color: "c", dash: false },
+          ],
+        },
+      },
+      { id: "logy", label: "Log probability to see the rare outcomes", patch: { y: { scale: "log", domain: [1e-4, 1] } } },
     ],
   };
 
-  const summaryTbl: ChartSpec = {
+  const summaryTbl = tableSpec({
     id: "mm-table",
     title: "Mean, median and what they measure",
-    kind: "table",
     data: table(
       [f("policy", "Policy"), f("mean", "Mean", "x"), f("median", "Median", "x"), f("atOrAbove", "Replays ending at or above the mean", "pct"), f("pMax", "Clean season", "pct1"), f("pRuin", "Ruin", "pct2")],
       ids.map((id) => {
@@ -123,30 +130,26 @@ export function buildMeanMedian(p: Params, d: Derived): ScenarioView {
         return { policy: d.byId[id].label, mean: s.mean, median: s.median, atOrAbove: s.pAtOrAboveMean, pMax: s.pMax, pRuin: s.pRuin };
       }),
     ),
-    mark: "line",
-    x: { field: "policy" },
-    y: { field: "mean" },
-    series: [],
     columns: [{ field: "policy", emphasize: true }, { field: "mean" }, { field: "median" }, { field: "atOrAbove" }, { field: "pMax" }, { field: "pRuin", color: "loss" }],
-  };
+  });
+
+  const degenerate = d.degenerate.singleName ? " With one name per night the diversified policy is the coin itself; raise names per night in the deck to see the gap open." : "";
 
   return {
     id: "mean-median",
     number: 2,
     eyebrow: "Reading the numbers",
     title: "What “mean” means when no season ends there",
-    question: "The mean of the coin-flip season is 1.10×, yet a tranche can only end at 1.99× or 0. What is that number measuring?",
-    lede: `The mean answers a question about a pool: run this tranche in many parallel worlds and average them. The median answers a question about you: the one world you actually live in. For the coin they differ by ${x2(
-      Math.abs(A.mean - A.median),
-    )}; diversification narrows the gap and pulls the typical season below the average one.`,
+    question: `The mean of the coin-flip season is ${A.mean.toFixed(2)}×, yet a tranche can only end at ${d.cleanEnd.toFixed(2)}× or 0. What is that number measuring?`,
+    lede: `The mean answers a question about a pool: run this tranche in many parallel worlds and average them. The median answers a question about you: the one world you actually live in.${degenerate}`,
     kpis: [
-      { label: "Mean, coin and diversified", value: x2(A.mean), sub: "same for A and B", help: "Expected season end. Spreading the same risk over more names does not change it." },
-      { label: "Median, coin", value: x2(A.median), sub: `${pct(d.pClean)} land here`, color: "a", help: "Half of replays end at or above this. For the coin it is one of the two outcomes." },
-      { label: "Median, diversified", value: x2(B.median), sub: `${pct1(B.pMax)} clean seasons`, color: "b", help: "The typical diversified season has one or two partial hits." },
+      { label: "Mean, coin and diversified", value: x2(A.mean), sub: "the same for A and B", help: "Expected season end. Spreading the same risk over more names does not change it." },
+      { label: "Median, coin → diversified", value: `${x2(A.median)} → ${x2(B.median)}`, sub: `${pct(d.pClean)} vs ${pct1(B.pMax)} clean seasons`, color: "b", help: "Half of replays end at or above this. For the coin it is one of the two outcomes; for the diversified tranche it is a season with one or two partial hits." },
       { label: "Seasons at or above the mean", value: pct(B.pAtOrAboveMean), sub: "diversified tranche", help: "How often a single replay does at least as well as the average of all replays." },
+      { label: "Growth the median compounds at", value: `${(B.expLog * 100).toFixed(1)}%`, sub: "E[log end | survive], diversified", help: "Geometric growth is roughly the mean minus half the variance. Diversification removes variance without touching the mean." },
     ],
     primary: [quantiles],
-    secondary: [hist, running],
+    secondary: [stems, running],
     tables: [summaryTbl],
     localParams: ["parallelTranches"],
     notes: [
@@ -156,7 +159,7 @@ export function buildMeanMedian(p: Params, d: Derived): ScenarioView {
       },
       {
         title: "Why the diversified median sits below the mean",
-        body: `Three names mean ${3 * p.nights} name-events instead of ${p.nights}, so a clean season drops from ${pct(d.pClean)} to ${pct1(
+        body: `${k} names mean ${k * p.nights} name-events instead of ${p.nights}, so a clean season drops from ${pct(d.pClean)} to ${pct1(
           B.pMax,
         )}. The typical season carries one or two partial hits that gnaw into the payoff. The mean is the same because those hits are exactly what the coin pays in full, just more often and smaller.`,
       },

@@ -27,12 +27,13 @@ be swapped without touching the others.
 
 | Layer | Where | What it knows |
 |---|---|---|
-| Model | `src/model/` | Pure math. Season distributions (exact multinomial enumeration, a binned log-space engine, seeded Monte Carlo), the binary reduction, calibration, wing rates, correlation, Kelly sizing. No DOM, no chart library. |
-| Parameters | `src/model/params.ts` | One typed object plus a schema with tiers: primary (control deck), secondary (tuned under a section), advanced (settings dialog). |
-| View-model | `src/viewmodel/` | Turns model output into renderer-agnostic chart specs (`src/charts/spec.ts`): data table, mark, axes, series, annotations, user-story presets. One file per section. |
+| Model | `src/model/` | Pure math. Season distributions (exact multinomial enumeration, a binned log-space engine, seeded Monte Carlo), the binary reduction, calibration and record statistics, wing rates (Normal, Student-t or an imported sample), correlation, Kelly sizing and the robust optimum averaged over a band of loss rates. No DOM, no chart library. |
+| Parameters | `src/model/params.ts` | One typed object plus a schema with tiers: primary (control deck), secondary (tuned under a section), advanced (settings dialog). Imported datasets sit beside it. |
+| View-model | `src/viewmodel/` | Turns model output into renderer-agnostic chart specs (`src/charts/spec.ts`): data table, mark, axes, series, annotations, stories. One file per section. Runs in a Web Worker (`worker.ts`) so sliders never block the page. |
+| Axis resolution | `src/charts/resolve.ts` | Computes concrete domains, tick positions and tick labels once, so every backend draws the same ranges and puts reference lines in the same place. |
 | Switchboard | `src/charts/registry.ts`, `src/charts/backends/` | Routes a spec to ECharts, Plotly, Vega-Lite, or an HTML table. Each backend is loaded on first use. |
-| Authoring | `src/ui/Authoring.tsx` | Edits a spec in the GUI (backend, mark, axis scale and domain, x field, series visibility and emphasis, extra columns, height) and stores only the diff, keyed by chart id. |
-| State | `src/state/store.ts` | Parameters, chart edits, default backend. Persisted locally, exported and imported as one JSON file. |
+| Authoring | `src/ui/Authoring.tsx`, stories in each spec | A story is a one-click re-definition of a chart (and sometimes of the deck), shown as chips under the chart title. The ⚙ panel edits the spec by hand (backend, mark, axis scale and domain in the axis's own units, x field, series visibility, mark and emphasis, extra columns, legend, height) and stores only the diff, keyed by chart id. |
+| State | `src/state/store.ts` | Parameters, imported data, chart edits, default backend. Validated on load, persisted locally, exported and imported as one JSON file. `#reset` in the address clears it. |
 | UI | `src/ui/` | Control deck, section layout, chart host, tables, dialogs. One dark theme, graphite, with three policy hues and two status colours. |
 
 ## Reading the app
@@ -43,11 +44,25 @@ be swapped without touching the others.
 - **Sections.** Each opens with the question it answers, a short lede, a row of
   figures, the primary chart, then secondary charts. Tables, notes, derivations, and the
   quoted-versus-computed figures sit in expanders underneath.
-- **⚙ on any chart** opens the chart definition. The stories at the top are one-click
-  re-definitions ("zoom on the range you cannot rule out", "show the mean instead").
-- **⊞ on any chart** shows the numbers behind it.
-- **Settings** picks the default backend and the engine limits; **Import / export**
-  moves the whole state as JSON.
+- **Story chips** under a chart title re-define it in one click ("zoom on the range
+  you cannot rule out", "what if q is really 3.2%?"). Clicking an active chip undoes it.
+- **⚙ on any chart** opens the chart definition; **⊞** shows the numbers behind it.
+- **Data** imports a trade log (0/1 losses or P&L per unit of max loss) and realized
+  moves in priced sigmas. The record feeds section 3 and the robust sizing curve;
+  the moves can replace the Normal in section 4.
+- **Settings** picks the default backend and the engine; **Import / export** moves the
+  whole state as JSON.
+
+## Conventions worth knowing
+
+- Growth is reported as E[log end | the tranche survives], always next to the
+  probability of ruin. The unconditional expectation is −∞ whenever ruin is possible.
+- The effective loss rate of a wing is E[payout]/W. A fairly priced wing has
+  effective rate c/W, which equals the break-even rate b/(1+b): any deck rate below
+  it is a claim about the chain.
+- The robust risk per night maximises growth averaged over loss rates drawn uniformly
+  between the optimistic rate and break-even, or from a Beta posterior when a trade log
+  is imported.
 
 ## The three policies
 

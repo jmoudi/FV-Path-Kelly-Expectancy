@@ -1,5 +1,5 @@
-import type { Params } from "../model/params";
-import { derive, type Derived } from "./derived";
+import type { Datasets, Params } from "../model/params";
+import { deckView, derive, type DeckView, type Derived } from "./derived";
 import { buildAxes } from "./scenarios/axes";
 import { buildBinary } from "./scenarios/binary";
 import { buildCalibration } from "./scenarios/calibration";
@@ -10,14 +10,24 @@ import { buildMeanMedian } from "./scenarios/meanMedian";
 import { buildWing } from "./scenarios/wing";
 import type { ScenarioView } from "./types";
 
-export type Builder = (p: Params, d: Derived) => ScenarioView;
+export type Builder = (p: Params, d: Derived, data: Datasets) => ScenarioView;
 
 export const BUILDERS: Builder[] = [buildBinary, buildMeanMedian, buildCalibration, buildWing, buildDiversification, buildCorrelation, buildAxes, buildChaining];
 
-export function buildAll(p: Params): { derived: Derived; scenarios: ScenarioView[] } {
-  const derived = derive(p);
-  return { derived, scenarios: BUILDERS.map((b) => b(p, derived)) };
+export interface BuildResult {
+  deck: DeckView;
+  scenarios: ScenarioView[];
+  /** Milliseconds the build took. */
+  ms: number;
+}
+
+export function buildAll(p: Params, data: Datasets): BuildResult {
+  const t0 = typeof performance !== "undefined" ? performance.now() : 0;
+  const derived = derive(p, data);
+  const scenarios = BUILDERS.map((b) => b(p, derived, data));
+  const ms = typeof performance !== "undefined" ? performance.now() - t0 : 0;
+  return { deck: deckView(derived), scenarios, ms };
 }
 
 export { derive };
-export type { Derived, ScenarioView };
+export type { DeckView, Derived, ScenarioView };

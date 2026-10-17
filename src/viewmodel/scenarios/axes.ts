@@ -1,13 +1,13 @@
-import { f, table, type ChartSpec, type Row } from "../../charts/spec";
-import { breadthTable, kellyFraction, logGrowthPerBet } from "../../model/kelly";
-import type { Params } from "../../model/params";
+import { f, table, tableSpec, type ChartSpec, type Row } from "../../charts/spec";
+import { breadthTable, kellyFraction, logGrowthPerBet, seasonLogGrowth } from "../../model/kelly";
+import type { Datasets, Params } from "../../model/params";
 import { sampleGrid } from "../../model/season";
 import { linspace } from "../../model/stats";
 import { pct, pct1, pct2, signedPct1, type Derived } from "../derived";
 import type { ScenarioView } from "../types";
 
-export function buildAxes(p: Params, d: Derived): ScenarioView {
-  const k = Math.max(1, Math.round(p.names));
+export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView {
+  const k = d.k;
   const q = p.lossRate;
   const b = p.gain;
   const n = p.nights;
@@ -32,17 +32,18 @@ export function buildAxes(p: Params, d: Derived): ScenarioView {
     heat: { xField: "night", yField: "name", valueField: "outcome", palette: "binary", cellLabels: false },
     height: Math.max(90, 34 * k + 20),
     caption: "Dark cells won, red cells lost everything they risked.",
+    stories: [{ id: "seed", label: "Draw another season", params: { seed: (p.seed % 90_000) + 41 } }],
   };
   const pathRows: Row[] = grid.path.map((v, t) => ({ night: t, tranche: v }));
   const pathChart: ChartSpec = {
     id: "axes-path",
     title: "The tranche under that same grid",
-    subtitle: `Each night multiplies the tranche once, by one factor that already contains all ${k} names.`,
+    subtitle: `Each night multiplies the tranche once, by one factor that already contains all ${k} name${k === 1 ? "" : "s"}.`,
     kind: "xy",
     data: table([f("night", "Night", "int"), f("tranche", "Tranche, start = 1", "x")], pathRows),
     mark: "step",
     x: { field: "night", domain: [0, n] },
-    y: { field: "tranche", format: "x" },
+    y: { field: "tranche", format: "x", zero: false },
     series: [{ field: "tranche", color: "c", label: "Tranche", emphasis: "strong" }],
     height: 200,
     annotations: [{ kind: "hline", y: 1, text: "start", color: "muted", at: "start" }],
@@ -63,88 +64,95 @@ export function buildAxes(p: Params, d: Derived): ScenarioView {
     height: 280,
     annotations: [
       { kind: "point", x: q, y: fstar, text: `deck q ${pct2(q)}: f* ${pct(fstar)}`, color: "ink", at: "end" },
-      { kind: "point", x: p.altLossRate, y: kellyFraction(p.altLossRate, b), text: `optimistic: ${pct(kellyFraction(p.altLossRate, b))}`, color: "good", at: "end" },
+      { kind: "point", x: p.altLossRate, y: kellyFraction(p.altLossRate, b), text: `optimistic: ${pct(kellyFraction(p.altLossRate, b))}`, color: "ramp1", at: "end" },
       { kind: "vline", x: d.breakEven, text: "break-even: f* = 0", color: "loss", at: "end" },
     ],
   };
 
-  const worse = Math.min(0.08, q + (q - p.altLossRate));
+  // The hump, computed exactly for k names with f of the tranche each (k·f ≤ 1).
+  const worse = Math.min(0.08, d.breakEven);
   const rates = [p.altLossRate, q, worse];
-  const fs = linspace(0.005, 0.6, 120);
+  const fMax = Math.min(0.6, 1 / k);
+  const fs = linspace(0.005, fMax, 120);
   const humpRows: Row[] = fs.map((ff) => {
     const r: Row = { f: ff };
-    rates.forEach((qq, i) => (r[`g${i}`] = k * n * logGrowthPerBet(ff, qq, b)));
+    rates.forEach((qq, i) => (r[`g${i}`] = seasonLogGrowth(Math.min(1, k * ff), k, qq, b, n, p.sharedOutcome)));
     return r;
   });
+  const humpMin = Math.max(-0.3, Math.min(...humpRows.map((r) => Math.min(r.g0 as number, r.g1 as number, r.g2 as number))));
   const hump: ChartSpec = {
     id: "axes-hump",
     title: "Log growth per season against the fraction risked per name",
-    subtitle: `${k} names a night, ${n} nights. The hump peaks at f*; twice f* is roughly zero growth. The curve for the rate you cannot rule out decides the row you sit in.`,
+    subtitle: `${k} name${k === 1 ? "" : "s"} a night, ${n} nights, computed exactly for the whole night. The hump peaks at f*; about twice f* gives zero growth. The axis stops where ${k} names would exceed the tranche.`,
     kind: "xy",
     data: table([f("f", "Fraction of the tranche per name", "pct"), ...rates.map((qq, i) => f(`g${i}`, `q = ${pct2(qq)}`, "pct1"))], humpRows),
     mark: "line",
-    x: { field: "f", format: "pct", domain: [0, 0.6] },
-    y: { field: "g1", label: "Log growth per season", format: "pct", domain: [-0.15, null] },
+    x: { field: "f", format: "pct", domain: [0, fMax] },
+    y: { field: "g1", label: "Log growth per season", format: "pct", domain: [Math.floor(humpMin * 20) / 20, null], zero: false },
     series: [
       { field: "g0", color: "ramp1", label: `optimistic q = ${pct2(rates[0])}` },
       { field: "g1", color: "ramp2", label: `deck q = ${pct2(rates[1])}`, emphasis: "strong" },
-      { field: "g2", color: "ramp3", label: `worse q = ${pct2(rates[2])}` },
+      { field: "g2", color: "ramp3", label: `break-even q = ${pct2(rates[2])}` },
     ],
     height: 300,
     annotations: [
       { kind: "hline", y: 0, text: "no growth", color: "muted", at: "end" },
-      { kind: "point", x: fstar, y: k * n * gBet, text: `f* ${pct(fstar)}`, color: "ink", at: "end" },
+      ...(fstar <= fMax ? [{ kind: "point" as const, x: fstar, y: seasonLogGrowth(Math.min(1, k * fstar), k, q, b, n, p.sharedOutcome), text: `f* ${pct(fstar)}`, color: "ink" as const, at: "end" as const }] : []),
       { kind: "vline", x: p.riskPerNight / k, text: `your per-name fraction ${pct(p.riskPerNight / k)}`, color: "c", at: "start" },
     ],
-    stories: [{ id: "zoom", label: "Zoom on the positive region", patch: { y: { domain: [-0.02, null] }, x: { domain: [0, 0.35] } } }],
+    stories: [
+      { id: "zoom", label: "Zoom on the positive region", patch: { y: { domain: [-0.02, null] }, x: { domain: [0, Math.min(fMax, 0.35)] } } },
+      { id: "opt", label: "What if the optimistic rate is true?", narrative: "The deck moves to the optimistic rate; f* roughly doubles.", params: { lossRate: p.altLossRate } },
+    ],
   };
 
-  const rows = breadthTable(q, b, n, 6);
+  const rowsDeck = breadthTable(q, b, n, 6);
+  const rowsOpt = breadthTable(p.altLossRate, b, n, 6);
+  const capDeck = rowsDeck.find((r) => r.capBinds)?.names;
+  const capOpt = rowsOpt.find((r) => r.capBinds)?.names;
   const breadthChart: ChartSpec = {
     id: "axes-breadth",
     title: "Breadth: one more uncorrelated name is worth one more night",
-    subtitle: "Log growth per season at the Kelly fraction per name. The capital ceiling flattens the bars once k·f* passes 100%.",
+    subtitle: `Log growth per season at the Kelly fraction per name, capped by capital once k·f* passes 100%. At the deck's rate the cap ${capDeck ? `binds from ${capDeck} names` : "does not bind up to six names"}; at the optimistic rate it ${capOpt ? `binds from ${capOpt}` : "does not bind"}.`,
     kind: "xy",
-    data: table([f("names", "Names per night", "int"), f("growthCapped", "Capped by capital", "pct1"), f("growthUncapped", "Uncapped Kelly", "pct1")], rows.map((r) => ({ names: `${r.names}`, growthCapped: r.growthCapped, growthUncapped: r.growthUncapped }))),
+    data: table(
+      [f("names", "Names per night", "int"), f("deck", `at the deck's q ${pct2(q)}`, "pct1"), f("opt", `at the optimistic q ${pct2(p.altLossRate)}`, "pct1"), f("optUncapped", "optimistic, uncapped", "pct1")],
+      rowsDeck.map((r, i) => ({ names: `${r.names}`, deck: r.growthCapped, opt: rowsOpt[i].growthCapped, optUncapped: rowsOpt[i].growthUncapped })),
+    ),
     mark: "bar",
     x: { field: "names", categorical: true },
-    y: { field: "growthCapped", label: "Log growth per season", format: "pct1" },
+    y: { field: "deck", label: "Log growth per season", format: "pct1" },
     series: [
-      { field: "growthCapped", color: "c", label: "Capped by capital" },
-      { field: "growthUncapped", color: "muted", label: "Uncapped Kelly", emphasis: "muted" },
+      { field: "deck", color: "ramp2", label: `deck q ${pct2(q)}` },
+      { field: "opt", color: "ramp1", label: `optimistic q ${pct2(p.altLossRate)}` },
     ],
     height: 260,
-    stories: [{ id: "opt", label: "At the optimistic rate the cap binds sooner", patch: {} }],
+    stories: [{ id: "uncapped", label: "Show what the cap takes away", narrative: "Uncapped Kelly would risk more than the tranche.", patch: { extraSeries: [{ field: "optUncapped", color: "muted" }] } }],
   };
 
-  const breadthTbl: ChartSpec = {
+  const breadthTbl = tableSpec({
     id: "axes-table",
-    title: "Names per night at the Kelly fraction",
-    kind: "table",
+    title: "Names per night at the Kelly fraction, deck rate",
     data: table(
       [f("names", "Names per night", "int"), f("fractionPerName", "Fraction per name", "pct1"), f("totalAtRisk", "Total at risk", "pct"), f("growthCapped", "Log growth per season", "pct2"), f("cap", "Capital ceiling")],
-      rows.map((r) => ({ names: r.names, fractionPerName: r.fractionPerName, totalAtRisk: r.totalAtRisk, growthCapped: r.growthCapped, cap: r.capBinds ? "binds" : "" })),
+      rowsDeck.map((r) => ({ names: r.names, fractionPerName: r.fractionPerName, totalAtRisk: r.totalAtRisk, growthCapped: r.growthCapped, cap: r.capBinds ? "binds" : "" })),
     ),
-    mark: "line",
-    x: { field: "names" },
-    y: { field: "growthCapped" },
-    series: [],
     columns: [{ field: "names", emphasize: true }, { field: "fractionPerName" }, { field: "totalAtRisk" }, { field: "growthCapped" }, { field: "cap", color: "loss" }],
     highlightRow: { field: "names", value: k },
-  };
+  });
 
   return {
     id: "axes",
     number: 7,
     eyebrow: "Time and breadth",
     title: "Two axes, and the sizing rule that makes them one",
-    question: "Twenty all-in steps produce a coin; sixty parallel thirds produce a hump. Why does nobody separate the two axes?",
-    lede: `Growth is a sum over steps of E[log(1 + Σ fᵢrᵢ)]. Time steps sit outside the log: each adds a term and outcomes multiply. Parallel bets sit inside it: their outcomes add up before the log is taken, so a single loss is divided by the number of bets before it hits capital. The distinction only exists while exposure is fixed per step. Size every bet at its own fraction and the grid collapses to one number: independent bets per unit time.`,
+    question: `${n} all-in steps produce a coin; ${k * n} parallel ${k === 1 ? "bets" : `${k === 2 ? "halves" : k === 3 ? "thirds" : `${k}ths`}`} produce a hump. Why does nobody separate the two axes?`,
+    lede: `Growth is a sum over steps of E[log(1 + Σ fᵢrᵢ)]. Time steps sit outside the log, so outcomes multiply; parallel bets sit inside it, so a single loss is divided by the number of bets before it hits capital. The distinction only exists while exposure is fixed per step: size every bet at its own fraction and the grid collapses to one number, independent bets per unit time.`,
     kpis: [
       { label: "Kelly fraction per name", value: pct(fstar), sub: "p − q/b at the deck's q", color: "c" },
-      { label: "Total at risk, k names", value: pct(Math.min(1, k * fstar)), sub: k * fstar > 1 ? "capital ceiling binds" : `${k} × f*` },
-      { label: "Growth per season, k names", value: signedPct1(rows[k - 1].growthCapped), sub: "at the Kelly fraction" },
+      { label: "Growth per season, k names", value: signedPct1(rowsDeck[k - 1].growthCapped), sub: `${k} × ${pct(rowsDeck[k - 1].fractionPerName)} = ${pct(rowsDeck[k - 1].totalAtRisk)} at risk`, help: "At the Kelly fraction per name, capped so the names never exceed the tranche." },
       { label: "Growth per name-night", value: `${(gBet * 100).toFixed(3)}%`, sub: "the same beside or after another bet", help: "Each independent bet contributes this whether it sits next to another bet on the same night or on the next night." },
+      { label: "Capital ceiling", value: capDeck ? `from ${capDeck} names` : "not binding", sub: capOpt ? `optimistic rate: from ${capOpt}` : "at either rate" },
     ],
     primary: [gridChart, pathChart],
     secondary: [kellyCurve, hump, breadthChart],
@@ -166,7 +174,7 @@ export function buildAxes(p: Params, d: Derived): ScenarioView {
     ],
     sourceFigures: [
       { label: "f* at 2.94%", quoted: "13%", computed: pct1(kellyFraction(0.02945, b)) },
-      { label: "Growth per season, 1 / 3 / 5 names", quoted: "0.6% / 1.9% / 3.1%", computed: `${pct1(rows[0].growthCapped)} / ${pct1(rows[2].growthCapped)} / ${pct1(rows[4].growthCapped)}` },
+      { label: "Growth per season, 1 / 3 / 5 names", quoted: "0.6% / 1.9% / 3.1%", computed: `${pct1(rowsDeck[0].growthCapped)} / ${pct1(rowsDeck[2].growthCapped)} / ${pct1(rowsDeck[4].growthCapped)}` },
       { label: "Five names at 2.52%", quoted: "want 25% each, 125% total", computed: `${pct(kellyFraction(0.0252, b))} each, ${pct(5 * kellyFraction(0.0252, b))} total` },
     ],
   };

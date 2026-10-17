@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { breakEvenLossRate, cleanEnd, lossRateFromPClean, pCleanFromLossRate, seasonMean } from "../src/model/binary";
-import { eventsToResolve } from "../src/model/calibration";
+import { eventsForTest, eventsToResolve, eventsUntilUpperBelow, parseNumberList, recordStats } from "../src/model/calibration";
 import { breachBeyond, crossoverSharedOutcome, jointLossProb, ruinPerSeason } from "../src/model/correlation";
-import { breadthTable, kellyFraction, seasonLogGrowth } from "../src/model/kelly";
-import { nightDist, nightLogGrowth, scheduleDistribution, summarize } from "../src/model/season";
+import { betaPosterior, breadthTable, kellyFraction, nightOptimum, robustOptimum, robustSeasonLogGrowth, seasonLogGrowth, seasonRuin, uniformBand } from "../src/model/kelly";
+import { binnedDistributions, nightDist, nightLogGrowth, nightRuin, scheduleDistribution, summarize } from "../src/model/season";
 import { normalCdf, normalQuantile, studentTCdf } from "../src/model/stats";
-import { wingRates } from "../src/model/wing";
+import { fairRealizedRatio, wingRates } from "../src/model/wing";
 
 const b = 0.035;
 const n = 20;
@@ -47,21 +47,53 @@ describe("calibration (section 3)", () => {
     expect(events).toBeGreaterThan(90);
     expect(events).toBeLessThan(150);
   });
+  it("a proper one-sided test needs more", () => {
+    expect(eventsForTest(0.0338, 0.0252, 0.05, 0.8)).toBeGreaterThan(eventsToResolve(0.0252, 0.0338, 2));
+  });
+  it("finds when the band clears break-even", () => {
+    const nStar = eventsUntilUpperBelow(0.02945, 0.0338, 2);
+    expect(nStar).not.toBeNull();
+    expect(nStar!).toBeGreaterThan(3000);
+    expect(nStar!).toBeLessThan(12000);
+  });
+  it("reads a record either way", () => {
+    const bin = recordStats([0, 0, 1, 0, 0, 0, 0, 0, 0, 0], b, 2)!;
+    expect(bin.kind).toBe("binary");
+    expect(bin.rate).toBeCloseTo(0.1, 10);
+    const pnl = recordStats([0.035, 0.035, -1, 0.035, -0.4], b, 2)!;
+    expect(pnl.kind).toBe("pnl");
+    const mean = (0.035 * 3 - 1 - 0.4) / 5;
+    expect(pnl.rate).toBeCloseTo((b - mean) / (1 + b), 10);
+    expect(parseNumberList("# comment\n0\n1\nx\n2.5, 7\n")).toEqual([0, 1, 7]);
+  });
 });
 
 describe("wing rates (section 4)", () => {
+  const base = { strikeDistance: 2, wingWidth: 0.5, creditFraction: 0.0338, moveDist: "normal" as const, tailDf: 4, realizedRatio: 1 };
   it("orders breach > effective > full gap", () => {
-    const r = wingRates({ strikeDistance: 2, wingWidth: 0.5, creditFraction: 0.0338, moveDist: "normal", tailDf: 4, realizedRatio: 1 });
+    const r = wingRates(base);
     expect(r.breach).toBeGreaterThan(r.effective);
     expect(r.effective).toBeGreaterThan(r.fullGap);
     expect(r.breach).toBeCloseTo(1 - normalCdf(2), 6);
     expect(r.gainPerUnit).toBeCloseTo(0.035, 3);
+    expect(r.fairRate).toBeCloseTo(breakEvenLossRate(r.gainPerUnit), 10);
   });
   it("student-t with unit variance has fatter tails than normal", () => {
-    const base = { strikeDistance: 2.5, wingWidth: 0.5, creditFraction: 0.0338, tailDf: 4, realizedRatio: 1 } as const;
-    const nr = wingRates({ ...base, moveDist: "normal" });
-    const st = wingRates({ ...base, moveDist: "student" });
+    const nr = wingRates({ ...base, strikeDistance: 2.5 });
+    const st = wingRates({ ...base, strikeDistance: 2.5, moveDist: "student" });
     expect(st.breach).toBeGreaterThan(nr.breach);
+  });
+  it("solves the fair realized ratio", () => {
+    const s = fairRealizedRatio(base);
+    expect(s).not.toBeNull();
+    expect(wingRates({ ...base, realizedRatio: s! }).effective).toBeCloseTo(base.creditFraction, 6);
+  });
+  it("uses an empirical sample", () => {
+    const sample = [0, 0.5, -1, 2.2, 2.6, 3, 1.9, -0.4];
+    const r = wingRates({ ...base, moveDist: "empirical", sample });
+    expect(r.breach).toBeCloseTo(3 / 8, 10);
+    expect(r.fullGap).toBeCloseTo(2 / 8, 10);
+    expect(r.effective).toBeCloseTo((0.4 + 1 + 1) / 8, 10);
   });
 });
 
@@ -75,6 +107,7 @@ describe("diversification within one season (section 5)", () => {
     expect(s.pRuin).toBeCloseTo(0.45, 2);
     expect(s.median).toBeCloseTo(1.99, 2);
     expect(s.pBelow).toBeCloseTo(0.45, 2);
+    expect(s.expLog).toBeCloseTo(n * Math.log(1 + b), 6);
   });
   it("three names at a third each: same mean, median below 1, ruin ~0.05%", () => {
     const d = scheduleDistribution([{ nights: n, policy: { ...base, names: 3, riskPerName: 1 / 3 } }]);
@@ -91,8 +124,7 @@ describe("diversification within one season (section 5)", () => {
       { nights: 10, policy: { ...base, names: 1, riskPerName: 1 } },
       { nights: 10, policy: { ...base, names: 3, riskPerName: 1 / 3 } },
     ]);
-    const s = summarize(d);
-    expect(s.pRuin).toBeCloseTo(0.26, 1);
+    expect(summarize(d).pRuin).toBeCloseTo(0.26, 1);
   });
   it("capping single-name nights at a third: ruin 0.03%, mean 1.06", () => {
     const d = scheduleDistribution([
@@ -116,6 +148,13 @@ describe("diversification within one season (section 5)", () => {
     expect(binned.median).toBeCloseTo(exact.median, 2);
     expect(binned.pBelow).toBeCloseTo(exact.pBelow, 2);
     expect(binned.pRuin).toBeCloseTo(exact.pRuin, 5);
+  });
+  it("binned snapshots line up with a fresh run", () => {
+    const blocks = [{ nights: 2 * n, policy: { ...base, names: 3, riskPerName: 1 / 6 } }];
+    const snaps = binnedDistributions(blocks, [n]);
+    expect(snaps).toHaveLength(2);
+    const one = summarize(binnedDistributions([{ nights: n, policy: blocks[0].policy }])[0]);
+    expect(summarize(snaps[0]).median).toBeCloseTo(one.median, 6);
   });
 });
 
@@ -141,7 +180,6 @@ describe("kelly and breadth (section 7)", () => {
   });
   it("breadth table: 0.6%, 1.9%, 3.1% per season", () => {
     const rows = breadthTable(q55, b, n, 5);
-    // The discussion rounds 1.83% to 1.9% and 3.05% to 3.1%.
     expect(rows[0].growthCapped).toBeCloseTo(0.006, 3);
     expect(rows[2].growthCapped).toBeCloseTo(0.019, 2);
     expect(rows[4].growthCapped).toBeCloseTo(0.031, 2);
@@ -154,7 +192,7 @@ describe("kelly and breadth (section 7)", () => {
   });
 });
 
-describe("chained seasons (section 8)", () => {
+describe("growth conventions and robust sizing (section 8)", () => {
   const base = { gain: b, lossRate: q55, sharedOutcome: 0 };
   it("log growth grid matches the discussion", () => {
     expect(seasonLogGrowth(0.39, 3, q55, b, n)).toBeCloseTo(0.019, 2);
@@ -164,9 +202,24 @@ describe("chained seasons (section 8)", () => {
     expect(seasonLogGrowth(1.0, 3, 0.032, b, n)).toBeCloseTo(-0.107, 2);
     expect(seasonLogGrowth(0.75, 3, 0.0252, b, n)).toBeCloseTo(0.074, 3);
   });
-  it("nightly log growth drops the ruin state", () => {
-    const nd = nightDist({ ...base, names: 3, riskPerName: 1 / 3 });
-    expect(Number.isFinite(nightLogGrowth(nd))).toBe(true);
+  it("growth is conditional on survival and ruin is reported beside it", () => {
+    const coin = nightDist({ ...base, names: 1, riskPerName: 1 });
+    expect(nightRuin(coin)).toBeCloseTo(q55, 12);
+    expect(nightLogGrowth(coin)).toBeCloseTo(Math.log(1 + b), 12);
+    expect(seasonRuin(1, 1, q55, b, n)).toBeCloseTo(0.45, 2);
+    const safe = nightDist({ ...base, names: 3, riskPerName: 1 / 6 });
+    expect(nightRuin(safe)).toBe(0);
+  });
+  it("the robust optimum sits below the single-rate optimum", () => {
+    const band = uniformBand(0.0252, breakEvenLossRate(b));
+    const robust = robustOptimum(3, band, b, n);
+    const single = nightOptimum(3, q55, b, n);
+    expect(robust.risk).toBeGreaterThan(0.2);
+    expect(robust.risk).toBeLessThan(0.6);
+    expect(single.risk).toBeGreaterThan(0.3);
+    expect(robustSeasonLogGrowth(robust.risk, 3, band, b, n)).toBeGreaterThanOrEqual(robustSeasonLogGrowth(0.5, 3, band, b, n) - 1e-12);
+    const post = betaPosterior(3, 97);
+    expect(post.weights.reduce((s, w) => s + w, 0)).toBeCloseTo(1, 10);
   });
   it("four seasons: single-name mean 1.44, ruin 91%", () => {
     const d = scheduleDistribution([{ nights: 4 * n, policy: { ...base, names: 1, riskPerName: 1 } }]);
@@ -176,9 +229,9 @@ describe("chained seasons (section 8)", () => {
     expect(s.median).toBe(0);
   });
   it("four seasons, three names whole tranche: mean 1.44, median ~0.92, p10 ~0.18", () => {
-    const d = scheduleDistribution([{ nights: 4 * n, policy: { ...base, names: 3, riskPerName: 1 / 3 } }]);
+    const d = scheduleDistribution([{ nights: 4 * n, policy: { ...base, names: 3, riskPerName: 1 / 3 } }], { maxCompositions: 60_000 });
     const s = summarize(d);
-    expect(d.method).toBe("exact");
+    expect(d.method).toBe("binned");
     expect(s.mean).toBeCloseTo(1.44, 1);
     expect(s.median).toBeGreaterThan(0.85);
     expect(s.median).toBeLessThan(1.0);

@@ -2,7 +2,8 @@ import * as echarts from "echarts/core";
 import { BarChart, HeatmapChart, LineChart, ScatterChart } from "echarts/charts";
 import { GridComponent, LegendComponent, MarkAreaComponent, MarkLineComponent, MarkPointComponent, TooltipComponent, VisualMapComponent } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
-import { formatNumber, tickFormatter } from "../format";
+import { formatNumber } from "../format";
+import { resolveAxes, type ResolvedAxis } from "../resolve";
 import { fieldFormat, fieldLabel, type Annotation, type ChartSpec, type SeriesSpec } from "../spec";
 import { THEME, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
 import { categories, numberOrNull, showLegend, type Backend, type RenderHandle } from "./types";
@@ -24,43 +25,43 @@ echarts.use([
 
 type EOption = Record<string, unknown>;
 
-function axisOption(spec: ChartSpec, which: "x" | "y", cats?: (string | number)[]): EOption {
-  const ax = spec[which];
-  const fmt = ax.format ?? fieldFormat(spec.data, ax.field);
-  const tick = tickFormatter(fmt);
+const LABEL_BG = withAlpha(THEME.surface, 0.82);
+
+function axisOption(ax: ResolvedAxis, which: "x" | "y", cats?: (string | number)[]): EOption {
   const isCat = !!cats;
   const base: EOption = {
     type: isCat ? "category" : ax.scale === "log" ? "log" : "value",
-    name: ax.label ?? fieldLabel(spec.data, ax.field),
+    name: ax.label,
     nameLocation: "middle",
-    nameGap: which === "x" ? 30 : 48,
+    nameGap: which === "x" ? 30 : 50,
     nameTextStyle: { color: THEME.muted, fontSize: 11, fontFamily: THEME.fontUi },
     axisLabel: {
       color: THEME.muted,
       fontSize: 11,
       fontFamily: THEME.fontMono,
-      formatter: isCat ? (v: string) => v : (v: number) => tick(v),
+      formatter: isCat ? (v: string) => v : (v: number) => ax.formatter(v),
       hideOverlap: true,
     },
     axisLine: { lineStyle: { color: THEME.hairline } },
     axisTick: { show: false },
-    splitLine: { show: ax.grid !== false, lineStyle: { color: THEME.grid } },
+    splitLine: { show: ax.grid, lineStyle: { color: THEME.grid } },
   };
-  if (isCat) base.data = cats!.map((c) => (typeof c === "number" ? tick(c) : c));
-  if (ax.domain) {
-    if (ax.domain[0] != null) base.min = ax.domain[0];
-    if (ax.domain[1] != null) base.max = ax.domain[1];
+  if (isCat) base.data = cats!.map((c) => (typeof c === "number" ? ax.formatter(c) : c));
+  else {
+    base.min = ax.min;
+    base.max = ax.max;
+    // Only label the ends of the axis when they are real ticks, so "4.225%" never shows.
+    const near = (v: number) => ax.ticks.some((t) => Math.abs(t - v) <= Math.abs(v) * 1e-9 + 1e-12);
+    (base.axisLabel as Record<string, unknown>).showMinLabel = near(ax.min);
+    (base.axisLabel as Record<string, unknown>).showMaxLabel = near(ax.max);
   }
-  if (!isCat && ax.scale !== "log" && !ax.domain) base.scale = which === "y" ? false : true;
   return base;
 }
 
-function seriesOption(spec: ChartSpec, s: SeriesSpec, cats?: (string | number)[], withMarks?: EOption): EOption {
+function seriesOption(spec: ChartSpec, s: SeriesSpec, logX: boolean, logY: boolean, cats?: (string | number)[], withMarks?: EOption): EOption {
   const mark = s.mark ?? spec.mark;
   const color = roleColor(s.color);
   const xField = s.xField ?? spec.x.field;
-  const logX = spec.x.scale === "log";
-  const logY = spec.y.scale === "log";
   const rows = spec.data.rows;
   const name = s.label ?? fieldLabel(spec.data, s.field);
   const op = emphasisOpacity(s.emphasis);
@@ -73,9 +74,11 @@ function seriesOption(spec: ChartSpec, s: SeriesSpec, cats?: (string | number)[]
       if (x == null) continue;
       byCat.set(x, numberOrNull(r[s.field]));
     }
-    data = cats.map((c) => {
+    data = cats.map((c, i) => {
       const v = byCat.get(c) ?? null;
-      return v != null && (!logY || v > 0) ? v : null;
+      const val = v != null && (!logY || v > 0) ? v : null;
+      if (s.colors && mark === "bar") return { value: val, itemStyle: { color: withAlpha(roleColor(s.colors[i % s.colors.length]), op) } };
+      return val;
     });
   } else {
     data = [];
@@ -92,9 +95,9 @@ function seriesOption(spec: ChartSpec, s: SeriesSpec, cats?: (string | number)[]
       return {
         ...common,
         type: "bar",
-        itemStyle: { color: withAlpha(color, op), borderRadius: [3, 3, 0, 0] },
+        itemStyle: { color: withAlpha(color, op), borderRadius: [2, 2, 0, 0] },
         barWidth: spec.barWidthPx ?? undefined,
-        barGap: "8%",
+        barGap: "10%",
         barCategoryGap: "25%",
         stack: spec.stack ? "total" : undefined,
         large: true,
@@ -135,14 +138,12 @@ function seriesOption(spec: ChartSpec, s: SeriesSpec, cats?: (string | number)[]
   }
 }
 
-function markOptions(spec: ChartSpec): EOption {
+function markOptions(spec: ChartSpec, xf: (v: number) => string, yf: (v: number) => string): EOption {
   const anns = spec.annotations ?? [];
   if (!anns.length) return {};
   const lines: EOption[] = [];
   const points: EOption[] = [];
   const areas: unknown[] = [];
-  const xf = tickFormatter(spec.x.format ?? fieldFormat(spec.data, spec.x.field));
-  const yf = tickFormatter(spec.y.format ?? fieldFormat(spec.data, spec.y.field));
   const lineOf = (a: Annotation) => {
     const color = roleColor(a.color ?? "muted");
     const label = {
@@ -151,9 +152,9 @@ function markOptions(spec: ChartSpec): EOption {
       color,
       fontSize: 10.5,
       fontFamily: THEME.fontUi,
-      position: a.kind === "vline" ? (a.at === "start" ? "insideStartTop" : "insideEndTop") : a.at === "start" ? "insideStartTop" : "insideEndTop",
+      position: a.at === "start" ? "insideStartTop" : "insideEndTop",
       distance: 6,
-      backgroundColor: withAlpha(THEME.surface, 0.8),
+      backgroundColor: LABEL_BG,
       padding: [2, 4],
       borderRadius: 3,
     };
@@ -176,7 +177,7 @@ function markOptions(spec: ChartSpec): EOption {
           position: a.at === "start" ? "left" : a.at === "end" ? "right" : "top",
           fontSize: 10.5,
           fontFamily: THEME.fontUi,
-          backgroundColor: withAlpha(THEME.surface, 0.8),
+          backgroundColor: LABEL_BG,
           padding: [2, 4],
           borderRadius: 3,
           distance: 8,
@@ -184,48 +185,41 @@ function markOptions(spec: ChartSpec): EOption {
         value: a.kind === "point" ? `${xf(a.x)}, ${yf(a.y)}` : "",
       });
     } else if (a.kind === "xband" && a.x != null && a.x2 != null) {
-      areas.push([
-        { xAxis: a.x, itemStyle: { color: withAlpha(roleColor(a.color ?? "muted"), 0.1) }, name: a.text ?? "" },
-        { xAxis: a.x2 },
-      ]);
+      areas.push([{ xAxis: a.x, itemStyle: { color: withAlpha(roleColor(a.color ?? "muted"), 0.1) }, name: a.text ?? "" }, { xAxis: a.x2 }]);
     } else if (a.kind === "yband" && a.y != null && a.y2 != null) {
       areas.push([{ yAxis: a.y, itemStyle: { color: withAlpha(roleColor(a.color ?? "muted"), 0.1) }, name: a.text ?? "" }, { yAxis: a.y2 }]);
     }
   }
   const out: EOption = {};
-  if (lines.length) out.markLine = { silent: true, symbol: ["none", "none"], animation: false, data: lines };
+  // precision: ECharts rounds mark-line coordinates to 2 decimals by default, which
+  // would put 2.94%, 3.38% and 2.52% all at 3.00%.
+  if (lines.length) out.markLine = { silent: true, symbol: ["none", "none"], animation: false, precision: 12, data: lines };
   if (points.length) out.markPoint = { silent: true, animation: false, data: points };
-  if (areas.length)
-    out.markArea = {
-      silent: true,
-      animation: false,
-      label: { show: true, color: THEME.muted, fontSize: 10.5, position: "insideTop" },
-      data: areas,
-    };
+  if (areas.length) out.markArea = { silent: true, animation: false, label: { show: true, color: THEME.muted, fontSize: 10.5, position: "insideTop" }, data: areas };
   return out;
 }
 
 function xyOption(spec: ChartSpec): EOption {
-  const cats = spec.x.categorical ? categories(spec.data.rows, spec.x.field) : undefined;
-  const marks = markOptions(spec);
-  const series = spec.series.map((s, i) => seriesOption(spec, s, cats, i === 0 ? marks : undefined));
+  const axes = resolveAxes(spec);
+  const cats = axes.x.categorical ? categories(spec.data.rows, spec.x.field) : undefined;
+  const marks = markOptions(spec, axes.x.formatter, axes.y.formatter);
+  const series = spec.series.map((s, i) => seriesOption(spec, s, axes.x.scale === "log", axes.y.scale === "log", cats, i === 0 ? marks : undefined));
   const legend = showLegend(spec);
-  const xFmt = tickFormatter(spec.x.format ?? fieldFormat(spec.data, spec.x.field));
   const seriesFmt = new Map(spec.series.map((s) => [s.label ?? fieldLabel(spec.data, s.field), fieldFormat(spec.data, s.field)]));
+  const xFmt = axes.x.formatter;
   return {
     animation: false,
     backgroundColor: "transparent",
     textStyle: { fontFamily: THEME.fontUi, color: THEME.ink2 },
-    grid: { left: 64, right: 22, top: legend ? 34 : 18, bottom: 46 },
+    grid: { left: 66, right: 22, top: legend ? 34 : 18, bottom: 46 },
     legend: {
       show: legend,
       top: 0,
       right: 0,
       data: spec.series.filter((s) => s.legend !== false).map((s) => s.label ?? fieldLabel(spec.data, s.field)),
       textStyle: { color: THEME.ink2, fontSize: 11, fontFamily: THEME.fontUi },
-      icon: "roundRect",
-      itemWidth: 12,
-      itemHeight: 4,
+      itemWidth: 18,
+      itemHeight: 8,
       itemGap: 14,
     },
     tooltip: {
@@ -256,8 +250,8 @@ function xyOption(spec: ChartSpec): EOption {
         return head + body;
       },
     },
-    xAxis: axisOption(spec, "x", cats),
-    yAxis: axisOption(spec, "y"),
+    xAxis: axisOption(axes.x, "x", cats),
+    yAxis: axisOption(axes.y, "y"),
     series,
   };
 }
@@ -266,20 +260,32 @@ function heatOption(spec: ChartSpec): EOption {
   const h = spec.heat!;
   const xs = categories(spec.data.rows, h.xField);
   const ys = categories(spec.data.rows, h.yField);
-  const xf = tickFormatter(fieldFormat(spec.data, h.xField));
-  const yf = tickFormatter(fieldFormat(spec.data, h.yField));
+  const xFmt = fieldFormat(spec.data, h.xField);
+  const yFmt = fieldFormat(spec.data, h.yField);
+  const catLabel = (c: string | number, fmt?: typeof xFmt) => (typeof c === "number" ? formatNumber(c, fmt ?? "auto") : c);
   const vf = h.format ?? fieldFormat(spec.data, h.valueField) ?? "auto";
-  const data: [number, number, number][] = [];
+  const data: unknown[] = [];
   let min = Infinity;
   let max = -Infinity;
+  const same = (a: unknown, b: unknown) => (typeof a === "number" && typeof b === "number" ? Math.abs(a - b) < 1e-9 : a === b);
   for (const r of spec.data.rows) {
     const v = numberOrNull(r[h.valueField]);
-    if (v == null) continue;
     const xi = xs.indexOf(r[h.xField] as string | number);
     const yi = ys.indexOf(r[h.yField] as string | number);
-    data.push([xi, yi, v]);
-    min = Math.min(min, v);
-    max = Math.max(max, v);
+    const label = h.labelField ? r[h.labelField] : null;
+    const hl = h.highlight && same(r[h.xField], h.highlight.x) && same(r[h.yField], h.highlight.y);
+    const item: Record<string, unknown> = { value: [xi, yi, v, label ?? null] };
+    if (hl) item.itemStyle = { borderColor: THEME.ink, borderWidth: 2.5 };
+    if (v == null) item.itemStyle = { ...(item.itemStyle as object), color: THEME.raised };
+    data.push(item);
+    if (v != null) {
+      min = Math.min(min, v);
+      max = Math.max(max, v);
+    }
+  }
+  if (!Number.isFinite(min)) {
+    min = 0;
+    max = 1;
   }
   let vmin = min;
   let vmax = max;
@@ -288,24 +294,26 @@ function heatOption(spec: ChartSpec): EOption {
     const span = Math.max(Math.abs(max - c), Math.abs(min - c));
     vmin = c - span;
     vmax = c + span;
+  } else if (h.palette === "binary") {
+    vmin = 0;
+    vmax = 1;
   }
+  const labelOf = (p: { value: unknown[] }) => (p.value[3] != null ? String(p.value[3]) : p.value[2] == null ? "" : formatNumber(p.value[2] as number, vf));
   return {
     animation: false,
     backgroundColor: "transparent",
     textStyle: { fontFamily: THEME.fontUi, color: THEME.ink2 },
-    grid: { left: 84, right: 22, top: 18, bottom: h.palette === "binary" ? 44 : 70 },
+    grid: { left: 84, right: 22, top: 18, bottom: h.palette === "binary" ? 44 : 74 },
     tooltip: {
       backgroundColor: THEME.raised,
       borderColor: THEME.hairline,
       textStyle: { color: THEME.ink, fontSize: 12 },
-      formatter: (p: { value: [number, number, number] }) =>
-        `${fieldLabel(spec.data, h.xField)} ${typeof xs[p.value[0]] === "number" ? xf(xs[p.value[0]] as number) : xs[p.value[0]]}<br/>${fieldLabel(spec.data, h.yField)} ${
-          typeof ys[p.value[1]] === "number" ? yf(ys[p.value[1]] as number) : ys[p.value[1]]
-        }<br/><b style="font-family:${THEME.fontMono}">${formatNumber(p.value[2], vf)}</b>`,
+      formatter: (p: { value: unknown[] }) =>
+        `${fieldLabel(spec.data, h.xField)} ${catLabel(xs[p.value[0] as number], xFmt)}<br/>${fieldLabel(spec.data, h.yField)} ${catLabel(ys[p.value[1] as number], yFmt)}<br/><b style="font-family:${THEME.fontMono}">${labelOf(p)}</b>`,
     },
     xAxis: {
       type: "category",
-      data: xs.map((c) => (typeof c === "number" ? xf(c) : c)),
+      data: xs.map((c) => catLabel(c, xFmt)),
       name: spec.x.label ?? fieldLabel(spec.data, h.xField),
       nameLocation: "middle",
       nameGap: 30,
@@ -317,7 +325,7 @@ function heatOption(spec: ChartSpec): EOption {
     },
     yAxis: {
       type: "category",
-      data: ys.map((c) => (typeof c === "number" ? yf(c) : c)),
+      data: ys.map((c) => catLabel(c, yFmt)),
       name: spec.y.label ?? fieldLabel(spec.data, h.yField),
       nameLocation: "middle",
       nameGap: 66,
@@ -327,6 +335,8 @@ function heatOption(spec: ChartSpec): EOption {
       axisTick: { show: false },
     },
     visualMap: {
+      show: h.palette !== "binary",
+      dimension: 2,
       min: vmin,
       max: vmax,
       calculable: false,
@@ -335,22 +345,15 @@ function heatOption(spec: ChartSpec): EOption {
       bottom: 0,
       itemWidth: 10,
       itemHeight: 140,
+      text: [formatNumber(vmax, vf), formatNumber(vmin, vf)],
       textStyle: { color: THEME.muted, fontSize: 10.5, fontFamily: THEME.fontMono },
-      formatter: (v: number) => formatNumber(v, vf),
       inRange: { color: heatPalette(h.palette) },
-      show: h.palette !== "binary",
     },
     series: [
       {
         type: "heatmap",
         data,
-        label: {
-          show: h.cellLabels !== false,
-          color: THEME.ink,
-          fontSize: 11,
-          fontFamily: THEME.fontMono,
-          formatter: (p: { value: [number, number, number] }) => formatNumber(p.value[2], vf),
-        },
+        label: { show: h.cellLabels !== false, color: THEME.ink, fontSize: 11, fontFamily: THEME.fontMono, formatter: labelOf },
         itemStyle: { borderColor: THEME.surface, borderWidth: 2, borderRadius: 3 },
         emphasis: { itemStyle: { borderColor: THEME.ink } },
       },

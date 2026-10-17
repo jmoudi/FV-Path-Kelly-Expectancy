@@ -4,17 +4,52 @@ import { loadBackend, BACKEND_INFO } from "../charts/registry";
 import { applyOverride, type BackendId, type ChartSpec } from "../charts/spec";
 import { useStore } from "../state/store";
 import { Authoring } from "./Authoring";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { TableView } from "./TableView";
 
 /**
  * Renders one chart spec through the switchboard. Mounts lazily when scrolled
- * near the viewport, swaps backends on demand, and hosts the authoring panel.
+ * near the viewport, swaps backends on demand, and hosts the stories and the
+ * authoring panel.
  */
 export function ChartHost({ spec: base }: { spec: ChartSpec }) {
+  const clearOverride = useStore((s) => s.clearOverride);
+  return (
+    <ErrorBoundary
+      fallback={(err, retry) => (
+        <div className="chart-card" id={`chart-${base.id}`}>
+          <div className="chart-head">
+            <div className="t">
+              <div className="chart-title">{base.title}</div>
+              <div className="chart-sub">This chart could not render: {err.message}</div>
+            </div>
+          </div>
+          <div className="actions">
+            <button
+              type="button"
+              className="btn small"
+              onClick={() => {
+                clearOverride(base.id);
+                retry();
+              }}
+            >
+              Reset this chart
+            </button>
+          </div>
+        </div>
+      )}
+    >
+      <ChartCard base={base} />
+    </ErrorBoundary>
+  );
+}
+
+function ChartCard({ base }: { base: ChartSpec }) {
   const override = useStore((s) => s.overrides[base.id]);
   const defaultBackend = useStore((s) => s.defaultBackend);
   const authoringOpen = useStore((s) => s.authoringOpen);
   const setAuthoringOpen = useStore((s) => s.setAuthoringOpen);
+  const applyStory = useStore((s) => s.applyStory);
   const spec = useMemo(() => applyOverride(base, override), [base, override]);
   const backendId: BackendId = spec.backend ?? (base.kind === "table" ? "table" : defaultBackend);
   const [tableView, setTableView] = useState(false);
@@ -89,17 +124,21 @@ export function ChartHost({ spec: base }: { spec: ChartSpec }) {
     }
   }, [spec, mounted, effective]);
 
+  // Re-attach the resize observer whenever the plot element is (re)created.
   useEffect(() => {
     const el = plotRef.current;
-    if (!el || !("ResizeObserver" in window)) return;
+    if (!el || !("ResizeObserver" in window) || effective === "table") return;
     const ro = new ResizeObserver(() => handleRef.current?.resize());
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [effective, mounted]);
 
   const open = authoringOpen === base.id;
   const height = (spec.height ?? 300) + (base.kind === "heatmap" ? 90 : 70);
-  const edited = !!override;
+  const edited = !!override && !override.story;
+  const activeStory = override?.story;
+  const stories = base.stories ?? [];
+  const story = stories.find((s) => s.id === activeStory);
 
   return (
     <div ref={cardRef} className={`chart-card${edited ? " edited" : ""}`} id={`chart-${base.id}`}>
@@ -110,15 +149,25 @@ export function ChartHost({ spec: base }: { spec: ChartSpec }) {
         </div>
         <div className="chart-tools">
           {base.kind !== "table" && (
-            <button type="button" className={`icon-btn${tableView ? " on" : ""}`} title={tableView ? "Back to the chart" : "Show the numbers"} aria-pressed={tableView} onClick={() => setTableView((v) => !v)}>
+            <button type="button" className={`icon-btn${tableView ? " on" : ""}`} title={tableView ? "Back to the chart" : "Show the numbers"} aria-label={tableView ? "Back to the chart" : "Show the numbers behind this chart"} aria-pressed={tableView} onClick={() => setTableView((v) => !v)}>
               ⊞
             </button>
           )}
-          <button type="button" className={`icon-btn${open || edited ? " on" : ""}`} title="Chart definition: backend, axes, marks" aria-expanded={open} onClick={() => setAuthoringOpen(open ? null : base.id)}>
+          <button type="button" className={`icon-btn${open || edited ? " on" : ""}`} title="Chart definition: backend, axes, marks" aria-label="Open the chart definition" aria-expanded={open} onClick={() => setAuthoringOpen(open ? null : base.id)}>
             ⚙
           </button>
         </div>
       </div>
+      {stories.length > 0 && (
+        <div className="stories" role="group" aria-label="Stories">
+          {stories.map((st) => (
+            <button key={st.id} type="button" className={`chip${activeStory === st.id ? " on" : ""}`} onClick={() => applyStory(base.id, st)} title={st.narrative}>
+              {st.label}
+            </button>
+          ))}
+          {story?.narrative && <span className="story-narrative">{story.narrative}</span>}
+        </div>
+      )}
       {effective === "table" ? (
         <TableView spec={spec} />
       ) : (
