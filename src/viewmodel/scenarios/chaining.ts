@@ -30,7 +30,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const heat: ChartSpec = {
     id: "chain-heat",
     title: "Log growth per season by risk per night and true loss rate",
-    subtitle: `${k} name${k === 1 ? "" : "s"} a night, growth conditional on survival; cells where a season wipes the tranche more than 1% of the time say so instead. No row stays positive at break-even. The outlined cell is your deck.`,
+    subtitle: `${k} name${k === 1 ? "" : "s"} a night, growth conditional on survival; cells where a season wipes the tranche more than 1% of the time say so instead. The outlined cell is your deck.`,
     kind: "heatmap",
     data: table([f("risk", "Tranche at risk per night", "pct"), f("q", "True loss rate per name", "pct2"), f("growth", "Log growth per season", "pct1"), f("label", "Label")], gridRows),
     mark: "bar",
@@ -53,7 +53,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const sweepMin = Math.max(-0.2, Math.min(...sweepRows.map((r) => Math.min(r.g0 as number, r.g1 as number, r.g2 as number, r.robust as number))));
   const sweep: ChartSpec = {
     id: "chain-sweep",
-    title: "The row to sit in: growth averaged over the rates you cannot rule out",
+    title: "Growth averaged over the loss-rate band",
     subtitle: `The thick curve averages growth over a loss rate drawn ${d.bandLabel}. It peaks at ${pct(d.robust.risk)} of the tranche per night; growth-optimal at the deck's rate alone would be ${pct(d.nightKelly.risk)}.`,
     kind: "xy",
     data: table(
@@ -104,7 +104,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const growthChart: ChartSpec = {
     id: "chain-curve",
     title: "Mean and median as seasons are chained",
-    subtitle: "Solid is the median, dashed the mean. The mean compounds on a shrinking set of lucky paths; the median is where the typical path sits.",
+    subtitle: "Solid: median. Dashed: mean.",
     kind: "xy",
     data: table(
       [
@@ -241,12 +241,13 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   return {
     id: "chaining",
     number: 8,
-    eyebrow: "Replaying the tranche",
-    title: `Chain ${N} season${N === 1 ? "" : "s"} and the median becomes your number`,
-    question: "Survive season one with the drawdown a bad season brings, then play again. What changes over several seasons?",
-    lede: `Chaining compounds every policy's mean the same way; what changes is which number describes your outcome. The coin's mean after ${N} seasons rides the ${pct1(
-      Math.pow(d.pClean, N),
-    )} of paths that survive them all. The diversified tranche at full exposure solves ruin but not growth, and the reserve policy turns the median positive at the price of mean that belonged to paths you were unlikely to be on. Section 3 says the loss rate cannot be pinned down, so the row to sit in is the one that does best averaged over the rates you cannot rule out.`,
+    title: "Chained seasons",
+    claim: "Over seasons the median becomes your number. Sit where growth stays best averaged over the loss rates you cannot rule out, not where it peaks at one rate.",
+    lede: `Log growth by risk per night and true loss rate with your cell outlined, the curve averaged over the band, then mean, median and the full distribution as ${N} season${N === 1 ? "" : "s"} are chained.`,
+    views: [
+      { id: "sizing-grid", title: "Sizing grid", blurb: "Growth per season by risk per night and true loss rate, and the curve averaged over the band of rates you cannot rule out.", charts: ["chain-heat", "chain-sweep", "chain-grid-table"], kpis: [0, 4] },
+      { id: "chained-outcomes", title: "Chained outcomes", blurb: "Mean and median as seasons are chained, the distribution after N seasons, and sampled paths.", charts: ["chain-curve", "chain-dist", "chain-fan", "chain-table"], kpis: [1, 2, 3] },
+    ],
     kpis: [
       { label: "Robust risk per night", value: pct(d.robust.risk), sub: `peak of the averaged curve · Kelly at the deck's rate ${pct(d.nightKelly.risk)}`, color: "ink", help: `Risk per night that maximises growth averaged over a loss rate drawn ${d.bandLabel}. The deck's ${pct(p.riskPerNight)} is ${Number.isFinite(halfVsKelly) ? `${halfVsKelly.toFixed(2)}× the single-rate optimum` : "beyond any positive optimum"}.` },
       { label: `Median after ${N} season${N === 1 ? "" : "s"}`, value: `${x2(sB.median)} → ${x2(sC.median)}`, sub: "whole tranche → reserve", color: "c" },

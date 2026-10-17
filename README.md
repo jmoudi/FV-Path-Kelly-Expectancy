@@ -36,22 +36,43 @@ be swapped without touching the others.
 | State | `src/state/store.ts` | Parameters, imported data, chart edits, default backend. Validated on load, persisted locally, exported and imported as one JSON file. `#reset` in the address clears it. |
 | UI | `src/ui/` | Control deck, section layout, chart host, tables, dialogs. One dark theme, graphite, with three policy hues and two status colours. |
 
-## Reading the app
+## Using the app
 
-- **Control deck.** Six inputs: loss rate per name (or the clean-season probability it
-  implies), gain per unit risked, nights per season, names per night, tranche at risk
-  per night, seasons chained. Six headline numbers update with them.
-- **Sections.** Each opens with the question it answers, a short lede, a row of
-  figures, the primary chart, then secondary charts. Tables, notes, derivations, and the
-  quoted-versus-computed figures sit in expanders underneath.
+- **Deck bar.** Anchored under the top bar on every page. Collapsed: the six inputs in
+  three groups (per event, per season, sizing) and two headline figures. Expanded
+  (Deck ▾): full inputs with help, every figure, the definitions, and the sweep presets.
+  A thin strip under it shows the active input's presets and run state.
+- **Tour** is the guided single page: each section has a functional title, a one-line
+  lede, the claim it defends in a boxed aside, an inputs bar, two headline figures, the
+  primary chart, secondary charts, and expanders for tables, notes and the
+  quoted-versus-recomputed figures.
+- **Views** are the same charts split into 17 responsibilities (season outcomes,
+  sizing grid, confidence band, candidate rates, …), each on its own page with the
+  context beside it. Open them from the Views menu, the chips next to a section title,
+  the ↗ on any chart, or Alt+← / Alt+→.
+- **Inputs** are synthetic number fields: type, use the wheel (Shift ×10, Alt ×0.1),
+  arrow keys, or drag the slider underneath. Dragging is relative and its feel is a
+  per-parameter distance in pixels (`input.sensitivityPx` in the schema), scaled by a
+  global sensitivity in Settings. Double-click a slider for the default. Focusing a
+  field makes it the active input.
+- **Sweeps** drive an input automatically from a saved preset: loop, ping-pong, or a
+  list of spots with hold times; over the whole range, a fraction of it, or absolute
+  values; with any step and interval, gliding or stepping. Presets are generic and
+  linked per input; links are saved with the state. On the active input: Ctrl+Enter
+  runs or pauses, Ctrl+. stops, Ctrl+[ and Ctrl+] switch presets, Ctrl+Shift+Enter
+  pauses everything. Inputs that make no sense to sweep (seed, engine caps) are marked.
+- **Undo.** Ctrl+Z / Ctrl+Shift+Z step through parameter changes, including the state
+  before a sweep started.
 - **Story chips** under a chart title re-define it in one click ("zoom on the range
   you cannot rule out", "what if q is really 3.2%?"). Clicking an active chip undoes it.
-- **⚙ on any chart** opens the chart definition; **⊞** shows the numbers behind it.
+- **⚙ on any chart** opens the chart definition as a popover that leaves the layout
+  alone and closes when the pointer moves away; **⊞** shows the numbers behind it.
 - **Data** imports a trade log (0/1 losses or P&L per unit of max loss) and realized
-  moves in priced sigmas. The record feeds section 3 and the robust sizing curve;
-  the moves can replace the Normal in section 4.
-- **Settings** picks the default backend and the engine; **Import / export** moves the
-  whole state as JSON.
+  moves in priced sigmas. The record feeds calibration and the robust sizing curve;
+  the moves can replace the Normal in the effective-loss-rate section.
+- **Settings** exist as a quick dialog (⚙ in the top bar) and as a full page: default
+  backend, sweep presets, engine, resets. **Import / export** moves the whole state as
+  JSON.
 
 ## Conventions worth knowing
 

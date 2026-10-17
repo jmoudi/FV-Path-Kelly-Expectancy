@@ -32,7 +32,7 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
   const need: ChartSpec = {
     id: "cal-events",
     title: "Events needed to tell two loss rates apart",
-    subtitle: `At ${z}σ separation around a ${pct2(qbar)} base rate. The whole range from fair to a good season lives inside one percentage point.`,
+    subtitle: `At ${z}σ separation around a ${pct2(qbar)} base rate.`,
     kind: "xy",
     data: table([f("gap", "Gap between the two rates", "pct2"), f("events", "Name-events needed", "int")], needRows),
     mark: "line",
@@ -62,7 +62,7 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
     return {
       id,
       title,
-      subtitle: `The observed loss rate after ${n.toLocaleString()} name-events, if the true rate is the optimistic one or the break-even one. Stems sit at the only values a count can take.`,
+      subtitle: `Observed loss rate after ${n.toLocaleString()} name-events under the optimistic and the break-even rate.`,
       kind: "xy",
       data: table([f("rate", "Observed loss rate", "pct2"), f("opt", `true rate ${pct2(qOpt)}`, "pct2"), f("be", `true rate ${pct2(qBE)}`, "pct2")], rows),
       mark: "bar",
@@ -96,8 +96,8 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
   if (rec) bandAnn.push({ kind: "point", x: rec.events, y: rec.rate, text: `your record: ${rec.events} events, ${pct2(rec.rate)}`, color: "ink", at: "end" });
   const band: ChartSpec = {
     id: "cal-band",
-    title: "The confidence band around a record that averages the deck's rate",
-    subtitle: `Wilson interval at ${z}σ. The band must exclude the break-even line before the record says anything about the edge.`,
+    title: "Confidence band as the record grows",
+    subtitle: `Wilson interval at ${z}σ around an observed rate equal to the deck's.`,
     kind: "xy",
     data: table([f("n", "Name-events observed", "int"), f("lo", "Lower bound", "pct2"), f("hat", "Observed rate", "pct2"), f("hi", "Upper bound", "pct2")], bandRows),
     mark: "line",
@@ -141,12 +141,14 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
   return {
     id: "calibration",
     number: 3,
-    eyebrow: "Expensive probability",
-    title: "Your edge lives in a number you cannot measure this decade",
-    question: "A 60% day-trading system reveals itself in a few hundred trades. How long until this one does?",
-    lede: `Both games are probability; the difference is where the edge sits. Here the entire range from fair to a good season lives in less than one percentage point of a rare-event frequency, and telling ${pct2(
-      qOpt,
-    )} from ${pct2(qBE)} at ${z}σ takes about ${Math.round(nOptBE).toLocaleString()} events. The estimate has to come from cross-sectional history, and then only as far as past reaction distributions still apply.`,
+    title: "Calibration",
+    claim: "The edge sits in a rare-event rate that a decade of your own trading cannot resolve; it has to come from cross-sectional history.",
+    lede: `Events needed to separate two loss rates, what a record looks like after one year and after ${Math.round(nOptBE).toLocaleString()} events, and the band around an observed rate as the record grows.`,
+    views: [
+      { id: "events-needed", title: "Events needed", blurb: "How many name-events separate two loss rates, and what that is in years.", charts: ["cal-events", "cal-table"], params: ["altLossRate", "zSigma", "eventsPerYear"], kpis: [0, 1, 2, 3] },
+      { id: "sampling", title: "Sampling distributions", blurb: "What an observed loss rate can look like under either true rate.", charts: ["cal-pmf-year", "cal-pmf-resolved"], params: ["eventsPerYear", "altLossRate"] },
+      { id: "confidence-band", title: "Confidence band", blurb: "How the uncertainty around an observed rate shrinks with the record.", charts: ["cal-band"], params: ["zSigma", "eventsPerYear"] },
+    ],
     kpis,
     primary: [need],
     secondary: [oneYear, resolved, band],

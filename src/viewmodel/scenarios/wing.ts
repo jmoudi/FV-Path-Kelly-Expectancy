@@ -51,8 +51,8 @@ export function buildWing(p: Params, _d: Derived, data: Datasets): ScenarioView 
 
   const payout: ChartSpec = {
     id: "wing-payout",
-    title: "What the wing pays out",
-    subtitle: "Payout as a fraction of the width. Above the credit line the event loses money; at 100% it is the full loss the binary model assumes every bad event to be.",
+    title: "Payout per unit width",
+    subtitle: "Above the credit line the event loses money; at 100% it is the full loss the binary model assumes.",
     kind: "xy",
     data: table([f("x", "Move toward the short strike, priced sigmas", "x2"), f("payout", "Payout per unit width", "pct")], densRows),
     mark: "line",
@@ -71,7 +71,7 @@ export function buildWing(p: Params, _d: Derived, data: Datasets): ScenarioView 
   const sweep: ChartSpec = {
     id: "wing-sweep",
     title: "Three candidate rates against the short-strike distance",
-    subtitle: "Breach overstates, full gap understates, effective reproduces the event's expectation. Where the effective curve meets c/W the wing is fairly priced.",
+    subtitle: "Where the effective curve meets c/W the wing is fairly priced.",
     kind: "xy",
     data: table([f("d", "Short strike distance, priced sigmas", "x2"), f("breach", "Breach rate", "pct2"), f("effective", "Effective rate", "pct2"), f("fullGap", "Full-gap rate", "pct2")], sweepRows),
     mark: "line",
@@ -149,14 +149,13 @@ export function buildWing(p: Params, _d: Derived, data: Datasets): ScenarioView 
   return {
     id: "wing",
     number: 4,
-    eyebrow: "Which rate goes in",
-    title: "Breach, full gap, or the rate in between",
-    question: "The binary model wants one full-loss rate per event. The wing produces partial losses. Which number is q?",
-    lede: `The breach rate (${pct2(r.breach)}) overstates it, the full-gap rate (${pct2(r.fullGap)}) understates it, and the effective rate (${pct2(
-      r.effective,
-    )}) reproduces the event's expected value once every bad event is treated as a full loss. In an efficient market the credit equals the expected payout, so the fair effective rate is c/W = ${pct2(
-      r.fairRate,
-    )}, which is exactly break-even. Any deck rate below that is a claim about the chain.`,
+    title: "Effective loss rate",
+    claim: "q is expected loss per unit of max loss. A fairly priced wing puts it at c/W, which is exactly break-even; anything lower is a claim about the chain.",
+    lede: `The realized move against one short wing, the payout it produces, and the three candidate rates (breach ${pct2(r.breach)}, effective ${pct2(r.effective)}, full gap ${pct2(r.fullGap)}) against c/W = ${pct2(r.fairRate)}.`,
+    views: [
+      { id: "move-vs-wing", title: "Move against the wing", blurb: "The realized move distribution over the short and long strike, and the payout ramp.", charts: ["wing-density", "wing-payout"], params: ["strikeDistance", "wingWidth", "creditFraction", "moveDist", "tailDf", "realizedRatio"], kpis: [0, 1] },
+      { id: "wing-rates", title: "Candidate rates", blurb: "Breach, effective and full-gap rates at your strikes and across strike distances, against the fair rate.", charts: ["wing-bars", "wing-sweep", "wing-table"], params: ["strikeDistance", "wingWidth", "creditFraction", "realizedRatio"], kpis: [0, 1, 2, 3] },
+    ],
     kpis: [
       { label: "Effective rate", value: pct2(r.effective), sub: "E[payout] ÷ width", color: "b", help: "The EV-matching full-loss rate for these inputs." },
       { label: "Edge asserted per event", value: signedPct1(edgePerMaxLoss), sub: `c ÷ W − effective = ${signedPct1(r.edgeRate)} as a rate`, color: edgePerMaxLoss > 0.005 ? "loss" : "ink", help: "Expected P&L per unit of max loss. Zero means the wing is priced fairly; positive means these inputs assume the chain overprices the tail." },

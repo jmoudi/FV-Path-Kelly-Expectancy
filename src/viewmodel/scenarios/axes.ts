@@ -21,8 +21,8 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
   grid.losses.forEach((row, t) => row.forEach((lost, i) => gridRows.push({ night: t + 1, name: `name ${i + 1}`, outcome: lost })));
   const gridChart: ChartSpec = {
     id: "axes-grid",
-    title: "The two axes, drawn",
-    subtitle: `One sampled season of ${d.byId.C.label}. Across: nights, each a step outside the log. Down: names on the same night, added up inside the log before the tranche feels them.`,
+    title: "One season as a grid: names by nights",
+    subtitle: `One sampled season of ${d.byId.C.label}. Across: nights (outside the log). Down: names on the night (inside the log).`,
     kind: "heatmap",
     data: table([f("night", "Night", "int"), f("name", "Name"), f("outcome", "Outcome (1 = full loss)", "int")], gridRows),
     mark: "bar",
@@ -112,7 +112,7 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
   const capOpt = rowsOpt.find((r) => r.capBinds)?.names;
   const breadthChart: ChartSpec = {
     id: "axes-breadth",
-    title: "Breadth: one more uncorrelated name is worth one more night",
+    title: "Growth per season by names per night",
     subtitle: `Log growth per season at the Kelly fraction per name, capped by capital once k·f* passes 100%. At the deck's rate the cap ${capDeck ? `binds from ${capDeck} names` : "does not bind up to six names"}; at the optimistic rate it ${capOpt ? `binds from ${capOpt}` : "does not bind"}.`,
     kind: "xy",
     data: table(
@@ -144,10 +144,13 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
   return {
     id: "axes",
     number: 7,
-    eyebrow: "Time and breadth",
-    title: "Two axes, and the sizing rule that makes them one",
-    question: `${n} all-in steps produce a coin; ${k * n} parallel ${k === 1 ? "bets" : `${k === 2 ? "halves" : k === 3 ? "thirds" : `${k}ths`}`} produce a hump. Why does nobody separate the two axes?`,
-    lede: `Growth is a sum over steps of E[log(1 + Σ fᵢrᵢ)]. Time steps sit outside the log, so outcomes multiply; parallel bets sit inside it, so a single loss is divided by the number of bets before it hits capital. The distinction only exists while exposure is fixed per step: size every bet at its own fraction and the grid collapses to one number, independent bets per unit time.`,
+    title: "Time and breadth",
+    claim: "Time steps sit outside the log and parallel bets inside it; sizing every bet at its own fraction collapses both axes into one number, independent bets per unit time.",
+    lede: `One sampled season as a names-by-nights grid with the tranche beneath it, the Kelly fraction per name, the growth hump, and growth by names per night.`,
+    views: [
+      { id: "grid-and-path", title: "Grid and path", blurb: "One sampled season drawn as names by nights, with the tranche it produces.", charts: ["axes-grid", "axes-path"] },
+      { id: "kelly-breadth", title: "Kelly and breadth", blurb: "The growth-optimal fraction, the growth hump, and growth per season by names per night.", charts: ["axes-kelly", "axes-hump", "axes-breadth", "axes-table"], kpis: [0, 1, 2, 3] },
+    ],
     kpis: [
       { label: "Kelly fraction per name", value: pct(fstar), sub: "p − q/b at the deck's q", color: "c" },
       { label: "Growth per season, k names", value: signedPct1(rowsDeck[k - 1].growthCapped), sub: `${k} × ${pct(rowsDeck[k - 1].fractionPerName)} = ${pct(rowsDeck[k - 1].totalAtRisk)} at risk`, help: "At the Kelly fraction per name, capped so the names never exceed the tranche." },

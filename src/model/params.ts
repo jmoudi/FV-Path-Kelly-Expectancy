@@ -87,6 +87,29 @@ export const DEFAULT_PARAMS: Params = {
 export type Tier = "primary" | "secondary" | "advanced";
 export type Unit = "pct" | "pct2" | "x" | "int" | "sigma" | "ratio" | "choice";
 
+/** The deck's three input groups. */
+export type ParamGroup = "event" | "season" | "sizing";
+export const GROUP_LABELS: Record<ParamGroup, { label: string; blurb: string }> = {
+  event: { label: "Per event", blurb: "What one name does on one night." },
+  season: { label: "Per season", blurb: "How many nights, how many names a night." },
+  sizing: { label: "Sizing", blurb: "How much of the tranche a night can lose, and how long you replay it." },
+};
+
+/**
+ * How the synthetic number input behaves for one parameter. The slider's feel is a
+ * physical distance, not a share of its rendered width.
+ */
+export interface InputConfig {
+  /** Show the drag slider under the box. */
+  slider: boolean;
+  /** Pixels of drag from the middle to either extreme. */
+  sensitivityPx: number;
+  /** Change per wheel notch; defaults to the step. */
+  wheelStep?: number;
+  /** Decimal places shown in the box (in display units). */
+  decimals?: number;
+}
+
 export interface ParamDef {
   key: keyof Params;
   label: string;
@@ -98,10 +121,28 @@ export interface ParamDef {
   tier: Tier;
   /** Which section the secondary input belongs to. */
   section?: string;
+  /** Which deck group a primary input belongs to. */
+  group?: ParamGroup;
   help: string;
+  /** A one-line definition for the glossary in the expanded deck. */
+  definition?: string;
   choices?: { value: string; label: string }[];
   /** The input also changes the deck's policies, so every section moves with it. */
   affectsAll?: boolean;
+  input?: Partial<InputConfig>;
+  /** Whether a sweep preset may drive it. Engine settings and seeds are not swept. */
+  sweepable?: boolean;
+}
+
+export const DEFAULT_INPUT: InputConfig = { slider: true, sensitivityPx: 220 };
+
+export function inputConfig(def: ParamDef): InputConfig {
+  return { ...DEFAULT_INPUT, ...(def.input ?? {}) };
+}
+
+export function isSweepable(def: ParamDef): boolean {
+  if (def.unit === "choice") return false;
+  return def.sweepable ?? def.tier !== "advanced";
 }
 
 export const PARAM_DEFS: ParamDef[] = [
@@ -114,7 +155,10 @@ export const PARAM_DEFS: ParamDef[] = [
     max: 0.08,
     step: 0.0005,
     tier: "primary",
+    group: "event",
     help: "Probability that one name hits max loss on one night. The binary abstraction treats every bad event as a full loss, so this is expected loss as a fraction of max loss (section 4 derives it from a wing).",
+    definition: "q: expected loss per unit of max loss on one name-event. The breach rate overstates it, the full-gap rate understates it.",
+    input: { sensitivityPx: 320, wheelStep: 0.0005 },
   },
   {
     key: "gain",
@@ -125,21 +169,27 @@ export const PARAM_DEFS: ParamDef[] = [
     max: 0.15,
     step: 0.0025,
     tier: "primary",
+    group: "event",
     help: "What a winning name pays as a fraction of the amount it risked. 3.5% is a wing that collects 3.4% of its width.",
+    definition: "b: credit over max loss, c ÷ (W − c). Break-even loss rate is b ÷ (1 + b).",
+    input: { decimals: 2 },
   },
-  { key: "nights", label: "Nights per season", short: "n", unit: "int", min: 5, max: 60, step: 1, tier: "primary", help: "Games in a row before the tranche is reckoned. One night can carry several names." },
-  { key: "names", label: "Names per night", short: "k", unit: "int", min: 1, max: 6, step: 1, tier: "primary", help: "Independent bets placed on the same night in the diversified policies." },
+  { key: "nights", label: "Nights per season", short: "n", unit: "int", min: 5, max: 60, step: 1, tier: "primary", group: "season", help: "Games in a row before the tranche is reckoned. One night can carry several names.", definition: "n: nights in a season. Clean season = (1 − q)^n; clean end = (1 + b)^n." },
+  { key: "names", label: "Names per night", short: "k", unit: "int", min: 1, max: 6, step: 1, tier: "primary", group: "season", help: "Independent bets placed on the same night in the diversified policies.", definition: "k: names on one night. Each risks 1/k of what the night risks.", input: { sensitivityPx: 140 } },
   {
     key: "riskPerNight",
     label: "Tranche at risk per night",
+    short: "risk",
     unit: "pct",
     min: 0.05,
     max: 1,
     step: 0.05,
     tier: "primary",
+    group: "sizing",
     help: "Share of the tranche that can be lost on one night in the reserve policy. 100% is the whole tranche; 50% keeps half in reserve.",
+    definition: "Risk per night: the most a night can take from the tranche. The rest is the reserve.",
   },
-  { key: "seasons", label: "Seasons chained", short: "N", unit: "int", min: 1, max: 12, step: 1, tier: "primary", help: "Seasons played back to back without refilling the tranche." },
+  { key: "seasons", label: "Seasons chained", short: "N", unit: "int", min: 1, max: 12, step: 1, tier: "primary", group: "sizing", help: "Seasons played back to back without refilling the tranche.", definition: "N: seasons replayed without refilling. Median after N is the number you most likely see.", input: { sensitivityPx: 160 } },
 
   {
     key: "sharedOutcome",
@@ -193,7 +243,7 @@ export const PARAM_DEFS: ParamDef[] = [
   },
   { key: "tailDf", label: "Student-t degrees of freedom", unit: "ratio", min: 2.5, max: 30, step: 0.5, tier: "secondary", section: "wing", help: "Lower is fatter-tailed. 4 is a common fit for single-stock earnings moves." },
   { key: "realizedRatio", label: "Realized ÷ priced sigma", unit: "ratio", min: 0.3, max: 2.5, step: 0.01, tier: "secondary", section: "wing", help: "Scales the whole realized distribution against what the chain priced. 1.00 means the chain was right on average." },
-  { key: "parallelTranches", label: "Parallel tranches sampled", unit: "int", min: 50, max: 5000, step: 50, tier: "secondary", section: "mean-median", help: "How many independent replays the pooling chart averages." },
+  { key: "parallelTranches", label: "Parallel tranches sampled", unit: "int", min: 50, max: 5000, step: 50, tier: "secondary", section: "mean-median", help: "How many independent replays the pooling chart averages.", sweepable: false },
 
   {
     key: "engine",

@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { BACKEND_INFO } from "../charts/registry";
-import type { BackendId } from "../charts/spec";
 import { parseNumberList, recordStats } from "../model/calibration";
-import { PARAM_DEFS } from "../model/params";
 import { useStore } from "../state/store";
 import { pct2 } from "../viewmodel/derived";
 import { copyText, saveText } from "./download";
-import { ParamInput } from "./ParamInput";
+import { SettingsBody } from "./SettingsBody";
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -24,7 +21,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   }, [onClose]);
   return (
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="dialog" role="dialog" aria-modal="true" aria-label={title} ref={ref}>
+      <div className={`dialog${wide ? " wide" : ""}`} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
         <div className="row" style={{ justifyContent: "space-between" }}>
           <h3>{title}</h3>
           <button type="button" className="btn quiet" onClick={onClose}>
@@ -46,7 +43,7 @@ export function ImportExportDialog({ onClose }: { onClose: () => void }) {
   const json = () => JSON.stringify(exportState(), null, 2);
   return (
     <Modal title="Import and export" onClose={onClose}>
-      <p>The whole state travels as one JSON file: every parameter, every chart edit, the imported data and the default backend. Paste a file here, or save the current one.</p>
+      <p>The whole state travels as one JSON file: every parameter, chart edit, sweep preset and link, the imported data and the default backend.</p>
       <div className="row">
         <button type="button" className="btn primary" onClick={() => void saveText(`tranche-replay-${new Date().toISOString().slice(0, 10)}.json`, json()).then((how) => setMsg({ ok: how !== "none", text: how === "download" ? "Saved." : how === "clipboard" ? "Downloads are blocked here, so it was copied to the clipboard." : "Could not save." }))}>
           Save current state
@@ -166,13 +163,13 @@ export function DataDialog({ onClose }: { onClose: () => void }) {
       <DatasetEditor
         kind="record"
         title="Trade log"
-        blurb="Per-event outcomes. Either 0/1 with 1 = a full loss, or P&L per unit of max loss: a clean win is +b (0.035), a full loss −1, a partial loss in between. Section 3 shows the record's effective rate and band; section 8 weights its robust curve by the record's posterior."
+        blurb="Per-event outcomes. Either 0/1 with 1 = a full loss, or P&L per unit of max loss: a clean win is +b (0.035), a full loss −1, a partial loss in between. Calibration shows the record's effective rate and band; the sizing grid weights its robust curve by the record's posterior."
         placeholder={"0\n0\n1\n0\n…"}
       />
       <DatasetEditor
         kind="moves"
         title="Realized moves"
-        blurb="Realized earnings moves in priced sigmas, positive toward the short strike (one wing). Section 4 can use them as the empirical move distribution: pick “Imported moves” under Tune this section."
+        blurb="Realized earnings moves in priced sigmas, positive toward the short strike (one wing). The effective-loss-rate section can use them as the empirical move distribution: pick “Imported moves” among its inputs."
         placeholder={"0.4\n-1.2\n2.7\n…"}
       />
     </Modal>
@@ -180,106 +177,12 @@ export function DataDialog({ onClose }: { onClose: () => void }) {
 }
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
-  const defaultBackend = useStore((s) => s.defaultBackend);
-  const setDefaultBackend = useStore((s) => s.setDefaultBackend);
-  const clearAllOverrides = useStore((s) => s.clearAllOverrides);
-  const resetParams = useStore((s) => s.resetParams);
-  const resetEverything = useStore((s) => s.resetEverything);
-  const overrides = useStore((s) => s.overrides);
-  const edited = Object.keys(overrides).length;
-  const [confirm, setConfirm] = useState<"charts" | "params" | "all" | null>(null);
-  const advanced = PARAM_DEFS.filter((d) => d.tier === "advanced");
   return (
-    <Modal title="Switchboard and settings" onClose={onClose}>
-      <p>Every chart is a renderer-agnostic definition routed through one of these backends. Pick the default here; override it per chart with the ⚙ button on any card.</p>
-      <div className="backend-cards">
-        {(["echarts", "plotly", "vega"] as BackendId[]).map((b) => (
-          <button key={b} type="button" className={`backend-card${defaultBackend === b ? " on" : ""}`} onClick={() => setDefaultBackend(b)}>
-            <b>{BACKEND_INFO[b].label}</b>
-            <span>{BACKEND_INFO[b].blurb}</span>
-          </button>
-        ))}
-      </div>
-      <h4>Chart edits</h4>
-      <div className="row">
-        <span style={{ color: "var(--ink-2)", fontSize: "var(--fs-ui)" }}>{edited === 0 ? "No chart has been edited." : `${edited} chart${edited === 1 ? "" : "s"} carry edits or stories.`}</span>
-        {confirm === "charts" ? (
-          <>
-            <button
-              type="button"
-              className="btn primary"
-              onClick={() => {
-                clearAllOverrides();
-                setConfirm(null);
-              }}
-            >
-              Yes, reset every chart
-            </button>
-            <button type="button" className="btn quiet" onClick={() => setConfirm(null)}>
-              Keep them
-            </button>
-          </>
-        ) : (
-          <button type="button" className="btn" disabled={edited === 0} onClick={() => setConfirm("charts")}>
-            Reset all chart edits
-          </button>
-        )}
-      </div>
-      <h4>Parameters</h4>
-      <div className="row">
-        {confirm === "params" ? (
-          <>
-            <button
-              type="button"
-              className="btn primary"
-              onClick={() => {
-                resetParams();
-                setConfirm(null);
-              }}
-            >
-              Yes, back to the discussion's inputs
-            </button>
-            <button type="button" className="btn quiet" onClick={() => setConfirm(null)}>
-              Keep mine
-            </button>
-          </>
-        ) : (
-          <button type="button" className="btn" onClick={() => setConfirm("params")}>
-            Reset every parameter to the discussion's inputs
-          </button>
-        )}
-      </div>
-      <h4>Engine</h4>
-      <div className="params-compact" style={{ padding: 0 }}>
-        {advanced.map((d) => (
-          <ParamInput key={d.key} k={d.key} compact />
-        ))}
-      </div>
-      <h4>Start over</h4>
-      <div className="row">
-        {confirm === "all" ? (
-          <>
-            <button
-              type="button"
-              className="btn primary"
-              onClick={() => {
-                resetEverything();
-                setConfirm(null);
-              }}
-            >
-              Yes, forget everything
-            </button>
-            <button type="button" className="btn quiet" onClick={() => setConfirm(null)}>
-              Keep it
-            </button>
-          </>
-        ) : (
-          <button type="button" className="btn quiet" onClick={() => setConfirm("all")}>
-            Forget parameters, chart edits and imported data
-          </button>
-        )}
-        <span className="caption">Opening the app with #reset in the address does the same.</span>
-      </div>
+    <Modal title="Settings" onClose={onClose} wide>
+      <p className="caption">
+        Reduced view. <a href="#settings" onClick={onClose}>Open the full settings page</a> for more room.
+      </p>
+      <SettingsBody full={false} />
     </Modal>
   );
 }

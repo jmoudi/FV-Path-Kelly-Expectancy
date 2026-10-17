@@ -14,7 +14,7 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
   const outcomes: ChartSpec = {
     id: "binary-outcomes",
     title: "Where a single-name season can end",
-    subtitle: "Whole tranche at risk every night, gains compounding inside. Two outcomes, nothing in between.",
+    subtitle: "Whole tranche at risk every night, gains compounding inside.",
     kind: "xy",
     data: table(
       [f("end", "Season end, tranche units", "x"), f("ruin", "Ruin", "pct1"), f("clean", "Clean season", "pct1")],
@@ -133,10 +133,13 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
   return {
     id: "binary",
     number: 1,
-    eyebrow: "The reduction",
-    title: "A season is a coin, and “roughly 50-50” is the whole edge",
-    question: "If every event risks the whole tranche and gains compound inside it, what is left of the per-event detail?",
-    lede: `One number: the probability of a clean season. A full loss is absorbing, so ${n} nights end at ${end.toFixed(2)}× or at 0, and “roughly 50-50, doubled or zero” is not an edge but the break-even point, almost to the decimal.`,
+    title: "Season reduction",
+    claim: "An all-in season is a coin: “roughly 50-50, doubled or zero” is break-even, not an edge.",
+    lede: `A full loss is absorbing, so ${n} all-in nights end at ${end.toFixed(2)}× or at 0; the only number that survives is the probability of a clean season.`,
+    views: [
+      { id: "season-outcomes", title: "Season outcomes", blurb: "Where an all-in season ends and the paths that get there.", charts: ["binary-outcomes", "binary-fan"], kpis: [0, 1, 2, 3] },
+      { id: "clean-season-curve", title: "Clean season vs loss rate", blurb: "The one curve the coin reduces to, with break-even and the deck marked.", charts: ["binary-curve", "binary-table"], kpis: [0, 2] },
+    ],
     kpis: [
       { label: "Break-even loss rate", value: pct2(d.breakEven), sub: "b ÷ (1 + b)", color: "loss", help: "Above this per-event loss rate the season has negative expectation. It is also c/W, the rate at which the wing is fairly priced." },
       { label: "Edge per season", value: signedPct1(mean - 1), sub: `≈ 2p − 1 = ${signedPct1(2 * d.pClean - 1)}`, help: "Mean season end minus one. The shorthand 2p − 1 is exact when the clean end is 2×." },

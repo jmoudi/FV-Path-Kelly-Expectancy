@@ -30,12 +30,29 @@ export interface SourceFigure {
   computed: string;
 }
 
+/**
+ * A responsibility: one chart with its context, or a group of charts a finance
+ * desk would read together. Each has its own page.
+ */
+export interface ResponsibilityView {
+  id: string;
+  title: string;
+  blurb: string;
+  /** Chart ids from this section, in reading order. */
+  charts: string[];
+  /** Indices into the section's kpis. */
+  kpis?: number[];
+  params?: (keyof Params)[];
+}
+
 export interface ScenarioView {
   id: string;
   number: number;
-  eyebrow: string;
+  /** Functional name: what the section is about. */
   title: string;
-  question: string;
+  /** The one statement the section defends, shown in an inline box. */
+  claim: string;
+  /** One sentence on what the section shows. */
   lede: string;
   /** The first two are shown; the rest sit behind "more figures". */
   kpis: KPI[];
@@ -48,4 +65,13 @@ export interface ScenarioView {
   localParams: (keyof Params)[];
   actions?: Action[];
   sourceFigures?: SourceFigure[];
+  views: ResponsibilityView[];
+}
+
+export function allCharts(s: ScenarioView): ChartSpec[] {
+  return [...s.primary, ...s.secondary, ...s.tables];
+}
+
+export function viewOfChart(s: ScenarioView, chartId: string): ResponsibilityView | undefined {
+  return s.views.find((v) => v.charts.includes(chartId));
 }

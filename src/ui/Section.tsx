@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useStore } from "../state/store";
 import type { Action, KPI, Note, ScenarioView } from "../viewmodel/types";
+import { viewOfChart } from "../viewmodel/types";
 import { ChartHost } from "./ChartHost";
 import { Help } from "./Help";
 import { ParamInput } from "./ParamInput";
@@ -26,7 +27,7 @@ function NoteBody({ body }: { body: string }) {
   );
 }
 
-function Notes({ notes }: { notes: Note[] }) {
+export function Notes({ notes }: { notes: Note[] }) {
   return (
     <div className="expander-body">
       {notes.map((n) => (
@@ -54,7 +55,7 @@ export function KpiTile({ k }: { k: KPI }) {
   );
 }
 
-function ActionButton({ a }: { a: Action }) {
+export function ActionButton({ a }: { a: Action }) {
   const setParams = useStore((s) => s.setParams);
   const [confirm, setConfirm] = useState(false);
   if (a.warning && confirm) {
@@ -87,20 +88,71 @@ function ActionButton({ a }: { a: Action }) {
   );
 }
 
+export function SourceFigures({ view }: { view: ScenarioView }) {
+  if (!view.sourceFigures?.length) return null;
+  return (
+    <details className="expander">
+      <summary>Figures quoted in the discussion, recomputed here</summary>
+      <div className="expander-body">
+        <table className="figs">
+          <thead>
+            <tr>
+              <th scope="col">Figure</th>
+              <th scope="col">Quoted</th>
+              <th scope="col">This app</th>
+            </tr>
+          </thead>
+          <tbody>
+            {view.sourceFigures.map((s) => (
+              <tr key={s.label}>
+                <td>{s.label}</td>
+                <td className="mono">{s.quoted}</td>
+                <td className="mono">{s.computed}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="caption">Recomputed from the current deck. Small differences are rounding in the discussion; large ones mean the deck has moved away from its inputs.</p>
+      </div>
+    </details>
+  );
+}
+
+/** A section of the guided tour. */
 export function Section({ view }: { view: ScenarioView }) {
   const head = view.kpis.slice(0, 2);
   const more = view.kpis.slice(2);
   return (
     <section className="section" id={`s-${view.id}`} aria-labelledby={`h-${view.id}`}>
       <div className="section-head">
-        <div className="eyebrow">
-          <span className="n">{String(view.number).padStart(2, "0")}</span>
-          <span>{view.eyebrow}</span>
+        <div className="section-title-row">
+          <h2 id={`h-${view.id}`}>{view.title}</h2>
+          <span className="view-links">
+            {view.views.map((v) => (
+              <a key={v.id} href={`#view/${v.id}`} className="chip tiny">
+                {v.title} ↗
+              </a>
+            ))}
+          </span>
         </div>
-        <h2 id={`h-${view.id}`}>{view.title}</h2>
-        <p className="question">{view.question}</p>
-        <p className="lede">{view.lede}</p>
+        <div className="prose">
+          <aside className="claim">{view.claim}</aside>
+          <p className="lede">{view.lede}</p>
+        </div>
       </div>
+
+      {view.localParams.length > 0 && (
+        <details className="inputs-bar">
+          <summary>
+            Inputs for this section <span className="caption">({view.localParams.length})</span>
+          </summary>
+          <div className="params-compact">
+            {view.localParams.map((k) => (
+              <ParamInput key={k} k={k} compact />
+            ))}
+          </div>
+        </details>
+      )}
 
       {head.length > 0 && (
         <div className="kpi-row">
@@ -124,14 +176,14 @@ export function Section({ view }: { view: ScenarioView }) {
 
       <div className="stack">
         {view.primary.map((c) => (
-          <ChartHost key={c.id} spec={c} />
+          <ChartHost key={c.id} spec={c} viewId={viewOfChart(view, c.id)?.id} />
         ))}
       </div>
 
       {view.secondary.length > 0 && (
         <div className="grid-2">
           {view.secondary.map((c) => (
-            <ChartHost key={c.id} spec={c} />
+            <ChartHost key={c.id} spec={c} viewId={viewOfChart(view, c.id)?.id} />
           ))}
         </div>
       )}
@@ -145,21 +197,11 @@ export function Section({ view }: { view: ScenarioView }) {
       )}
 
       <div className="section-tail">
-        {view.localParams.length > 0 && (
-          <details className="expander">
-            <summary>Tune this section</summary>
-            <div className="params-compact">
-              {view.localParams.map((k) => (
-                <ParamInput key={k} k={k} compact />
-              ))}
-            </div>
-          </details>
-        )}
         {view.tables.map((t) => (
           <details className="expander" key={t.id}>
             <summary>{t.title}</summary>
             <div className="expander-body">
-              <ChartHost spec={t} />
+              <ChartHost spec={t} viewId={viewOfChart(view, t.id)?.id} />
             </div>
           </details>
         ))}
@@ -169,32 +211,7 @@ export function Section({ view }: { view: ScenarioView }) {
             <Notes notes={view.notes} />
           </details>
         )}
-        {view.sourceFigures && view.sourceFigures.length > 0 && (
-          <details className="expander">
-            <summary>Figures quoted in the discussion, recomputed here</summary>
-            <div className="expander-body">
-              <table className="figs">
-                <thead>
-                  <tr>
-                    <th scope="col">Figure</th>
-                    <th scope="col">Quoted</th>
-                    <th scope="col">This app</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {view.sourceFigures.map((s) => (
-                    <tr key={s.label}>
-                      <td>{s.label}</td>
-                      <td className="mono">{s.quoted}</td>
-                      <td className="mono">{s.computed}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="caption">Recomputed from the current deck. Small differences are rounding in the discussion; large ones mean the deck has moved away from its inputs.</p>
-            </div>
-          </details>
-        )}
+        <SourceFigures view={view} />
       </div>
     </section>
   );

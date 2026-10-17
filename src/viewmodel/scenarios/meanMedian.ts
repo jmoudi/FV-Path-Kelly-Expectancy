@@ -24,7 +24,7 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
   const quantiles: ChartSpec = {
     id: "mm-quantiles",
     title: "Every replay sorted from worst to best",
-    subtitle: "Read the median at the 50% mark. The mean is the average height of the whole curve, which is why it can sit where no replay ends.",
+    subtitle: "Median at the 50% mark; the mean is the average height of the whole curve.",
     kind: "xy",
     data: table([f("pctile", "Share of replays ending at or below", "pct"), ...ids.map((id) => f(id, d.byId[id].label, "x"))], qRows),
     mark: "step",
@@ -59,7 +59,7 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
   const running: ChartSpec = {
     id: "mm-running",
     title: `Pooling ${N} independent tranches`,
-    subtitle: "The mean is what a pool of many parallel tranches converges to. You own one tranche, so you never see this average directly.",
+    subtitle: "Running average of independent replays; it converges to the mean.",
     kind: "xy",
     data: table([f("count", "Tranches pooled", "int"), ...ids.map((id) => f(id, d.byId[id].label, "x"))], runRows),
     mark: "line",
@@ -89,8 +89,8 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
   addStems("C");
   const stems: ChartSpec = {
     id: "mm-stems",
-    title: "The balance point",
-    subtitle: `Probability of each exact outcome of ${d.byId.B.label} (${methodLabel(d.season.B.dist.method)}). A fulcrum under the stems balances at the mean; half of the mass sits left of the median.`,
+    title: "Exact outcomes, policy B",
+    subtitle: `Probability of each exact season end of ${d.byId.B.label} (${methodLabel(d.season.B.dist.method)}). Mean and median marked.`,
     kind: "xy",
     data: table([f("end", "Season end, tranche units", "x"), f("B", d.byId.B.label, "pct1"), f("C", d.byId.C.label, "pct1")], [...stemRows.values()].sort((a, b) => (a.end as number) - (b.end as number))),
     mark: "bar",
@@ -138,10 +138,13 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
   return {
     id: "mean-median",
     number: 2,
-    eyebrow: "Reading the numbers",
-    title: "What “mean” means when no season ends there",
-    question: `The mean of the coin-flip season is ${A.mean.toFixed(2)}×, yet a tranche can only end at ${d.cleanEnd.toFixed(2)}× or 0. What is that number measuring?`,
-    lede: `The mean answers a question about a pool: run this tranche in many parallel worlds and average them. The median answers a question about you: the one world you actually live in.${degenerate}`,
+    title: "Mean and median",
+    claim: "The mean is the average of a pool of parallel tranches you never own; the median is the season you most likely live.",
+    lede: `Every replay of one season sorted, the exact outcomes of the diversified tranche, and the average of a pool of replays.${degenerate}`,
+    views: [
+      { id: "replay-quantiles", title: "Replay quantiles", blurb: "Every replay sorted, with the exact outcomes of the diversified tranche.", charts: ["mm-quantiles", "mm-stems", "mm-table"], kpis: [0, 1, 2] },
+      { id: "pooling", title: "Pooling parallel tranches", blurb: "How the mean emerges from a pool you do not own.", charts: ["mm-running"], params: ["parallelTranches"], kpis: [0, 3] },
+    ],
     kpis: [
       { label: "Mean, coin and diversified", value: x2(A.mean), sub: "the same for A and B", help: "Expected season end. Spreading the same risk over more names does not change it." },
       { label: "Median, coin → diversified", value: `${x2(A.median)} → ${x2(B.median)}`, sub: `${pct(d.pClean)} vs ${pct1(B.pMax)} clean seasons`, color: "b", help: "Half of replays end at or above this. For the coin it is one of the two outcomes; for the diversified tranche it is a season with one or two partial hits." },

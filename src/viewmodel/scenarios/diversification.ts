@@ -31,8 +31,8 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
   }
   const shape: ChartSpec = {
     id: "div-shape",
-    title: "Same mean, different shape",
-    subtitle: `Share of seasons ending at or below each value (${methodLabel(d.season.B.dist.method)}). The coin jumps from ${pct(1 - d.pClean)} straight to 100%; ${k} names at 1/${k} each climb through the middle; the reserve policy climbs steepest around 1×.`,
+    title: "Season end, cumulative",
+    subtitle: `Share of seasons ending at or below each value (${methodLabel(d.season.B.dist.method)}).`,
     kind: "xy",
     data: table([f("end", "Season end, tranche units", "x"), ...ids.map((id) => f(id, d.byId[id].label, "pct1"))], cdfRows),
     mark: "step",
@@ -114,8 +114,8 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
   });
   const mix: ChartSpec = {
     id: "div-mix",
-    title: "Names per game is the wrong measure",
-    subtitle: `Season ruin as single-name nights are mixed in. Rule 1 puts the whole tranche on the lone name; rule 2 caps every name at 1/${k} of the tranche and leaves the rest idle.`,
+    title: "Ruin against single-name nights",
+    subtitle: `Rule 1 puts the whole tranche on the lone name; rule 2 caps every name at 1/${k} of the tranche and leaves the rest idle.`,
     kind: "xy",
     data: table(
       [
@@ -182,12 +182,13 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
   return {
     id: "diversification",
     number: 5,
-    eyebrow: "The free lunch",
-    title: `${k === 1 ? "More" : k} names on one night: the mean stays, the shape changes`,
-    question: `Is a season of ${p.nights} nights with ${k} names each the same bet as ${p.nights} spins of one all-in name?`,
-    lede: `No. Diversification leaves the expected outcome unchanged and changes everything else: with ${k} names the clean season drops from ${pct(d.pClean)} to ${pct1(
-      B.pMax,
-    )}, the typical season carries one or two partial hits, and ruin falls from ${pct(A.pRuin)} to ${smallPct(B.pRuin)}. It does not make the typical season better; it makes the bad one survivable, which is what lets you replay the tranche.${degenerate}`,
+    title: "Diversification",
+    claim: "Spreading a night over names leaves the mean alone and changes everything else: the free lunch is survivability, not a better typical season.",
+    lede: `One season under the coin, ${k} names on the whole tranche, and ${k} names with a reserve; then what mixing single-name nights back in does to ruin.${degenerate}`,
+    views: [
+      { id: "season-shape", title: "Season shape", blurb: "The cumulative distribution of one season under each policy, with sampled paths.", charts: ["div-shape", "div-fan-A", "div-fan-B", "div-table"], params: ["thresholdBelow"], kpis: [0, 1, 2, 3] },
+      { id: "single-name-mix", title: "Single-name nights", blurb: "Ruin and mean as single-name nights are mixed in, under two sizing rules.", charts: ["div-mix", "div-mix-table"], params: ["singleNameShare"] },
+    ],
     kpis: [
       { label: "Ruin, coin → diversified", value: `${pct(A.pRuin)} → ${smallPct(B.pRuin)}`, sub: "one season", color: "b" },
       { label: "Median, coin → diversified", value: `${x2(A.median)} → ${x2(B.median)}`, sub: "mean unchanged" },

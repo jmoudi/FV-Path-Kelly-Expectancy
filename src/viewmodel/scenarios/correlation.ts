@@ -72,8 +72,8 @@ export function buildCorrelation(p: Params, d: Derived, _data: Datasets): Scenar
   const mNow = shockedLossRate(q, p.volShock) / q;
   const convexity: ChartSpec = {
     id: "cor-shock",
-    title: "Shared volatility is convex",
-    subtitle: `If realized moves run above what every chain priced, the per-name loss rate rises by a factor m and the all-${k}-names loss by m${power(k)}.`,
+    title: "Loss-rate multiplier under a volatility shock",
+    subtitle: `Realized moves above what every chain priced raise the per-name loss rate by m and the all-${k}-names loss by m${power(k)}.`,
     kind: "xy",
     data: table([f("scale", "Realized ÷ priced sigma", "x2"), f("single", "Per-name loss rate multiplier", "x2"), f("joint", `All ${k} names at once`, "num")], shockRows),
     mark: "line",
@@ -126,16 +126,15 @@ export function buildCorrelation(p: Params, d: Derived, _data: Datasets): Scenar
   return {
     id: "correlation",
     number: 6,
-    eyebrow: "Shared causes",
-    title: "A triple loss is rare only if the names are strangers",
-    question: single
-      ? "With one name per night there is no joint loss to speak of. How does the picture change with several?"
-      : `${k} names at max loss on the same night has probability q${power(k)} ≈ ${smallPct(Math.pow(q, k))} if they are independent. How much correlation does it take to swamp that?`,
+    title: "Shared causes",
+    claim: "A joint loss is set by how often the names share a cause, not by how rare tails are; shared volatility is second-order next to shared direction.",
     lede: single
-      ? "Shared causes only matter once a night carries several names. Set names per night above one in the deck and this section comes alive: a small share of evenings with a common cause then dominates the independent tail."
-      : `Very little. If on a fraction c of evenings the names share one outcome, the joint loss is about c·q + q${power(k)}, and the correlation term wins as soon as c exceeds q${power(k - 1)} ≈ ${smallPct(
-          cross,
-        )}. The chance of a joint loss is not set by how rare tails are but by how often the names share a cause. Shared volatility is the same convexity, but at the season level it is second-order next to shared direction.`,
+      ? "With one name per night there is no joint loss; set names per night above one in the deck to see shared causes act."
+      : `Season ruin against the share of nights with one shared outcome (joint loss ≈ c·q + q${power(k)}, crossover at c = q${power(k - 1)} ≈ ${smallPct(cross)}), the four cases from the discussion, and the convexity of a volatility shock across ${k} names.`,
+    views: [
+      { id: "shared-causes", title: "Shared-cause ruin", blurb: "Season ruin against the share of nights on which the names share one outcome.", charts: ["cor-curve", "cor-bars", "cor-table"], params: ["sharedOutcome"], kpis: [0, 1, 2] },
+      { id: "vol-shock", title: "Volatility shock", blurb: "How a shared move in realized volatility multiplies single and joint losses.", charts: ["cor-shock", "cor-shock-share"], params: ["volShock", "volShockShare"], kpis: [3] },
+    ],
     kpis: [
       { label: "Joint loss per night", value: `${smallPct(pIndep)} → ${smallPct(pJoint)}`, sub: `independent → your c ${pct2(c)}`, color: "loss" },
       { label: "Ruin per season", value: `${smallPct(ruinIndep)} → ${smallPct(ruinJoint)}`, sub: "independent → your c" },

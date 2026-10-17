@@ -5,14 +5,15 @@ import { applyOverride, type BackendId, type ChartSpec } from "../charts/spec";
 import { useStore } from "../state/store";
 import { Authoring } from "./Authoring";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { Popover } from "./Popover";
 import { TableView } from "./TableView";
 
 /**
  * Renders one chart spec through the switchboard. Mounts lazily when scrolled
  * near the viewport, swaps backends on demand, and hosts the stories and the
- * authoring panel.
+ * chart-definition popover.
  */
-export function ChartHost({ spec: base }: { spec: ChartSpec }) {
+export function ChartHost({ spec: base, viewId }: { spec: ChartSpec; viewId?: string }) {
   const clearOverride = useStore((s) => s.clearOverride);
   return (
     <ErrorBoundary
@@ -39,12 +40,12 @@ export function ChartHost({ spec: base }: { spec: ChartSpec }) {
         </div>
       )}
     >
-      <ChartCard base={base} />
+      <ChartCard base={base} viewId={viewId} />
     </ErrorBoundary>
   );
 }
 
-function ChartCard({ base }: { base: ChartSpec }) {
+function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
   const override = useStore((s) => s.overrides[base.id]);
   const defaultBackend = useStore((s) => s.defaultBackend);
   const authoringOpen = useStore((s) => s.authoringOpen);
@@ -57,6 +58,7 @@ function ChartCard({ base }: { base: ChartSpec }) {
 
   const cardRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<HTMLDivElement>(null);
+  const gearRef = useRef<HTMLButtonElement>(null);
   const handleRef = useRef<RenderHandle | null>(null);
   const specRef = useRef(spec);
   specRef.current = spec;
@@ -124,7 +126,6 @@ function ChartCard({ base }: { base: ChartSpec }) {
     }
   }, [spec, mounted, effective]);
 
-  // Re-attach the resize observer whenever the plot element is (re)created.
   useEffect(() => {
     const el = plotRef.current;
     if (!el || !("ResizeObserver" in window) || effective === "table") return;
@@ -148,12 +149,17 @@ function ChartCard({ base }: { base: ChartSpec }) {
           {spec.subtitle && <div className="chart-sub">{spec.subtitle}</div>}
         </div>
         <div className="chart-tools">
+          {viewId && (
+            <a className="icon-btn" href={`#view/${viewId}`} title="Open this chart in its own view" aria-label="Open this chart in its own view">
+              ↗
+            </a>
+          )}
           {base.kind !== "table" && (
             <button type="button" className={`icon-btn${tableView ? " on" : ""}`} title={tableView ? "Back to the chart" : "Show the numbers"} aria-label={tableView ? "Back to the chart" : "Show the numbers behind this chart"} aria-pressed={tableView} onClick={() => setTableView((v) => !v)}>
               ⊞
             </button>
           )}
-          <button type="button" className={`icon-btn${open || edited ? " on" : ""}`} title="Chart definition: backend, axes, marks" aria-label="Open the chart definition" aria-expanded={open} onClick={() => setAuthoringOpen(open ? null : base.id)}>
+          <button ref={gearRef} type="button" className={`icon-btn${open || edited ? " on" : ""}`} title="Chart definition: backend, axes, marks" aria-label="Open the chart definition" aria-expanded={open} onClick={() => setAuthoringOpen(open ? null : base.id)}>
             ⚙
           </button>
         </div>
@@ -189,7 +195,11 @@ function ChartCard({ base }: { base: ChartSpec }) {
           </span>
         </div>
       )}
-      {open && <Authoring base={base} spec={spec} override={override} onClose={() => setAuthoringOpen(null)} />}
+      {open && (
+        <Popover anchor={gearRef.current} onClose={() => setAuthoringOpen(null)} label={`Chart definition: ${base.title}`} width={420}>
+          <Authoring base={base} spec={spec} override={override} onClose={() => setAuthoringOpen(null)} />
+        </Popover>
+      )}
     </div>
   );
 }
