@@ -91,9 +91,12 @@ function trace(spec: ChartSpec, s: SeriesSpec, barWidth: number | undefined, cat
   }
 }
 
-function annotationLayout(spec: ChartSpec): { shapes: PLayout[]; annotations: PLayout[] } {
+function annotationLayout(spec: ChartSpec, xLog: boolean, yLog: boolean): { shapes: PLayout[]; annotations: PLayout[] } {
   const shapes: PLayout[] = [];
   const annotations: PLayout[] = [];
+  // Plotly annotations (unlike shapes) take log10 coordinates on a log axis.
+  const ax = (v: number) => (xLog ? Math.log10(v) : v);
+  const ay = (v: number) => (yLog ? Math.log10(v) : v);
   for (const a of spec.annotations ?? []) {
     const color = roleColor(a.color ?? "muted");
     const dash = a.dash === false ? "solid" : "dot";
@@ -102,7 +105,7 @@ function annotationLayout(spec: ChartSpec): { shapes: PLayout[]; annotations: PL
       shapes.push({ type: "line", xref: "x", yref: "paper", x0: a.x, x1: a.x, y0: 0, y1: 1, line: { color, width: 1.2, dash } });
       if (a.text)
         annotations.push({
-          x: a.x,
+          x: ax(a.x),
           y: a.at === "start" ? 0.02 : 0.98,
           xref: "x",
           yref: "paper",
@@ -119,7 +122,7 @@ function annotationLayout(spec: ChartSpec): { shapes: PLayout[]; annotations: PL
       if (a.text)
         annotations.push({
           x: a.at === "start" ? 0.02 : 0.98,
-          y: a.y,
+          y: ay(a.y),
           xref: "paper",
           yref: "y",
           text: a.text,
@@ -138,8 +141,8 @@ function annotationLayout(spec: ChartSpec): { shapes: PLayout[]; annotations: PL
           yref: "y",
           xsizemode: "pixel",
           ysizemode: "pixel",
-          xanchor: a.x,
-          yanchor: a.y,
+          xanchor: ax(a.x),
+          yanchor: ay(a.y),
           x0: -5,
           x1: 5,
           y0: -5,
@@ -149,8 +152,8 @@ function annotationLayout(spec: ChartSpec): { shapes: PLayout[]; annotations: PL
         });
       if (a.text)
         annotations.push({
-          x: a.x,
-          y: a.y,
+          x: ax(a.x),
+          y: ay(a.y),
           text: a.text,
           showarrow: a.kind === "point",
           arrowcolor: color,
@@ -162,7 +165,7 @@ function annotationLayout(spec: ChartSpec): { shapes: PLayout[]; annotations: PL
         });
     } else if (a.kind === "xband" && a.x != null && a.x2 != null) {
       shapes.push({ type: "rect", xref: "x", yref: "paper", x0: a.x, x1: a.x2, y0: 0, y1: 1, fillcolor: withAlpha(color, 0.1), line: { width: 0 } });
-      if (a.text) annotations.push({ x: (a.x + a.x2) / 2, y: 0.98, xref: "x", yref: "paper", text: a.text, showarrow: false, font: { ...font, color: THEME.muted }, yanchor: "top" });
+      if (a.text) annotations.push({ x: xLog ? (Math.log10(a.x) + Math.log10(a.x2)) / 2 : (a.x + a.x2) / 2, y: 0.98, xref: "x", yref: "paper", text: a.text, showarrow: false, font: { ...font, color: THEME.muted }, yanchor: "top" });
     } else if (a.kind === "yband" && a.y != null && a.y2 != null) {
       shapes.push({ type: "rect", xref: "paper", yref: "y", x0: 0, x1: 1, y0: a.y, y1: a.y2, fillcolor: withAlpha(color, 0.1), line: { width: 0 } });
     }
@@ -268,7 +271,7 @@ function build(spec: ChartSpec, widthPx: number): { data: PTrace[]; layout: PLay
   const plotPx = Math.max(200, widthPx - MARGIN.l - MARGIN.r);
   const barWidth = spec.barWidthPx && !cats && axes.x.scale === "linear" ? ((axes.x.max - axes.x.min) * spec.barWidthPx) / plotPx : undefined;
   const data = spec.series.map((s) => trace(spec, s, barWidth, cats));
-  const { shapes, annotations } = annotationLayout(spec);
+  const { shapes, annotations } = annotationLayout(spec, axes.x.scale === "log", axes.y.scale === "log");
   const many = spec.series.length > 8;
   return {
     data,

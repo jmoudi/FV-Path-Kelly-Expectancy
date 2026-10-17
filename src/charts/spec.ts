@@ -263,8 +263,10 @@ export function applyOverride(spec: ChartSpec, o?: SpecOverride): ChartSpec {
       if (f) series = [...series, { field: e.field, label: f.label, color: e.color }];
     }
   }
-  const x = { ...spec.x, ...(o.x ?? {}) };
-  if (o.x?.field && o.x.field !== spec.x.field && !o.x.label) x.label = undefined;
+  // A different x field brings its own domain, format and label; the old ones
+  // would leave an empty chart with the wrong ticks.
+  const xBase: AxisSpec = o.x?.field && o.x.field !== spec.x.field ? { field: o.x.field, scale: spec.x.scale, grid: spec.x.grid, format: fieldFormat(spec.data, o.x.field) } : spec.x;
+  const x = { ...xBase, ...(o.x ?? {}) };
   const y = { ...spec.y, ...(o.y ?? {}) };
   // A log scale cannot start at or below zero.
   for (const ax of [x, y]) {

@@ -8,6 +8,7 @@ interface Props {
   /** Pixels the pointer may wander from the popover before it closes. */
   leaveDistance?: number;
   label: string;
+  id?: string;
   children: ReactNode;
 }
 
@@ -16,9 +17,17 @@ interface Props {
  * opens without animation, and closes when the pointer moves away, on Escape, or
  * on a click outside.
  */
-export function Popover({ anchor, onClose, width = 400, leaveDistance = 120, label, children }: Props) {
+export function Popover({ anchor, onClose, width = 400, leaveDistance = 120, label, id, children }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; maxHeight: number } | null>(null);
+
+  // Keyboard focus goes back to where it was when the popover closes.
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    return () => {
+      if (prev && prev.isConnected && typeof prev.focus === "function") prev.focus({ preventScroll: true });
+    };
+  }, []);
 
   useLayoutEffect(() => {
     if (!anchor) return;
@@ -81,7 +90,7 @@ export function Popover({ anchor, onClose, width = 400, leaveDistance = 120, lab
 
   if (!anchor || !pos) return null;
   return createPortal(
-    <div ref={ref} className="popover" role="dialog" aria-label={label} style={{ left: pos.left, top: pos.top, width: Math.min(width, window.innerWidth - 16), maxHeight: pos.maxHeight }}>
+    <div ref={ref} id={id} className="popover" role="dialog" aria-label={label} style={{ left: pos.left, top: pos.top, width: Math.min(width, window.innerWidth - 16), maxHeight: pos.maxHeight }}>
       {children}
     </div>,
     document.body,

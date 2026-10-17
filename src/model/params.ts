@@ -114,6 +114,8 @@ export interface ParamDef {
   key: keyof Params;
   label: string;
   short?: string;
+  /** A shorter name for tight places (the reduced deck); the label stays the full name. */
+  shortLabel?: string;
   unit: Unit;
   min: number;
   max: number;
@@ -179,6 +181,7 @@ export const PARAM_DEFS: ParamDef[] = [
   {
     key: "riskPerNight",
     label: "Tranche at risk per night",
+    shortLabel: "Risk per night",
     short: "risk",
     unit: "pct",
     min: 0.05,

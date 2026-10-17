@@ -153,6 +153,8 @@ function markOptions(spec: ChartSpec, xf: (v: number) => string, yf: (v: number)
       fontSize: 10.5,
       fontFamily: THEME.fontUi,
       position: a.at === "start" ? "insideStartTop" : "insideEndTop",
+      // ECharts rotates inside labels along the line; keep them horizontal like the other backends.
+      rotate: 0,
       distance: 6,
       backgroundColor: LABEL_BG,
       padding: [2, 4],

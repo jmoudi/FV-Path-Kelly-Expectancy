@@ -112,7 +112,7 @@ export function SourceFigures({ view }: { view: ScenarioView }) {
             ))}
           </tbody>
         </table>
-        <p className="caption">Recomputed from the current deck. Small differences are rounding in the discussion; large ones mean the deck has moved away from its inputs.</p>
+        <p className="caption">Recomputed from the current deck, except where the label fixes an input at the discussion's number. Small differences are rounding in the discussion; large ones mean the deck has moved away from its inputs.</p>
       </div>
     </details>
   );

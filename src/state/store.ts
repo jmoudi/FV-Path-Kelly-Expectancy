@@ -40,6 +40,8 @@ interface AppState {
   links: Record<string, string>;
   /** input key -> running sweep (transient) */
   runs: Record<string, SweepRun>;
+  /** chart id -> the parameters a story moved, as they were before it (transient). */
+  storyPrev: Record<string, Partial<Params>>;
   activeInput: string | null;
   ui: UiSettings;
   /** Undo stack of parameter states (most recent last). Sweep ticks are not recorded. */
@@ -193,6 +195,7 @@ export const useStore = create<AppState>((set, get) => {
     presets: initialPresets,
     links: sanitizeLinks(initial.links, initialPresets),
     runs: {},
+    storyPrev: {},
     activeInput: null,
     ui: sanitizeUi(initial.ui),
     past: [],
@@ -257,20 +260,43 @@ export const useStore = create<AppState>((set, get) => {
       if (next) overrides[id] = next;
       else delete overrides[id];
       const prev = get().params;
+      const storyPrev = { ...get().storyPrev };
       let params = prev;
-      if (story.params && !active) params = sanitizeParams({ ...params, ...story.params });
+      if (active) {
+        // Turning a story off puts back the parameters it moved.
+        const back = storyPrev[id];
+        if (back) params = sanitizeParams({ ...params, ...back });
+        delete storyPrev[id];
+      } else if (story.params) {
+        // Snapshot what it is about to move, unless an earlier story on this chart already did.
+        const snap: Partial<Params> = storyPrev[id] ?? {};
+        for (const k of Object.keys(story.params) as (keyof Params)[]) if (!(k in snap)) (snap as Record<string, unknown>)[k] = prev[k];
+        storyPrev[id] = snap;
+        params = sanitizeParams({ ...params, ...story.params });
+      } else {
+        delete storyPrev[id];
+      }
       persist({ overrides, params });
-      set({ overrides, params, ...(params !== prev ? { past: pushHistory(get().past, prev), future: [] } : {}) });
+      set({ overrides, params, storyPrev, ...(params !== prev ? { past: pushHistory(get().past, prev), future: [] } : {}) });
     },
     clearOverride: (id) => {
       const overrides = { ...get().overrides };
       delete overrides[id];
-      persist({ overrides });
-      set({ overrides });
+      const storyPrev = { ...get().storyPrev };
+      const back = storyPrev[id];
+      delete storyPrev[id];
+      const prev = get().params;
+      const params = back ? sanitizeParams({ ...prev, ...back }) : prev;
+      persist({ overrides, params });
+      set({ overrides, params, storyPrev, ...(params !== prev ? { past: pushHistory(get().past, prev), future: [] } : {}) });
     },
     clearAllOverrides: () => {
-      persist({ overrides: {} });
-      set({ overrides: {} });
+      const prev = get().params;
+      let params = prev;
+      for (const back of Object.values(get().storyPrev)) params = { ...params, ...back };
+      params = params === prev ? prev : sanitizeParams(params);
+      persist({ overrides: {}, params });
+      set({ overrides: {}, params, storyPrev: {}, ...(params !== prev ? { past: pushHistory(get().past, prev), future: [] } : {}) });
     },
     setDefaultBackend: (defaultBackend) => {
       persist({ defaultBackend });

@@ -30,7 +30,7 @@ export function buildCorrelation(p: Params, d: Derived, _data: Datasets): Scenar
       ? "With one name per night there is nothing to share: the joint loss is q itself. Raise names per night in the deck."
       : `P(all ${k} names lose on one night) ≈ c·q + q${power(k)}. The correlation term dominates as soon as c exceeds q${power(k - 1)}.`,
     kind: "xy",
-    data: table([f("c", "Share of nights with one shared outcome, c", "pct2"), f("ruin", "Ruin per season", "pct2"), f("indep", "Ruin if independent", "pct3"), f("joint", "Joint loss per night", "pct3")], cRows),
+    data: table([f("c", "Share of nights with one shared outcome, c", "pct2"), f("ruin", "Ruin per season, whole tranche", "pct2"), f("indep", "Ruin if independent", "pct3"), f("joint", "Joint loss per night", "pct3")], cRows),
     mark: "line",
     x: { field: "c", scale: "log", format: "pct2", domain: [1e-5, 0.3] },
     y: { field: "ruin", scale: "log", format: "pct1", label: "P(ruin) per season" },
@@ -56,11 +56,11 @@ export function buildCorrelation(p: Params, d: Derived, _data: Datasets): Scenar
     title: "The discussion's four cases",
     subtitle: "Evenings on which the names effectively share one outcome.",
     kind: "xy",
-    data: table([f("c", "Shared-outcome nights"), f("ruin", "Ruin per season", "pct2")], stepRows),
+    data: table([f("c", "Shared-outcome nights"), f("ruin", "Ruin per season, whole tranche", "pct2")], stepRows),
     mark: "bar",
     x: { field: "c", categorical: true },
     y: { field: "ruin", format: "pct", label: "P(ruin) per season" },
-    series: [{ field: "ruin", color: "loss", label: "Ruin per season" }],
+    series: [{ field: "ruin", color: "loss", label: "Ruin per season, whole tranche" }],
     height: 240,
   };
 
@@ -94,11 +94,11 @@ export function buildCorrelation(p: Params, d: Derived, _data: Datasets): Scenar
     title: "Season ruin as more nights carry the shock",
     subtitle: `At ${p.volShock.toFixed(2)}× priced sigma, with directions still independent. Second-order next to shared direction.`,
     kind: "xy",
-    data: table([f("share", "Share of shocked nights", "pct"), f("ruin", "Ruin per season", "pct3")], shareRows),
+    data: table([f("share", "Share of shocked nights", "pct"), f("ruin", "Ruin per season, whole tranche", "pct3")], shareRows),
     mark: "line",
     x: { field: "share", format: "pct", domain: [0, 1] },
     y: { field: "ruin", format: "pct2", label: "P(ruin) per season" },
-    series: [{ field: "ruin", color: "loss", label: "Ruin per season" }],
+    series: [{ field: "ruin", color: "loss", label: "Ruin per season, whole tranche" }],
     height: 240,
     annotations: [{ kind: "vline", x: p.volShockShare, text: `your share ${pct(p.volShockShare)}`, color: "ink", at: "end" }],
   };
@@ -107,7 +107,7 @@ export function buildCorrelation(p: Params, d: Derived, _data: Datasets): Scenar
     id: "cor-table",
     title: "Shared causes, shared volatility, and ruin per season",
     data: table(
-      [f("case", "Case"), f("perNight", "Joint loss per night", "pct3"), f("ruin", "Ruin per season", "pct2")],
+      [f("case", "Case"), f("perNight", "Joint loss per night", "pct3"), f("ruin", "Ruin per season, whole tranche", "pct2")],
       [
         { case: "Independent names", perNight: pIndep, ruin: ruinIndep },
         ...steps.filter((x) => x > 0).map((cc) => ({ case: `Shared outcome on ${pct(cc)} of nights`, perNight: jointLossProb(q, k, cc), ruin: ruinPerSeason(jointLossProb(q, k, cc), n) })),
@@ -137,7 +137,7 @@ export function buildCorrelation(p: Params, d: Derived, _data: Datasets): Scenar
     ],
     kpis: [
       { label: "Joint loss per night", value: `${smallPct(pIndep)} → ${smallPct(pJoint)}`, sub: `independent → your c ${pct2(c)}`, color: "loss" },
-      { label: "Ruin per season", value: `${smallPct(ruinIndep)} → ${smallPct(ruinJoint)}`, sub: "independent → your c" },
+      { label: "Ruin per season, whole tranche", value: `${smallPct(ruinIndep)} → ${smallPct(ruinJoint)}`, sub: "independent → your c" },
       { label: "Crossover c", value: single ? "—" : smallPct(cross), sub: `q${power(k - 1)}`, help: "Above this share of shared-outcome nights the correlation term dominates the independent one." },
       { label: "Vol shock multiplier", value: `${mNow.toFixed(1)}× / ${Math.pow(mNow, k).toFixed(0)}×`, sub: `one name / all ${k} at ${p.volShock.toFixed(2)}× sigma` },
     ],

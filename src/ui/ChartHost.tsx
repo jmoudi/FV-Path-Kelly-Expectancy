@@ -47,6 +47,7 @@ export function ChartHost({ spec: base, viewId }: { spec: ChartSpec; viewId?: st
 
 function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
   const override = useStore((s) => s.overrides[base.id]);
+  const clearOverride = useStore((s) => s.clearOverride);
   const defaultBackend = useStore((s) => s.defaultBackend);
   const authoringOpen = useStore((s) => s.authoringOpen);
   const setAuthoringOpen = useStore((s) => s.setAuthoringOpen);
@@ -121,6 +122,7 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
     if (!handleRef.current || mounted !== effective) return;
     try {
       handleRef.current.update(spec);
+      setError(null);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -159,7 +161,7 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
               ⊞
             </button>
           )}
-          <button ref={gearRef} type="button" className={`icon-btn${open || edited ? " on" : ""}`} title="Chart definition: backend, axes, marks" aria-label="Open the chart definition" aria-expanded={open} onClick={() => setAuthoringOpen(open ? null : base.id)}>
+          <button ref={gearRef} type="button" className={`icon-btn${open || edited ? " on" : ""}`} title="Chart definition: backend, axes, marks" aria-label="Open the chart definition" aria-expanded={open} aria-controls={`authoring-${base.id}`} onClick={() => setAuthoringOpen(open ? null : base.id)}>
             ⚙
           </button>
         </div>
@@ -186,7 +188,17 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
           aria-label={spec.title}
         />
       )}
-      {(spec.caption || edited || effective !== "echarts") && (
+      {error && mounted && (
+        <div className="chart-error" role="alert">
+          <span>Could not render: {error}</span>
+          {override && (
+            <button type="button" className="btn small" onClick={() => clearOverride(base.id)}>
+              Reset this chart
+            </button>
+          )}
+        </div>
+      )}
+      {(spec.caption || edited || effective !== defaultBackend) && (
         <div className="caption" style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
           {spec.caption && <span>{spec.caption}</span>}
           <span className="backend-tag" style={{ marginLeft: "auto" }}>
@@ -196,7 +208,7 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
         </div>
       )}
       {open && (
-        <Popover anchor={gearRef.current} onClose={() => setAuthoringOpen(null)} label={`Chart definition: ${base.title}`} width={420}>
+        <Popover id={`authoring-${base.id}`} anchor={gearRef.current} onClose={() => setAuthoringOpen(null)} label={`Chart definition: ${base.title}`} width={420}>
           <Authoring base={base} spec={spec} override={override} onClose={() => setAuthoringOpen(null)} />
         </Popover>
       )}

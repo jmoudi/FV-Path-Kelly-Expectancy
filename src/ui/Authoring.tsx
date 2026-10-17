@@ -208,7 +208,7 @@ export function Authoring({ base, spec, override, onClose }: Props) {
                     value=""
                     onChange={(e) => {
                       if (!e.target.value) return;
-                      const colors = ["ramp2", "ramp3", "ramp1", "ramp4"] as const;
+                      const colors = ["ramp2", "ramp3", "ramp1", "ink"] as const;
                       const color = colors[(override?.extraSeries?.length ?? 0) % colors.length];
                       patch({ extraSeries: [...(override?.extraSeries ?? []), { field: e.target.value, color }] });
                     }}

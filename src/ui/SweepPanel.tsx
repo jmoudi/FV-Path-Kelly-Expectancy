@@ -45,9 +45,10 @@ export function SweepPanel({ compact }: { compact?: boolean }) {
     <div className="sweeps">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
         <div>
-          <h4 style={{ margin: 0 }}>Sweep presets</h4>
+          {!compact && <h4 style={{ margin: 0 }}>Sweep presets</h4>}
           <p className="caption" style={{ margin: "2px 0 0" }}>
-            A preset drives an input automatically. Active input: <b>{def ? def.label : "none (focus an input)"}</b>
+            {!compact && "A preset drives an input automatically. "}
+            Active input: <b>{def ? def.label : "none (focus an input)"}</b>
             {def && !sweepable ? " (not swept)" : ""}.
           </p>
         </div>
@@ -60,7 +61,7 @@ export function SweepPanel({ compact }: { compact?: boolean }) {
         {presets.map((p) => {
           const linkedKeys = Object.entries(links)
             .filter(([, v]) => v === p.id)
-            .map(([k]) => PARAM_BY_KEY[k]?.short ?? PARAM_BY_KEY[k]?.label ?? k);
+            .map(([k]) => PARAM_BY_KEY[k]?.shortLabel ?? PARAM_BY_KEY[k]?.label ?? k);
           const isLinked = !!activeInput && links[activeInput] === p.id;
           const run = activeInput ? runs[activeInput] : undefined;
           return (
@@ -74,7 +75,7 @@ export function SweepPanel({ compact }: { compact?: boolean }) {
                 {activeInput && sweepable && (
                   <>
                     <button type="button" className={`btn small${isLinked ? " primary" : ""}`} onClick={() => linkPreset(activeInput, isLinked ? null : p.id)}>
-                      {isLinked ? "linked" : `link to ${def?.short ?? "input"}`}
+                      {isLinked ? "linked" : `link to ${def?.shortLabel ?? def?.label ?? "input"}`}
                     </button>
                     {isLinked && (
                       <button type="button" className="btn small" onClick={() => toggleSweep(activeInput)}>

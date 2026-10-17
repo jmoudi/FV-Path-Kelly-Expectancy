@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { lossRateFromPClean } from "../model/binary";
-import { GROUP_LABELS, PARAM_DEFS, type ParamGroup } from "../model/params";
+import { GROUP_LABELS, PARAM_DEFS, type ParamGroup, type Params } from "../model/params";
 import { useStore } from "../state/store";
 import { pct, pct1, signedPct1, smallPct, x2, type DeckView } from "../viewmodel/derived";
 import { Help } from "./Help";
 import { ParamInput } from "./ParamInput";
-import { KpiTile } from "./Section";
 import { SweepPanel } from "./SweepPanel";
 import { SweepStrip } from "./SweepStrip";
 
@@ -20,10 +19,11 @@ function LinkedPClean({ pClean, bare }: { pClean: number; bare?: boolean }) {
   return (
     <div className={`nf compact linked${bare ? " bare" : ""}`}>
       <div className="nf-label">
-        <span className="nf-short" title="Probability of a clean season; typing here back-solves the loss rate">
-          p
+        <span className="nf-label-text">
+          <span>Clean season</span>
+          <span className="sym">p</span>
         </span>
-        {!bare && <Help text="Typing a clean-season probability here sets the loss rate so that (1 − q)^n equals it." />}
+        {!bare && <Help text="Probability that one all-in name survives the season, (1 − q)^n. Typing here back-solves the loss rate." />}
       </div>
       <div className="nf-row">
         <input
@@ -47,24 +47,77 @@ function LinkedPClean({ pClean, bare }: { pClean: number; bare?: boolean }) {
   );
 }
 
-function Group({ g, bare }: { g: ParamGroup; bare: boolean }) {
+/** The inputs of one group, in schema order, with the linked clean-season field after the loss rate. */
+function Fields({ g, bare }: { g: ParamGroup; bare: boolean }) {
   const defs = PARAM_DEFS.filter((d) => d.group === g);
   const pClean = useStore((s) => Math.pow(1 - s.params.lossRate, s.params.nights));
   return (
-    <fieldset className={`group${bare ? " bare" : ""}`}>
-      <legend>
-        {GROUP_LABELS[g].label}
-        {!bare && <span className="caption"> · {GROUP_LABELS[g].blurb}</span>}
-      </legend>
-      <div className="group-body">
-        {defs.map((d) => (
-          <div key={d.key} className="group-item">
-            <ParamInput k={d.key} bare={bare} />
-            {d.key === "lossRate" && <LinkedPClean pClean={pClean} bare={bare} />}
+    <>
+      {defs.map((d) => (
+        <div key={d.key} className="dk-field">
+          <ParamInput k={d.key} bare={bare} />
+          {d.key === "lossRate" && <LinkedPClean pClean={pClean} bare={bare} />}
+        </div>
+      ))}
+    </>
+  );
+}
+
+interface Figure {
+  label: string;
+  value: string;
+  basis: string;
+  help: string;
+  color?: "a" | "b" | "c";
+}
+
+/** The six headline figures, in reading order: what the coin gives, what the diversified tranche gives, what your policy gives. */
+function figures(deck: DeckView, p: Params): Figure[] {
+  return [
+    { label: "Clean season", value: pct(deck.pClean), basis: "1 name, whole tranche", color: "a", help: "Probability that a single all-in name survives the whole season, (1 − q)^n." },
+    { label: "Edge per season", value: signedPct1(deck.meanSeason - 1), basis: `mean ${x2(deck.meanSeason)} · ≈ 2p − 1`, help: "Mean season end minus one. The same for the coin and the diversified tranche; it is not what you earn." },
+    { label: `Median, ${p.names} name${p.names === 1 ? "" : "s"} all-in`, value: x2(deck.seasonB.median), basis: `ruin ${smallPct(deck.seasonB.pRuin)}`, color: "b", help: "Typical season end with the names split over the whole tranche, no reserve." },
+    { label: "Growth per season", value: signedPct1(deck.growthC), basis: `${pct(p.riskPerNight)} at risk · ruin ${smallPct(deck.ruinC)}`, color: "c", help: "E[log end | the tranche survives] under your policy; the rate the median compounds at." },
+    { label: "Robust risk per night", value: pct(deck.robust.risk), basis: `you risk ${pct(p.riskPerNight)} · Kelly ${pct1(deck.kelly)} per name`, color: "c", help: `Risk per night that maximises growth averaged over a loss rate drawn ${deck.bandLabel}.` },
+    { label: `Median after ${p.seasons} season${p.seasons === 1 ? "" : "s"}`, value: x2(deck.chainedC.median), basis: `P(below ${p.thresholdBelow.toFixed(2)}×) ${pct(deck.chainedC.pBelow)}`, color: "c", help: "Where the typical path of your policy stands after the seasons chained in the deck." },
+  ];
+}
+
+/** Row two of the reduced deck: the figures as one status line. */
+function FigureLine({ deck, pending }: { deck: DeckView | null; pending: boolean }) {
+  const p = useStore((s) => s.params);
+  if (!deck) return <div className="dk-figs caption">computing…</div>;
+  return (
+    <div className="dk-figs" style={{ opacity: pending ? 0.6 : 1 }} aria-label="Headline figures">
+      {figures(deck, p).map((f) => (
+        <span key={f.label} className={`fig${f.color ? ` role-${f.color}` : ""}`} title={`${f.help} ${f.basis}`}>
+          <b>{f.value}</b>
+          {f.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The figures in the full deck: a table with label, basis and value. */
+function FigureTable({ deck, pending }: { deck: DeckView | null; pending: boolean }) {
+  const p = useStore((s) => s.params);
+  if (!deck) return <div className="caption">computing…</div>;
+  return (
+    <div className="figtable" style={{ opacity: pending ? 0.6 : 1 }}>
+      {figures(deck, p).map((f) => (
+        <div key={f.label} className={`figrow${f.color ? ` role-${f.color}` : ""}`}>
+          <div className="fl">
+            <div className="t">
+              <span>{f.label}</span>
+              <Help text={f.help} />
+            </div>
+            <div className="s">{f.basis}</div>
           </div>
-        ))}
-      </div>
-    </fieldset>
+          <div className="fv">{f.value}</div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -91,31 +144,15 @@ function Definitions({ deck }: { deck: DeckView | null }) {
   );
 }
 
-function HeadlineKpis({ deck, pending, full }: { deck: DeckView | null; pending: boolean; full: boolean }) {
-  const params = useStore((s) => s.params);
-  if (!deck) return <div className="caption">computing…</div>;
-  const tiles = [
-    { label: "Clean season", value: pct(deck.pClean), sub: "1 name, whole tranche", color: "a" as const, help: "Probability that a single all-in name survives the whole season." },
-    { label: "Robust risk per night", value: pct(deck.robust.risk), sub: `you risk ${pct(params.riskPerNight)} · Kelly ${pct1(deck.kelly)} per name`, color: "c" as const, help: `Risk per night that maximises growth averaged over a loss rate drawn ${deck.bandLabel}.` },
-    { label: `Median after ${params.seasons} season${params.seasons === 1 ? "" : "s"}`, value: x2(deck.chainedC.median), sub: `P(below ${params.thresholdBelow.toFixed(2)}×) ${pct(deck.chainedC.pBelow)}`, color: "c" as const, help: "Where the typical path of your policy stands after the seasons chained in the deck." },
-    { label: "Edge per season", value: signedPct1(deck.meanSeason - 1), sub: `mean ${x2(deck.meanSeason)} · ≈ 2p − 1`, help: "Mean season end minus one; the same for the coin and the diversified tranche." },
-    { label: "Median, diversified", value: x2(deck.seasonB.median), sub: `${params.names} name${params.names === 1 ? "" : "s"}, all-in · ruin ${smallPct(deck.seasonB.pRuin)}`, color: "b" as const, help: "Typical season end with the names split over the whole tranche." },
-    { label: "Growth per season", value: signedPct1(deck.growthC), sub: `${pct(params.riskPerNight)} at risk · ruin ${smallPct(deck.ruinC)}`, color: "c" as const, help: "E[log end | survive] under your policy." },
-  ];
-  const shown = full ? tiles : tiles.slice(0, 2);
-  return (
-    <div className={`kpis${full ? "" : " kpis-bar"}`} style={{ opacity: pending ? 0.7 : 1 }}>
-      {shown.map((t) => (
-        <KpiTile key={t.label} k={t} />
-      ))}
-    </div>
-  );
-}
-
 /**
- * The deck: anchored under the top bar on every page. Collapsed it is one row of
- * grouped inputs and three figures; expanded it shows the full inputs with help,
- * every figure, the definitions, and the sweep presets.
+ * The deck, anchored under the top bar on every page.
+ *
+ * Reduced: two rows. Row one is the inputs in three groups set apart by distance,
+ * each with its readable label and symbol. Row two is the figures as one status
+ * line, the sweep strip for the active input, and the toggle.
+ *
+ * Full: two columns. Left, the inputs as sections with their help, then the sweep
+ * presets. Right, the figures as a table, then the definitions.
  */
 export function DeckBar({ deck, pending }: { deck: DeckView | null; pending: boolean }) {
   const expanded = useStore((s) => s.ui.deckExpanded);
@@ -132,45 +169,62 @@ export function DeckBar({ deck, pending }: { deck: DeckView | null; pending: boo
   }, [expanded, setUi]);
   return (
     <div className={`deckbar${expanded ? " expanded" : ""}`} id="deck">
-      <div className="deckbar-row">
-        <div className="deckbar-groups">
-          {GROUPS.map((g) => (
-            <Group key={g} g={g} bare />
-          ))}
+      <div className="dk-row dk-inputs">
+        {GROUPS.map((g) => (
+          <section key={g} className="dk-group" aria-label={GROUP_LABELS[g].label}>
+            <div className="dk-caption">{GROUP_LABELS[g].label}</div>
+            <div className="dk-fields">
+              <Fields g={g} bare />
+            </div>
+          </section>
+        ))}
+      </div>
+      <div className="dk-row dk-status">
+        <FigureLine deck={deck} pending={pending} />
+        <div className="dk-strip">
+          {activeInput && activeDef ? (
+            <>
+              <span className="dk-active" title="The input that hotkeys and sweeps act on">
+                {activeDef.shortLabel ?? activeDef.label}
+              </span>
+              <SweepStrip inputKey={activeInput} compact />
+            </>
+          ) : (
+            <span className="dk-hint">Focus an input to sweep it · Ctrl+Z undoes</span>
+          )}
         </div>
-        <HeadlineKpis deck={deck} pending={pending} full={false} />
-        <button type="button" className="btn small quiet deckbar-toggle" aria-expanded={expanded} onClick={() => setUi({ deckExpanded: !expanded })} title="Full deck: definitions, every figure, sweep presets">
-          {expanded ? "Collapse ▴" : "Deck ▾"}
+        <button type="button" className="btn small quiet deckbar-toggle" aria-expanded={expanded} onClick={() => setUi({ deckExpanded: !expanded })} title="Full deck: inputs with help, every figure, definitions, sweep presets">
+          {expanded ? "Collapse ▴" : "Full deck ▾"}
         </button>
       </div>
-      <div className="deckbar-striprow">
-        {activeInput && activeDef ? (
-          <>
-            <span className="deckbar-active" title="The input that hotkeys and sweeps act on">
-              <span className="caption">active</span> <b>{activeDef.label}</b>
-            </span>
-            <SweepStrip inputKey={activeInput} />
-          </>
-        ) : (
-          <span className="caption">Focus any input to sweep it, switch its preset, or reset it. Undo any change with Ctrl+Z.</span>
-        )}
-      </div>
       {expanded && (
-        <div className="deckbar-full">
-          <div className="deckbar-full-groups">
+        <div className="dk-full">
+          <div className="dk-col">
+            <h3 className="dk-h">Inputs</h3>
             {GROUPS.map((g) => (
-              <Group key={g} g={g} bare={false} />
+              <section key={g} className="dk-section" aria-label={GROUP_LABELS[g].label}>
+                <header>
+                  <h4>{GROUP_LABELS[g].label}</h4>
+                  <p>{GROUP_LABELS[g].blurb}</p>
+                </header>
+                <div className="dk-fields full">
+                  <Fields g={g} bare={false} />
+                </div>
+              </section>
             ))}
-          </div>
-          <HeadlineKpis deck={deck} pending={pending} full />
-          <div className="deckbar-full-lower">
-            <div>
-              <h4>Definitions</h4>
-              <Definitions deck={deck} />
-            </div>
-            <div>
+            <section className="dk-section" aria-label="Sweep presets">
+              <header>
+                <h4>Sweep presets</h4>
+                <p>A preset drives an input on its own. Link one to the active input, then run it from the strip or with Ctrl+Enter.</p>
+              </header>
               <SweepPanel compact />
-            </div>
+            </section>
+          </div>
+          <div className="dk-col">
+            <h3 className="dk-h">Figures</h3>
+            <FigureTable deck={deck} pending={pending} />
+            <h3 className="dk-h">Definitions</h3>
+            <Definitions deck={deck} />
           </div>
         </div>
       )}

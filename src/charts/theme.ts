@@ -13,7 +13,7 @@ export const THEME = {
   grid: "#23272c",
   ink: "#e8e9eb",
   ink2: "#aeb4bb",
-  muted: "#7d858e",
+  muted: "#8d959e",
   fontUi: '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif',
   fontMono: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
   roles: {
@@ -23,7 +23,7 @@ export const THEME = {
     loss: "#D64566",
     good: "#46A860",
     ink: "#e8e9eb",
-    muted: "#7d858e",
+    muted: "#8d959e",
     ramp1: "#9fd6e8",
     ramp2: "#4fb6d4",
     ramp3: "#1f87a7",

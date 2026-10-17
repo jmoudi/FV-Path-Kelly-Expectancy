@@ -58,8 +58,9 @@ function seriesLayer(spec: ChartSpec, s: SeriesSpec, xAx: ResolvedAxis, yAx: Res
   if (xAx.scale === "log") filters.push(`datum["${xField}"] > 0`);
   // Keep values inside the resolved domain so a clipped y does not draw outside the frame.
   if (!cat) filters.push(`datum["${xField}"] >= ${xAx.min} && datum["${xField}"] <= ${xAx.max}`);
+  // clip: a story or edit that narrows the domain must not draw outside the frame.
   const layer: VL = {
-    mark: m,
+    mark: { ...m, clip: true },
     transform: [{ filter: filters.join(" && ") }],
     encoding: {
       x: axisEnc(xAx, xField, cat),
@@ -75,7 +76,8 @@ function seriesLayer(spec: ChartSpec, s: SeriesSpec, xAx: ResolvedAxis, yAx: Res
     (layer.encoding as VL).color = { field: xField, type: "nominal", scale: { domain: cats.map(String), range: cats.map((_, i) => roleColor(s.colors![i % s.colors!.length])) }, legend: null };
     (layer.mark as VL).color = undefined;
   } else if (s.legend !== false && domain.length >= 2) {
-    (layer.encoding as VL).color = { datum: name, scale: { domain, range }, legend: { title: null, orient: "top-right", direction: "horizontal", symbolType: "stroke" } };
+    // The legend sits above the plot, as in the other backends, never over the data.
+    (layer.encoding as VL).color = { datum: name, scale: { domain, range }, legend: { title: null, orient: "top", direction: "horizontal", symbolType: "stroke", offset: 6 } };
     (layer.mark as VL).color = undefined;
   }
   if (spec.stack && (mark === "bar" || mark === "area")) (layer.encoding as VL).y = { ...((layer.encoding as VL).y as VL), stack: "zero" };
@@ -83,7 +85,10 @@ function seriesLayer(spec: ChartSpec, s: SeriesSpec, xAx: ResolvedAxis, yAx: Res
 }
 
 function annotationLayers(spec: ChartSpec, height: number): VL[] {
-  const out: VL[] = [];
+  const layers: VL[] = [];
+  // Each annotation is one mark. Without its own single-row data source a layer
+  // inherits the chart's rows and draws the mark once per row.
+  const out = { push: (l: VL) => layers.push({ data: { values: [{}] }, ...l, mark: { ...(l.mark as VL), clip: true } }) };
   for (const a of spec.annotations ?? []) {
     const color = roleColor(a.color ?? "muted");
     const dash = a.dash === false ? undefined : [4, 4];
@@ -103,7 +108,7 @@ function annotationLayers(spec: ChartSpec, height: number): VL[] {
       out.push({ mark: { type: "rect", color, opacity: 0.1 }, encoding: { y: { datum: a.y }, y2: { datum: a.y2 } } });
     }
   }
-  return out;
+  return layers;
 }
 
 const CONFIG: VL = {

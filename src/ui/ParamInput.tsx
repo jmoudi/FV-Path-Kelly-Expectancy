@@ -32,13 +32,10 @@ export function ParamInput({ k, compact, bare }: { k: keyof Params; compact?: bo
   }
 
   const num = typeof value === "number" ? value : def.min;
-  const label = bare ? (
-    <span className="nf-short" title={def.label}>
-      {def.short ?? def.label}
-    </span>
-  ) : (
+  // Readable in both modes: the name, then the symbol the charts use.
+  const label = (
     <>
-      <span>{def.label}</span>
+      <span title={bare ? def.label : undefined}>{bare ? (def.shortLabel ?? def.label) : def.label}</span>
       {def.short && <span className="sym">{def.short}</span>}
     </>
   );
