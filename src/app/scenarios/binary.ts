@@ -1,7 +1,7 @@
 import { f, table, tableSpec, type ChartSpec, type Row, type SeriesSpec } from "@kit/charts/spec";
 import { binaryTable, pCleanFromLossRate, seasonMean } from "@app/model/binary";
-import type { Datasets } from "@app/data/datasets";
-import type { Params } from "@app/data/params";
+import type { Datasets } from "@app/model/datasets";
+import type { Params } from "@app/model/params";
 import { samplePaths } from "@app/model/season";
 import { linspace } from "@kit/math/stats";
 import { fig } from "@app/data/discussion";

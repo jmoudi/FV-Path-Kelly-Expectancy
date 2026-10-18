@@ -1,6 +1,6 @@
 /**
  * Every sentence a kit frame shows on its own. The defaults are neutral; an app passes
- * its overrides to <KitProvider copy={...}> (this explainer: src/app/copy/kitCopy.ts).
+ * its overrides to <KitProvider copy={...}> (this explainer: src/app/data/copy/kitCopy.ts).
  */
 export interface KitCopy {
   /** Prefix of exported state files: "<prefix>-2026-10-18.json". */

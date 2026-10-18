@@ -1,10 +1,5 @@
-/** Imported datasets: the numbers this explainer accepts beside its parameters. */
-export interface Datasets {
-  /** Per-event outcomes: 0/1 full losses, or P&L per unit of max loss. */
-  record: number[];
-  /** Realized moves in priced sigmas, positive toward the short strike. */
-  moves: number[];
-}
+/** The imported datasets' empty value and their sanitizer (the Datasets contract is src/app/model/datasets.ts). */
+import type { Datasets } from "@app/model/datasets";
 
 export const EMPTY_DATASETS: Datasets = { record: [], moves: [] };
 

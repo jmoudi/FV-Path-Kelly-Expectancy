@@ -4,7 +4,7 @@
  * Pure data, no React, so it is tested on its own.
  */
 import { GROUP_LABELS, PARAM_DEFS, type ParamDef, type ParamGroup } from "@app/data/schema";
-import type { Params } from "@app/data/params";
+import type { Params } from "@app/model/params";
 
 export interface DeckLayoutGroup {
   group: ParamGroup;

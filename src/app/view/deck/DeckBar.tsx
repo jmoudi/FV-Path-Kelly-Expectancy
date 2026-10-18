@@ -24,7 +24,7 @@ function useOnSettingsPage(): boolean {
 
 /**
  * The deck, anchored under the top bar: the kit's deck frame (src/kit/ui/deck) filled
- * by the app's provider (src/app/deck), with the expanded state kept in the store.
+ * by the app's provider (src/app/view/deck), with the expanded state kept in the store.
  */
 export function DeckBar({ deck, pending }: { deck: DeckView | null; pending: boolean }) {
   const content = useDeckProps(deck);

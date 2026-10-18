@@ -1,7 +1,8 @@
 import type { ColorRole } from "@kit/charts/spec";
 import { medianGrowthPerSeason } from "@app/model/growth";
-import type { Params } from "@app/data/params";
-import { POLICY_IDS, POLICY_LEGEND, type PolicyId, type PolicyMeta } from "@app/model/policies";
+import type { Params } from "@app/model/params";
+import { POLICY_IDS, type PolicyId } from "@app/model/policies";
+import { POLICY_LEGEND, type PolicyMeta } from "@app/data/policies";
 import type { Distribution, Summary } from "@app/model/season";
 import { pct, pct1, pct2, probPct, x2, signedPct1, signedPp, smallPct } from "@kit/charts/numbers";
 import type { MarketState, Derived } from "@app/scenarios/derived";

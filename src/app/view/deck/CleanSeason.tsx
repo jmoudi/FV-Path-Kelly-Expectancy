@@ -1,26 +1,21 @@
 import { LinkedValue } from "@kit/ui/deck";
-import { lossRateFromPClean, pCleanFromLossRate } from "@app/model/binary";
-import { POLICY_META } from "@app/model/policies";
 import { useStore } from "@app/store";
 import { Help } from "@kit/ui/Help";
-import { pct } from "@kit/charts/numbers";
+import { cleanSeasonLink } from "@app/scenarios/controls";
 
-const COIN = POLICY_META.coin.name;
-
-/** P(clean season) of the Coin at the deck's q and n, and the back-solve that sets q from a typed value. */
+/** P(clean season) of the Coin at the deck's q and n, and the back-solve that sets q from a typed value (the view-model decides both). */
 function useCleanSeason() {
-  const q = useStore((s) => s.params.lossRate);
-  const n = useStore((s) => s.params.nights);
-  const setParam = useStore((s) => s.setParam);
-  const p = pCleanFromLossRate(q, n);
+  const lossRate = useStore((s) => s.params.lossRate);
+  const nights = useStore((s) => s.params.nights);
+  const setParams = useStore((s) => s.setParams);
+  const link = cleanSeasonLink({ lossRate, nights });
   const commit = (text: string): boolean => {
-    const v = Number(text.replace(",", ".").replace(/[%\s]/g, "")) / 100;
-    if (!Number.isFinite(v) || v <= 0 || v >= 1) return false;
-    setParam("lossRate", lossRateFromPClean(v, n));
+    const patch = link.solve(text);
+    if (!patch) return false;
+    setParams(patch);
     return true;
   };
-  const help = `Probability that one all-in name survives all ${n} nights, (1 − q)^n. Type a value and the loss rate per name is solved from it.`;
-  return { p, commit, help, editText: (p * 100).toFixed(1) };
+  return { ...link, commit };
 }
 
 /** Under Loss rate in the reduced deck: "= 55% clean season (Coin)"; a click turns the value into a box. */
@@ -31,13 +26,13 @@ export function CleanSeasonText() {
       mode="text"
       id="deck-pclean"
       prefix="="
-      value={pct(c.p)}
-      suffix={`clean season (${COIN})`}
+      value={c.value}
+      suffix={`clean season (${c.coin})`}
       editText={c.editText}
       unit="%"
       onCommit={c.commit}
       title={c.help}
-      ariaLabel={`Clean season (${COIN}); typing it solves the loss rate`}
+      ariaLabel={c.ariaLabel}
     />
   );
 }
@@ -55,17 +50,17 @@ export function CleanSeasonField({ id }: { id: string }) {
         mode="text"
         id={id}
         prefix="="
-        value={pct(c.p)}
+        value={c.value}
         suffix={
           <>
-            clean season ({COIN}) <span className="sym">p</span>
+            clean season ({c.coin}) <span className="sym">p</span>
           </>
         }
         editText={c.editText}
         unit="%"
         onCommit={c.commit}
         title={c.help}
-        ariaLabel={`Clean season (${COIN}); typing it solves the loss rate`}
+        ariaLabel={c.ariaLabel}
       />
       <Help text={c.help} />
     </div>

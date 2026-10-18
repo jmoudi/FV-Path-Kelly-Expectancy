@@ -1,5 +1,5 @@
-import type { Params } from "@app/data/params";
-import { quoted, type SourceFigure } from "@app/scenarios/types";
+import type { Params } from "@app/model/params";
+import { quoted, type SourceFigure } from "@kit/charts/scenario";
 import { pct, pct1, pct2, x2 } from "@kit/charts/numbers";
 
 /** The discussion's setup, which every quoted figure assumes. */

@@ -1,7 +1,7 @@
 import { f, table, tableSpec, type ChartSpec, type Row } from "@kit/charts/spec";
 import { medianGrowthPerSeason } from "@app/model/growth";
-import type { Datasets } from "@app/data/datasets";
-import type { Params } from "@app/data/params";
+import type { Datasets } from "@app/model/datasets";
+import type { Params } from "@app/model/params";
 import { POLICY_IDS, type PolicyId } from "@app/model/policies";
 import { sampleFromDistribution, weightedQuantile } from "@app/model/season";
 import { fig } from "@app/data/discussion";

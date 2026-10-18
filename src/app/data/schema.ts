@@ -4,7 +4,8 @@
  * src/kit/inputs/schema.ts; ParamDef here is the kit's, bound to Params.
  */
 import { createSchema, type ParamDef as KitParamDef } from "@kit/inputs/schema";
-import { CALENDAR_SHARE_KEYS, DEFAULT_PARAMS, type Params } from "./params";
+import { CALENDAR_SHARE_KEYS, type Params } from "@app/model/params";
+import { DEFAULT_PARAMS } from "./params";
 
 export type ParamDef = KitParamDef<Params>;
 

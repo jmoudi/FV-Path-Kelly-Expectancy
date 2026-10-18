@@ -1,5 +1,5 @@
 /**
- * The Desk's adapter: turns the DeskView (src/app/desk/desk.ts) into the kit's
+ * The Desk's adapter: turns the DeskView (src/app/scenarios/desk.ts) into the kit's
  * comparison grid (src/kit/ui/DeskGrid.tsx): one column per policy, row groups for one
  * season and N seasons, each row label linked to the view that explains it.
  */

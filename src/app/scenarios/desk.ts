@@ -1,11 +1,12 @@
 /**
  * The Desk: given my book, what happens? A policy comparison grid for one season
  * and N seasons, the sizing line, the calibration verdict and the market state.
- * Pure data; src/app/desk/DeskPage.tsx renders it.
+ * Pure data; src/app/view/desk/DeskPage.tsx renders it.
  */
 import { eventsToResolve } from "@app/model/calibration";
-import type { Params } from "@app/data/params";
-import { POLICY_IDS, type PolicyId, type PolicyMeta } from "@app/model/policies";
+import type { Params } from "@app/model/params";
+import { POLICY_IDS, type PolicyId } from "@app/model/policies";
+import type { PolicyMeta } from "@app/data/policies";
 import type { Summary } from "@app/model/season";
 import { fmtInt, pct, pct1, pct2, probPct, x2, years } from "@kit/charts/numbers";
 import type { Derived, MarketState } from "@app/scenarios/derived";

@@ -8,7 +8,7 @@
  */
 import type { GuideSection } from "@kit/ui/GuideFrame";
 import type { KeyBinding } from "@kit/ui/Settings";
-import { HOTKEY_HINTS as K } from "@kit/sweeps/useSweeps";
+import { HOTKEY_HINTS as K } from "@kit/sweeps/hotkeys";
 
 const MAC = K.undo.startsWith("⌘");
 const CTRL = MAC ? "⌘" : "Ctrl";

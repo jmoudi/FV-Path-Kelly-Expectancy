@@ -1,8 +1,8 @@
 import { f, figureSpec, table, tableSpec, type ChartSpec, type Row, type Story } from "@kit/charts/spec";
 import { calendarExpectedLogGrowth, calendarMeans, capitalUsed, medianCapitalUsed, medianNames, nightExpectedLog, normalizeShares, sampleCalendar } from "@app/model/calendar";
 import { breadthTable, kellyFraction, logGrowthPerBet, seasonLogGrowth } from "@app/model/kelly";
-import { CALENDAR_SHARE_KEYS, calendarShares, type Params } from "@app/data/params";
-import type { Datasets } from "@app/data/datasets";
+import { CALENDAR_SHARE_KEYS, calendarShares, type Params } from "@app/model/params";
+import type { Datasets } from "@app/model/datasets";
 import { railroad } from "@app/model/railroad";
 import { nightDist, sampleGrid } from "@app/model/season";
 import { linspace } from "@kit/math/stats";

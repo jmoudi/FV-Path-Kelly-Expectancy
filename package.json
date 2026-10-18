@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "parity": "node scripts/parity.mjs"
+    "parity": "node scripts/parity.mjs",
+    "boundaries": "node scripts/boundaries.mjs"
   },
   "dependencies": {
     "echarts": "^5.5.1",

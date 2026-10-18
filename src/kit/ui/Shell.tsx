@@ -1,7 +1,7 @@
 /**
  * Generic pieces of the app shell, lifted out of App.tsx: the sections page's scroll spy,
  * the [ / ] keys between views (when the app has them) and the crash screen. The app
- * keeps its own top bar and page switch (src/app/App.tsx) and composes these.
+ * keeps its own top bar and page switch (src/app/view/App.tsx) and composes these.
  */
 import { useEffect, useState } from "react";
 import { useKit } from "@kit/state/context";

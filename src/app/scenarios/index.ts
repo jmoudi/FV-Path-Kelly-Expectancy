@@ -1,5 +1,5 @@
-import type { Datasets } from "@app/data/datasets";
-import type { Params } from "@app/data/params";
+import type { Datasets } from "@app/model/datasets";
+import type { Params } from "@app/model/params";
 import { deckView, type DeckView } from "@app/scenarios/deck";
 import { derive, type Derived } from "./derived";
 import { buildDesk, type DeskView } from "@app/scenarios/desk";

@@ -2,10 +2,11 @@
  * The app's side of the sweep engine: the values of the anchors the schema names
  * (optimistic, deck, break-even for q; robust, Kelly, deck for the risk a night),
  * the sweep context of one parameter, and how its values and deltas read.
- * The engine (src/sweeps) is generic; this is where tranche knowledge enters.
+ * The engine (src/kit/sweeps) is generic; this is where tranche knowledge enters.
  */
 import { breakEvenLossRate } from "@app/model/binary";
-import { DEFAULT_PARAMS, type Params } from "@app/data/params";
+import type { Params } from "@app/model/params";
+import { DEFAULT_PARAMS } from "@app/data/params";
 import type { ParamDef } from "@app/data/schema";
 import type { SweepContext, SweepFormat } from "@kit/sweeps/engine";
 import { fmtInt, fmtMs, pct, sigma, x2 } from "@kit/charts/numbers";

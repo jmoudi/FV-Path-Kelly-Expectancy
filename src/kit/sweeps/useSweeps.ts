@@ -5,19 +5,10 @@ import { useKit, useKitApi, useKitSweeps } from "@kit/state/context";
 import { nextIndex } from "./engine";
 import { planWith } from "./adapter";
 import type { SweepPlan } from "./types";
+import { IS_MAC as mac } from "./hotkeys";
 
-const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
-const mod = mac ? "⌘" : "Ctrl";
-
-export const HOTKEY_HINTS = {
-  toggle: `${mod}+Enter`,
-  stop: `${mod}+.`,
-  prev: `${mod}+[`,
-  next: `${mod}+]`,
-  all: `${mod}+Shift+Enter`,
-  undo: `${mod}+Z`,
-  redo: `${mod}+Shift+Z`,
-};
+// The key names live in a React-free module so copy can import them; re-exported here for the frames.
+export { HOTKEY_HINTS } from "./hotkeys";
 
 function holdOf(plan: SweepPlan, index: number): number {
   return plan.holds[Math.max(0, index)] ?? plan.holds[0] ?? 400;

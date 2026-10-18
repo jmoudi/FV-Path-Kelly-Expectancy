@@ -9,9 +9,11 @@ import { railroad, stationLogSum } from "@app/model/railroad";
 import { calendarExpectedLogGrowth, calendarMeans, capitalUsed, cappedFraction, medianCapitalUsed, medianNames, normalizeShares, sampleCalendar } from "@app/model/calendar";
 import { eventMultiplier, levelsDistribution, partialShareOfBadSeasons, payoutLevels, wingSeasonDistribution } from "@app/model/wingSeason";
 import { evMatchingStake, symmetricKelly, symmetricSeasonDistribution, symmetricSeasonMean } from "@app/model/symmetric";
-import { DEFAULT_PARAMS, DISCUSSION_P_CLEAN, marketLossRate, marketOf, marketPatch } from "@app/data/params";
+import { DEFAULT_PARAMS, DISCUSSION_P_CLEAN } from "@app/data/params";
+import { marketLossRate, marketOf, marketPatch } from "@app/model/params";
 import { sanitizeParams } from "@app/data/schema";
-import { POLICY_IDS, POLICY_META, policies, policyLabel } from "@app/model/policies";
+import { POLICY_IDS } from "@app/model/policies";
+import { POLICY_META, policies, policyLabel } from "@app/data/policies";
 import { binnedDistributions, nightDist, nightLogGrowth, nightRuin, scheduleDistribution, summarize } from "@app/model/season";
 import { normalCdf, normalQuantile, studentTCdf } from "@kit/math/stats";
 import { fairRealizedRatio, ratioForLossRate, wingRates } from "@app/model/wing";
@@ -223,19 +225,20 @@ describe("growth figures", () => {
 });
 
 describe("market switch", () => {
+  const D = DISCUSSION_P_CLEAN;
   it("fair sets q to break-even, discussion to the 55% clean season", () => {
     const p = { gain: b, nights: n };
-    expect(marketLossRate("fair", p)).toBeCloseTo(breakEvenLossRate(b), 12);
-    expect(marketLossRate("discussion", p)).toBeCloseTo(lossRateFromPClean(DISCUSSION_P_CLEAN, n), 12);
-    expect(marketPatch("fair", p)).toEqual({ market: "fair", lossRate: breakEvenLossRate(b) });
-    expect(marketPatch("custom", p)).toEqual({ market: "custom" });
+    expect(marketLossRate("fair", p, D)).toBeCloseTo(breakEvenLossRate(b), 12);
+    expect(marketLossRate("discussion", p, D)).toBeCloseTo(lossRateFromPClean(DISCUSSION_P_CLEAN, n), 12);
+    expect(marketPatch("fair", p, D)).toEqual({ market: "fair", lossRate: breakEvenLossRate(b) });
+    expect(marketPatch("custom", p, D)).toEqual({ market: "custom" });
   });
   it("reads the deck's q back as fair, discussion or custom", () => {
-    expect(marketOf(DEFAULT_PARAMS)).toBe("discussion");
-    expect(marketOf({ ...DEFAULT_PARAMS, lossRate: breakEvenLossRate(b) })).toBe("fair");
-    expect(marketOf({ ...DEFAULT_PARAMS, lossRate: 0.0338 })).toBe("fair");
-    expect(marketOf({ ...DEFAULT_PARAMS, lossRate: 0.0252 })).toBe("custom");
-    expect(marketOf({ ...DEFAULT_PARAMS, nights: 30 })).toBe("custom");
+    expect(marketOf(DEFAULT_PARAMS, D)).toBe("discussion");
+    expect(marketOf({ ...DEFAULT_PARAMS, lossRate: breakEvenLossRate(b) }, D)).toBe("fair");
+    expect(marketOf({ ...DEFAULT_PARAMS, lossRate: 0.0338 }, D)).toBe("fair");
+    expect(marketOf({ ...DEFAULT_PARAMS, lossRate: 0.0252 }, D)).toBe("custom");
+    expect(marketOf({ ...DEFAULT_PARAMS, nights: 30 }, D)).toBe("custom");
     expect(DEFAULT_PARAMS.market).toBe("discussion");
     expect(sanitizeParams({ market: "nonsense" }).market).toBe("discussion");
     expect(sanitizeParams({ market: "fair" }).market).toBe("fair");

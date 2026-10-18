@@ -1,7 +1,7 @@
 import { f, table, tableSpec, type Annotation, type ChartSpec, type Row, type Story } from "@kit/charts/spec";
 import { eventsForTest, eventsToResolve, eventsUntilUpperBelow, observedRatePmf, wilsonInterval } from "@app/model/calibration";
-import type { Datasets } from "@app/data/datasets";
-import type { Params } from "@app/data/params";
+import type { Datasets } from "@app/model/datasets";
+import type { Params } from "@app/model/params";
 import { summarize, type Distribution } from "@app/model/season";
 import { linspace, logspace, normalQuantile } from "@kit/math/stats";
 import { evMatchingStake, symmetricKelly, symmetricSeasonDistribution } from "@app/model/symmetric";

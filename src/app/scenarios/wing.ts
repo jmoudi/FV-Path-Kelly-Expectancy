@@ -1,7 +1,8 @@
 import { f, table, tableSpec, type ChartSpec, type ColorRole, type Row, type SeriesSpec, type Story } from "@kit/charts/spec";
 import { pCleanFromLossRate } from "@app/model/binary";
-import { marketPatch, MARKET_TOL, type Params } from "@app/data/params";
-import type { Datasets } from "@app/data/datasets";
+import { marketPatch, MARKET_TOL, type Params } from "@app/model/params";
+import { DISCUSSION_P_CLEAN } from "@app/data/params";
+import type { Datasets } from "@app/model/datasets";
 import { summarize } from "@app/model/season";
 import { linspace } from "@kit/math/stats";
 import { fairRealizedRatio, movePdf, payoutFraction, ratioForLossRate, wingRates, type WingParams } from "@app/model/wing";
@@ -280,7 +281,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
     caption: `Whole tranche on each of ${p.nights} events; one event multiplies the tranche by 1 + (c/W − payout)/(1 − c/W). Where a ratio could be solved the mean is the same for every width, because the effective rate is; the width changes the shape.${seasonByWidth.some((s) => !s.solved) ? " A width without a solvable ratio keeps the deck's realized ÷ priced." : ""}`,
   });
 
-  const fairDeck = marketPatch("fair", p);
+  const fairDeck = marketPatch("fair", p, DISCUSSION_P_CLEAN);
   const fairQ = fairDeck.lossRate ?? d.breakEven;
   const actions: Action[] = [
     {

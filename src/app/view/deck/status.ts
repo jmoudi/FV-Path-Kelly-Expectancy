@@ -6,8 +6,8 @@
  */
 import type { Definition, Figure, FigureRow, LegendItem, StatusLead } from "@kit/ui/deck";
 import type { ParamDef } from "@app/data/schema";
-import type { Params } from "@app/data/params";
-import { POLICY_LEGEND, POLICY_META, YOUR_POLICY, policyDetail } from "@app/model/policies";
+import type { Params } from "@app/model/params";
+import { POLICY_LEGEND, POLICY_META, YOUR_POLICY, policyDetail } from "@app/data/policies";
 import { x2 } from "@kit/charts/numbers";
 import type { DeckView } from "@app/scenarios/deck";
 

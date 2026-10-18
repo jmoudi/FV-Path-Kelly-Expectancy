@@ -4,8 +4,8 @@
  * key, paste that file's literal here so the page reads exactly as before.
  */
 import type { KitCopy } from "@kit/ui/copy";
-import type { Params } from "@app/data/params";
-import { movedBadge } from "@app/scenarios/derived";
+import type { Params } from "@app/model/params";
+import { movedBadge } from "./paramText";
 
 export const KIT_COPY: Partial<KitCopy> = {
   exportFilePrefix: "tranche-replay",

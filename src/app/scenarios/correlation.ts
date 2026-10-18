@@ -1,7 +1,7 @@
 import { f, table, tableSpec, type ChartSpec, type Row, type Story } from "@kit/charts/spec";
 import { breachBeyond, crossoverSharedOutcome, jointLossProb, ruinPerSeason, ruinWithShock, shockedLossRate } from "@app/model/correlation";
-import type { Datasets } from "@app/data/datasets";
-import type { Params } from "@app/data/params";
+import type { Datasets } from "@app/model/datasets";
+import type { Params } from "@app/model/params";
 import { linspace, logspace } from "@kit/math/stats";
 import { fig } from "@app/data/discussion";
 import { movesDeck, near } from "@kit/charts/scenario";

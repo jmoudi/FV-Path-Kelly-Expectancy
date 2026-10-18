@@ -2,9 +2,8 @@
 
 import { SettingsGroup } from "@kit/ui/Settings";
 import { useRef, useState } from "react";
-import { parseNumberList, recordStats } from "@app/model/calibration";
 import { useStore } from "@app/store";
-import { pct2, sigma } from "@kit/charts/numbers";
+import { datasetCaption, readNumbers } from "@app/scenarios/controls";
 import { Modal } from "@kit/ui/Dialogs";
 
 function DatasetEditor({ kind, title, blurb, placeholder }: { kind: "record" | "moves"; title: string; blurb: string; placeholder: string }) {
@@ -16,7 +15,7 @@ function DatasetEditor({ kind, title, blurb, placeholder }: { kind: "record" | "
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const apply = (t: string, name?: string) => {
-    const nums = parseNumberList(t);
+    const nums = readNumbers(t);
     if (!nums.length) {
       setMsg("No numbers found.");
       return;
@@ -24,19 +23,12 @@ function DatasetEditor({ kind, title, blurb, placeholder }: { kind: "record" | "
     setDataset(kind, nums);
     setMsg(`Loaded ${nums.length} values${name ? ` from ${name}` : ""}.`);
   };
-  const stats = kind === "record" && values.length ? recordStats(values, gain, z) : null;
   return (
     <div className="dataset">
       <h4>{title}</h4>
       <p>{blurb}</p>
       <div className="row" style={{ alignItems: "baseline" }}>
-        <span className="caption">
-          {values.length === 0
-            ? "Nothing imported."
-            : kind === "record" && stats
-              ? `${values.length} events · effective rate ${pct2(stats.rate)} · band ${pct2(stats.interval[0])} to ${pct2(stats.interval[1])} (${stats.kind === "binary" ? "0/1 losses" : "P&L per max loss"})`
-              : `${values.length} moves · mean ${sigma(values.reduce((a, b) => a + b, 0) / values.length)} · beyond 2σ: ${pct2(values.filter((v) => v > 2).length / values.length)}`}
-        </span>
+        <span className="caption">{datasetCaption(kind, values, { gain, zSigma: z })}</span>
         {values.length > 0 && (
           <button type="button" className="btn small quiet" onClick={() => setDataset(kind, [])}>
             Clear
