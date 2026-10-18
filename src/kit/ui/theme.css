@@ -312,7 +312,7 @@ input[type="radio"] {
   color: var(--ink);
 }
 .rail a.on .n {
-  color: var(--ink);
+  color: var(--accent);
 }
 .main {
   min-width: 0;
@@ -540,12 +540,13 @@ input[type="radio"] {
   color: var(--ink);
   cursor: pointer;
   text-decoration: underline;
-  text-decoration-color: var(--muted);
-  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  text-underline-offset: 2px;
   text-align: left;
 }
 .action-link:hover {
-  text-decoration-color: var(--ink);
+  text-decoration-color: var(--accent);
 }
 .action-link::before {
   content: "→ ";
@@ -1005,13 +1006,15 @@ textarea.json,
   background: var(--hairline);
   border-radius: 1px;
 }
-/* At rest the slider is ink; only the field being worked on takes the accent. */
+/* A slider is a place to act, so it carries the accent: the filled part in a desaturated
+   accent, the thumb in the accent; the field being worked on takes the full accent and
+   a halo. The sweep's band (number-field.css) stays ink-2, apart from the fill. */
 .nf-fill {
   position: absolute;
   left: 0;
   top: 8px;
   height: 2px;
-  background: color-mix(in srgb, var(--ink-2) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
   border-radius: 1px;
 }
 .nf-thumb {
@@ -1021,10 +1024,15 @@ textarea.json,
   height: 10px;
   margin-left: -5px;
   border-radius: 50%;
-  background: var(--ink-2);
+  background: color-mix(in srgb, var(--accent) 80%, var(--bg));
   border: 2px solid var(--bg);
 }
-.nf.active .nf-thumb {
+.nf.active .nf-fill,
+.nf:focus-within .nf-fill {
+  background: color-mix(in srgb, var(--accent) 85%, transparent);
+}
+.nf.active .nf-thumb,
+.nf:focus-within .nf-thumb {
   background: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-tint);
 }
@@ -1225,12 +1233,8 @@ textarea.json,
   margin: 0;
   max-width: var(--prose-max);
   font-size: var(--fs-body);
-}
-.desk-verdict a {
+  /* The verdict is the block's one sentence: a link in ink, its underline in the accent tone. */
   color: var(--ink);
-  text-decoration: underline;
-  text-decoration-color: var(--muted);
-  text-underline-offset: 4px;
 }
 .desk-market {
   display: grid;

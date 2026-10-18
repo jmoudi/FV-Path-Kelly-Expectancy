@@ -6,7 +6,7 @@ import { BarAccumulator, exposeProbe, inRange, type AxisProbe, type RenderProbe,
 import { formatNumber } from "../format";
 import { LABEL_FONT_PX, LEGEND_ROW_PX, resolveChart, screenPx, type ResolvedAxis, type ResolvedChart, type ScreenAnnotation } from "../resolve";
 import { fieldFormat, fieldLabel, type ChartSpec, type SeriesSpec } from "../spec";
-import { THEME, barFill, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
+import { THEME, annotationLabelColor, barFill, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
 import { BAND_ALPHA, bandPoints, barPoints, linePoints, markOf, numberOrNull, seriesName, type Backend, type RenderHandle } from "./types";
 
 echarts.use([
@@ -204,8 +204,8 @@ function annotationSeries(rc: ResolvedChart): EOption {
     if (a.kind === "vline") lines.push({ xAxis: a.x, lineStyle, label: { show: false } });
     else if (a.kind === "hline") lines.push({ yAxis: a.y, lineStyle, label: { show: false } });
     else if (a.kind === "point") points.push({ coord: [a.x, a.y], symbol: "circle", symbolSize: 11, itemStyle: { color: roleColor(a.color ?? "ink"), borderColor: THEME.surface, borderWidth: 2 }, label: { show: false } });
-    else if (a.kind === "xband") areas.push([{ xAxis: a.x, itemStyle: { color: withAlpha(color, 0.1) } }, { xAxis: a.x2 }]);
-    else if (a.kind === "yband") areas.push([{ yAxis: a.y, itemStyle: { color: withAlpha(color, 0.1) } }, { yAxis: a.y2 }]);
+    else if (a.kind === "xband") areas.push([{ xAxis: a.x, itemStyle: { color: withAlpha(color, BAND_ALPHA) } }, { xAxis: a.x2 }]);
+    else if (a.kind === "yband") areas.push([{ yAxis: a.y, itemStyle: { color: withAlpha(color, BAND_ALPHA) } }, { yAxis: a.y2 }]);
   }
   const out: EOption = { id: ANNOTATIONS_ID, name: ANNOTATIONS_ID, type: "line", data: [], silent: true, tooltip: { show: false }, z: 5 };
   // precision: ECharts rounds mark-line coordinates to 2 decimals by default, which
@@ -240,7 +240,7 @@ function labelGraphics(rc: ResolvedChart, grid: { left: number; top: number; wid
       x = px(a, "x") ?? 0;
       y = px(a, "y") ?? 0;
     }
-    const color = a.kind === "xband" ? THEME.muted : roleColor(a.color ?? (a.kind === "point" || a.kind === "label" ? "ink" : "muted"));
+    const color = annotationLabelColor(a);
     out.push({
       type: "text",
       silent: true,

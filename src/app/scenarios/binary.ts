@@ -46,11 +46,11 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
     barWidthPx: 22,
     height: 140,
     annotations: [
-      { kind: "vline", x: mean, text: `mean ${x2(mean)}: no season ends here`, color: "muted" },
+      { kind: "vline", x: mean, text: `mean ${x2(mean)}: no season ends here`, color: "a" },
       { kind: "label", x: 0, y: 1 - d.pClean, text: `ruin ${pct(1 - d.pClean)} → 0×`, color: "loss", at: "end" },
       { kind: "label", x: end, y: d.pClean, text: `clean ${pct(d.pClean)} → ${x2(end)}`, color: "good", at: "end" },
     ],
-    caption: `The mean is p × ${x2(end)} = ${x2(mean)}; no season ends there. Section 02 takes the mean apart.`,
+    caption: `The mean is p × ${x2(end)} = ${x2(mean)}; no season ends there. [Section 02](#s-mean-median) takes the mean apart.`,
     stories: [
       {
         id: "opt",
@@ -84,7 +84,7 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
     height: 300,
     annotations: [
       { kind: "vline", x: be, text: `break-even q ${pct2(be)}`, color: "loss" },
-      { kind: "hline", y: 0.5, text: "coin flip", color: "muted", at: "start" },
+      { kind: "hline", y: 0.5, text: "coin flip", color: "ink2", at: "start" },
       { kind: "point", x: q, y: d.pClean, text: `deck: q ${pct2(q)}, p ${pct(d.pClean)}`, color: "ink", at: "end" },
     ],
     stories: [
@@ -98,7 +98,7 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
           y: { label: "Mean season end, tranche units", domain: [0, 2] },
           annotations: [
             { kind: "vline", x: be, text: `break-even q ${pct2(be)}`, color: "loss" },
-            { kind: "hline", y: 1, text: "fair: mean 1×", color: "muted", at: "start" },
+            { kind: "hline", y: 1, text: "fair: mean 1×", color: "ink2", at: "start" },
             { kind: "point", x: q, y: mean, text: `deck: mean ${x2(mean)}`, color: "ink", at: "end" },
           ],
         },
@@ -137,7 +137,7 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
     height: 280,
     annotations: [
       { kind: "hline", y: end, text: `clean end ${x2(end)}`, color: "good", at: "start" },
-      { kind: "hline", y: mean, text: `mean ${x2(mean)}`, color: "muted", at: "start" },
+      { kind: "hline", y: mean, text: `mean ${x2(mean)}`, color: "a", at: "start" },
     ],
   };
 
@@ -205,7 +205,7 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
       },
       {
         title: "The rate that goes in",
-        body: "The binary abstraction treats every bad event as a full loss, so q is expected loss as a fraction of max loss per event, not the breach rate and not the full-gap rate. Section 04 derives it from the wing and shows that an efficiently priced wing puts it exactly at break-even.",
+        body: "The binary abstraction treats every bad event as a full loss, so q is expected loss as a fraction of max loss per event, not the breach rate and not the full-gap rate. [Section 04](#s-wing) derives it from the wing and shows that an efficiently priced wing puts it exactly at break-even.",
       },
     ],
     sourceFigures: [

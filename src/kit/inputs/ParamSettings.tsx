@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useKit, useSchema } from "@kit/state/context";
 import { Popover } from "@kit/ui/Popover";
+import { Link } from "@kit/ui/Link";
 import { toDisplay, suffix as unitSuffix } from "./display";
 import { Num } from "./Num";
 import { effectiveSettings, hasSettings, type ParamSettingKey, type ParamSettings as Settings } from "./paramSettings";
@@ -148,7 +149,7 @@ export function ParamSettingsFields({ k, onClose }: { k: string; onClose?: () =>
           Reset
         </button>
         <span className="caption">
-          Range {rangeText(def)} · every parameter: <a href="#settings">Settings</a>
+          Range {rangeText(def)} · every parameter: <Link to="#settings">Settings</Link>
         </span>
       </div>
     </div>

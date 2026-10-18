@@ -20,6 +20,10 @@ export interface FigureItem {
   dot?: string;
   /** Rendered after the label, e.g. a "?" help button. */
   help?: ReactNode;
+  /** Where the figure is explained (a view, `#view/<id>`): the label becomes a link. */
+  href?: string;
+  /** DOM id of the figure, so links can point at it. */
+  elId?: string;
 }
 
 /** A link in a menu, a chip row or a breadcrumb. */

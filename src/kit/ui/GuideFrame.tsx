@@ -2,15 +2,19 @@
  * The guide page: in-app documentation of how the GUI works, from structured content
  * the app supplies (GuideSection[]). A left rail of section links that highlights the
  * section being read, the page's title and lede, then each section's blocks:
- * paragraphs, sub-headings, lists, small tables and key rows. No boxes; prose stays
- * within the measure (--prose-max). Sections are addressed as #<page>/<id>.
+ * paragraphs, sub-headings, lists, small tables, key rows and callouts. No boxes; prose
+ * stays within the measure (--prose-max). Sections are addressed as #<page>/<id> and
+ * carry the DOM id `<page>-<id>` (sub-headings `<page>-<id>-<slug>`), so any link can
+ * point at them.
  *
- * Inline markup in any text: `code` (keys, addresses, names in the code), **term**,
- * and [label](#href) links.
+ * Inline markup in any text (see `rich` in ./Link.tsx): `code` (keys, addresses, names
+ * in the code), **term** (its first appearance on the page is marked as a definition),
+ * [label](#href) links, and {{a:Coin}} for a name with its identity dot.
  */
-import { Fragment, useEffect, useMemo, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { KeyLegend, type KeyBinding } from "./Settings";
 import { useScrollSpy } from "./Shell";
+import { Link, rich, useRevealTarget } from "./Link";
 import "./guide.css";
 
 export type GuideBlock =
@@ -23,7 +27,9 @@ export type GuideBlock =
   /** A small table: a header row, then rows of cells. */
   | { kind: "table"; head: string[]; rows: string[][]; caption?: string }
   /** Key rows: keys rendered as <kbd>, what they do, where they apply. */
-  | { kind: "keys"; rows: KeyBinding[] };
+  | { kind: "keys"; rows: KeyBinding[] }
+  /** A callout: "Note" (good to know, a green rule) or "Careful" (it clears or overrides something, a red rule). */
+  | { kind: "callout"; tone: "note" | "careful"; text: string };
 
 export interface GuideSection {
   id: string;
@@ -41,41 +47,44 @@ export interface GuideFrameProps {
   page?: string;
 }
 
-const INLINE = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)\s]+\))/g;
-
-/** `code`, **term** and [label](href) inside a text. */
-export function inline(text: string): ReactNode {
-  const parts = text.split(INLINE);
-  return parts.map((part, i) => {
-    if (!part) return null;
-    if (part.startsWith("`") && part.endsWith("`")) return <code key={i}>{part.slice(1, -1)}</code>;
-    if (part.startsWith("**") && part.endsWith("**")) return <strong key={i}>{part.slice(2, -2)}</strong>;
-    const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(part);
-    if (link) return <a key={i} href={link[2]}>{link[1]}</a>;
-    return <Fragment key={i}>{part}</Fragment>;
-  });
+/** `code`, **term** and [label](href) inside a text (kept for callers of the guide's own renderer). */
+export function inline(text: string, terms?: Set<string>): ReactNode {
+  return rich(text, { terms });
 }
 
-function Block({ b }: { b: GuideBlock }) {
+const slug = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+const CALLOUT_LABEL = { note: "Note", careful: "Careful" } as const;
+
+function Block({ b, terms, idBase }: { b: GuideBlock; terms: Set<string>; idBase: string }) {
+  const t = (s: string) => inline(s, terms);
   switch (b.kind) {
     case "p":
-      return <p className="k-guide-p">{inline(b.text)}</p>;
+      return <p className="k-guide-p">{t(b.text)}</p>;
     case "h":
-      return <h3 className="k-guide-h3">{inline(b.text)}</h3>;
+      return (
+        <h3 className="k-guide-h3" id={`${idBase}-${slug(b.text)}`}>
+          {t(b.text)}
+        </h3>
+      );
     case "list": {
-      const items = b.items.map((it, i) => <li key={i}>{inline(it)}</li>);
+      const items = b.items.map((it, i) => <li key={i}>{t(it)}</li>);
       return b.ordered ? <ol className="k-guide-list">{items}</ol> : <ul className="k-guide-list">{items}</ul>;
     }
     case "table":
       return (
         <div className="k-guide-table-wrap">
           <table className="k-guide-table">
-            {b.caption && <caption>{inline(b.caption)}</caption>}
+            {b.caption && <caption>{t(b.caption)}</caption>}
             <thead>
               <tr>
                 {b.head.map((h, i) => (
                   <th key={i} scope="col">
-                    {inline(h)}
+                    {t(h)}
                   </th>
                 ))}
               </tr>
@@ -86,10 +95,10 @@ function Block({ b }: { b: GuideBlock }) {
                   {r.map((c, j) =>
                     j === 0 ? (
                       <th key={j} scope="row">
-                        {inline(c)}
+                        {t(c)}
                       </th>
                     ) : (
-                      <td key={j}>{inline(c)}</td>
+                      <td key={j}>{t(c)}</td>
                     ),
                   )}
                 </tr>
@@ -104,58 +113,53 @@ function Block({ b }: { b: GuideBlock }) {
           <KeyLegend bindings={b.rows} />
         </div>
       );
+    case "callout":
+      return (
+        <aside className={`k-guide-callout ${b.tone}`} aria-label={CALLOUT_LABEL[b.tone]}>
+          <span className="k-guide-callout-t">{CALLOUT_LABEL[b.tone]}</span> {t(b.text)}
+        </aside>
+      );
   }
 }
 
 export function GuideFrame({ title, lede, sections, current, page = "guide" }: GuideFrameProps) {
   const ids = useMemo(() => sections.map((s) => s.id), [sections]);
-  const spied = useScrollSpy(ids, true, "g-");
+  const spied = useScrollSpy(ids, true, `${page}-`);
   const active = spied || current || ids[0];
   const href = (id: string) => `#${page}/${id}`;
 
-  // A section in the address: scroll to it (also on first load).
-  useEffect(() => {
-    if (current) document.getElementById(`g-${current}`)?.scrollIntoView({ block: "start" });
-  }, [current]);
+  // A section in the address: scroll to it (also on first load), unless a link already did.
+  useRevealTarget(current ? `${page}-${current}` : undefined);
+
+  // Each term is marked as defined where it first appears on the page.
+  const terms = new Set<string>();
 
   return (
     <div className="k-guide">
       <nav className="k-guide-rail" aria-label={`${title}: sections`}>
         <div className="k-guide-rail-title">{title}</div>
         {sections.map((s, i) => (
-          <a
-            key={s.id}
-            href={href(s.id)}
-            className={active === s.id ? "on" : undefined}
-            aria-current={active === s.id ? "true" : undefined}
-            onClick={(e) => {
-              // The same address again does not fire hashchange: scroll here.
-              if (location.hash === href(s.id)) {
-                e.preventDefault();
-                document.getElementById(`g-${s.id}`)?.scrollIntoView({ block: "start" });
-              }
-            }}
-          >
+          <Link key={s.id} to={href(s.id)} variant="plain" className={active === s.id ? "on" : undefined} aria-current={active === s.id ? "true" : undefined}>
             <span className="n">{i + 1}</span>
             <span>{s.title}</span>
-          </a>
+          </Link>
         ))}
       </nav>
       <main className="k-guide-main">
         <header className="k-guide-head">
           <h1 className="page-title">{title}</h1>
-          {lede && <p className="page-lede">{inline(lede)}</p>}
+          {lede && <p className="page-lede">{inline(lede, terms)}</p>}
         </header>
         {sections.map((s, i) => (
-          <section key={s.id} id={`g-${s.id}`} className="k-guide-sec" aria-labelledby={`g-${s.id}-h`}>
-            <h2 className="k-guide-h2" id={`g-${s.id}-h`}>
+          <section key={s.id} id={`${page}-${s.id}`} className="k-guide-sec" aria-labelledby={`${page}-${s.id}-h`}>
+            <h2 className="k-guide-h2" id={`${page}-${s.id}-h`}>
               <span className="n" aria-hidden="true">
                 {i + 1}
               </span>
               {s.title}
             </h2>
             {s.body.map((b, j) => (
-              <Block key={j} b={b} />
+              <Block key={j} b={b} terms={terms} idBase={`${page}-${s.id}`} />
             ))}
           </section>
         ))}

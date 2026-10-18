@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "./Link";
 import type { LinkItem } from "./types";
 
 export interface ViewFrameProps {
@@ -30,14 +31,14 @@ export function ViewFrame({ eyebrow, title, prev, next, main, aside }: ViewFrame
         {(prev || next) && (
           <nav className="k-view-nav" aria-label="Neighbouring views">
             {prev && (
-              <a href={prev.href} rel="prev" title={prev.title} className="k-textlink">
+              <Link to={prev.href} rel="prev" title={prev.title}>
                 ← {prev.label}
-              </a>
+              </Link>
             )}
             {next && (
-              <a href={next.href} rel="next" title={next.title} className="k-textlink">
+              <Link to={next.href} rel="next" title={next.title}>
                 {next.label} →
-              </a>
+              </Link>
             )}
           </nav>
         )}

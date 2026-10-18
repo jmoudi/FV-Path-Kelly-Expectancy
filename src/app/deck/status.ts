@@ -9,7 +9,24 @@ import type { ParamDef } from "@app/params/schema";
 import type { Params } from "@app/params/params";
 import { POLICY_LEGEND, POLICY_META, YOUR_POLICY, policyDetail } from "@app/model/policies";
 import { x2 } from "@kit/charts/numbers";
+import { viewHref } from "@kit/ui/route";
 import type { DeckView } from "./deckView";
+
+/** The view that explains each deck figure: its label links there (row 2 and the drawer's figure table). */
+const FIGURE_VIEWS: Record<string, string> = {
+  ev: "replay-quantiles",
+  median: "chained-outcomes",
+  below: "chained-outcomes",
+  ruin: "chained-outcomes",
+  clean: "clean-season-curve",
+  premium: "move-vs-wing",
+  "median-spread": "season-shape",
+  growth: "sizing-grid",
+  "median-growth": "chained-outcomes",
+  robust: "sizing-grid",
+  "median-N": "chained-outcomes",
+};
+const figureHref = (id: string): string | undefined => (FIGURE_VIEWS[id] ? viewHref(FIGURE_VIEWS[id]) : undefined);
 
 /** The CSS colour of a palette role ("c" → "var(--c)"); the theme sets the variables. */
 export const roleColor = (role: string | undefined): string | undefined => (role ? `var(--${role})` : undefined);
@@ -40,7 +57,7 @@ export function deckStatus(deck: DeckView | null, p: Params): DeckStatus {
     { id: "median", label: `median after ${seasons}`, value: y?.text.median ?? "", title: `The season end that half of the paths beat after ${seasons} chained without refilling.` },
     { id: "below", label: below, value: y?.text.pBelow ?? "", title: `Probability of ending below ${x2(threshold)} of the starting tranche after ${seasons}.` },
     { id: "ruin", label: "ruin", value: y?.text.ruin ?? "", title: `Probability that the tranche is wiped out within ${seasons}.` },
-  ];
+  ].map((f) => ({ ...f, href: figureHref(f.id) }));
   const note = deck?.coin.text ?? `${POLICY_META.coin.name}: clean season … · ruin …`;
   return { lead, status, note };
 }
@@ -50,7 +67,7 @@ export const deckLegend: LegendItem[] = POLICY_LEGEND.map((m) => ({ id: m.id, la
 
 /** The drawer's figure table, every policy named. The help node is added by the React adapter. */
 export function deckFigureRows(deck: DeckView | null): (Omit<FigureRow, "help"> & { helpText: string })[] {
-  return (deck?.figures ?? []).map((f) => ({ id: f.id, label: f.label, basis: f.basis, value: f.value, color: roleColor(f.color), helpText: f.help }));
+  return (deck?.figures ?? []).map((f) => ({ id: f.id, label: f.label, basis: f.basis, value: f.value, color: roleColor(f.color), helpText: f.help, href: figureHref(f.id) }));
 }
 
 /** "q: expected loss …" under the term "Loss rate per name q" reads "Expected loss …". */

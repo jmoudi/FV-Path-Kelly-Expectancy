@@ -14,6 +14,7 @@ import { Num } from "@kit/inputs/Num";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 import { TableView } from "./TableView";
+import { Link, rich } from "./Link";
 
 /** The plot box's height: fixed by the spec, the same whatever the box shows. */
 export function boxHeightOf(spec: ChartSpec): number {
@@ -184,9 +185,9 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
   const tools = (
     <>
       {viewId && (
-        <a className="icon-btn" href={viewHref(viewId)} title="Open this chart in its own view" aria-label="Open this chart in its own view">
+        <Link to={viewHref(viewId)} variant="plain" className="icon-btn" title="Open this chart in its own view" aria-label="Open this chart in its own view">
           <Icon name="open" />
-        </a>
+        </Link>
       )}
       {!isTable && (
         <button type="button" className={`icon-btn${tableView ? " on" : ""}`} title={tableView ? "Back to the chart" : "Show the numbers"} aria-label={tableView ? "Back to the chart" : "Show the numbers behind this chart"} aria-pressed={tableView} onClick={() => setTableView((v) => !v)}>
@@ -246,7 +247,7 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
     </div>
   ) : undefined;
 
-  const footer = spec.caption ? <span className="k-chart-caption">{spec.caption}</span> : undefined;
+  const footer = spec.caption ? <span className="k-chart-caption">{rich(spec.caption)}</span> : undefined;
 
   return (
     <ChartFrame

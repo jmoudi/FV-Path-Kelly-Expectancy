@@ -18,4 +18,6 @@ export const KIT_COPY: Partial<KitCopy> = {
   manySeriesNote: (n) => `${n} sampled paths. Change the count under Settings → Paths in fan charts.`,
   storyMoved: (before, now) => movedBadge(before as Partial<Params> | undefined, now as unknown as Params),
   engineSettingsBlurb: "How season distributions are computed and how many samples the sampled charts draw.",
+  // The Guide's sections on the captions' subjects.
+  links: { inputs: "#guide/parameter-settings", replayer: "#guide/replayer" },
 };

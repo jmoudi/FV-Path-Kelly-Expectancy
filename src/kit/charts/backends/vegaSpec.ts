@@ -8,7 +8,7 @@ import { stepVertices } from "../bars";
 import { formatNumber } from "../format";
 import { LABEL_FONT_PX, LEGEND_ROW_PX, resolveChart, type ResolvedAxis, type ResolvedChart } from "../resolve";
 import { fieldFormat, fieldLabel, type ChartSpec, type Row, type SeriesSpec } from "../spec";
-import { THEME, barFill, emphasisOpacity, emphasisWidth, heatPalette, roleColor } from "../theme";
+import { THEME, annotationLabelColor, barFill, emphasisOpacity, emphasisWidth, heatPalette, roleColor } from "../theme";
 import { BAND_ALPHA, barPoints, categories, d3Format, linePoints, markOf, numberOrNull, seriesName } from "./types";
 
 export type VL = Record<string, unknown>;
@@ -199,11 +199,11 @@ function annotationLayers(rc: ResolvedChart): VL[] {
     if (a.kind === "vline") layers.push({ data: one("line"), mark: { type: "rule", color, strokeDash: dash, strokeWidth: 1, clip: true }, encoding: { x: { datum: a.x } } });
     else if (a.kind === "hline") layers.push({ data: one("line"), mark: { type: "rule", color, strokeDash: dash, strokeWidth: 1, clip: true }, encoding: { y: { datum: a.y } } });
     else if (a.kind === "point") layers.push({ data: one("dot"), mark: { type: "point", filled: true, color: roleColor(a.color ?? "ink"), opacity: 1, size: 90, stroke: THEME.surface, strokeWidth: 2, clip: true }, encoding: { x: { datum: a.x }, y: { datum: a.y } } });
-    else if (a.kind === "xband") layers.push({ data: one("area"), mark: { type: "rect", color, opacity: 0.1, clip: true }, encoding: { x: { datum: a.x }, x2: { datum: a.x2 } } });
-    else if (a.kind === "yband") layers.push({ data: one("area"), mark: { type: "rect", color, opacity: 0.1, clip: true }, encoding: { y: { datum: a.y }, y2: { datum: a.y2 } } });
+    else if (a.kind === "xband") layers.push({ data: one("area"), mark: { type: "rect", color, opacity: BAND_ALPHA, clip: true }, encoding: { x: { datum: a.x }, x2: { datum: a.x2 } } });
+    else if (a.kind === "yband") layers.push({ data: one("area"), mark: { type: "rect", color, opacity: BAND_ALPHA, clip: true }, encoding: { y: { datum: a.y }, y2: { datum: a.y2 } } });
     const l = a.label;
     if (!l || !a.text) continue;
-    const textColor = a.kind === "xband" ? THEME.muted : roleColor(a.color ?? (a.kind === "point" || a.kind === "label" ? "ink" : "muted"));
+    const textColor = annotationLabelColor(a);
     let x: VL;
     let y: VL;
     if (a.kind === "xband") {

@@ -53,7 +53,7 @@
   background: var(--surface);
 }
 .k-guide-rail a.on .n {
-  color: var(--ink);
+  color: var(--accent);
 }
 
 .k-guide-main {
@@ -87,11 +87,12 @@
   gap: 12px;
   align-items: baseline;
 }
+/* Section numbers in the accent: the guide's landmarks, the numbers its cross-references use. */
 .k-guide-h2 .n {
   font-family: var(--font-mono);
-  font-size: var(--fs-label);
-  font-weight: 400;
-  color: var(--muted);
+  font-size: var(--fs-ui);
+  font-weight: 500;
+  color: var(--accent);
   min-width: 1.6em;
 }
 .k-guide-h3 {
@@ -110,9 +111,46 @@
 }
 .k-guide-p strong,
 .k-guide-list strong,
-.k-guide-table strong {
+.k-guide-table strong,
+.k-guide-callout strong {
   color: var(--ink);
   font-weight: 600;
+}
+/* A defined term where it first appears: bold ink on a warm accent-tinted highlight,
+   apart from the cool raised code chips and from the underlined links. */
+.k-guide strong.k-term.first {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 2px;
+  padding: 0 3px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+/* A policy named in the text keeps its 8px identity dot before the name. */
+.k-guide .k-named {
+  display: inline-flex;
+  gap: 5px;
+  color: var(--ink);
+}
+.k-guide .k-named::before {
+  width: 7px;
+  height: 7px;
+}
+/* Callouts: "Note" on a good-green rule, "Careful" on a loss-red rule; the text stays ink-2. */
+.k-guide-callout {
+  margin: 4px 0 14px;
+  max-width: var(--prose-max);
+  padding: 2px 0 2px 14px;
+  border-left: 2px solid var(--good);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.k-guide-callout.careful {
+  border-left-color: var(--loss);
+}
+.k-guide-callout-t {
+  font-weight: 600;
+  color: var(--ink);
 }
 .k-guide-list {
   margin: 0 0 12px;
@@ -124,19 +162,20 @@
   display: grid;
   gap: 4px;
 }
+/* Code chips: mono on the raised surface, a hairline edge. */
 .k-guide code {
   font-family: var(--font-mono);
   font-size: var(--fs-ui);
   color: var(--ink);
-  background: var(--surface);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--hairline);
   border-radius: 4px;
-  padding: 0 4px;
+  padding: 0 5px;
   overflow-wrap: anywhere;
 }
-.k-guide a {
-  color: var(--ink);
-  text-decoration-color: var(--muted);
-  text-underline-offset: 3px;
+/* Links in the guide are the app's text links (.k-link); inside bold ink they keep the ink. */
+.k-guide strong .k-link {
+  color: inherit;
 }
 .k-guide-table-wrap {
   max-width: 100%;
@@ -157,24 +196,37 @@
 }
 .k-guide-table th,
 .k-guide-table td {
-  padding: 6px 18px 6px 0;
+  padding: 6px 16px 6px 10px;
   border-bottom: 1px solid var(--grid);
   text-align: left;
   vertical-align: baseline;
   color: var(--ink-2);
   line-height: 1.45;
 }
+/* The header row on a faint accent tint, so a table's columns read before its rows. */
 .k-guide-table thead th {
   font-size: var(--fs-label);
   font-weight: 500;
-  color: var(--muted);
+  color: var(--ink-2);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
   border-bottom-color: var(--hairline);
   white-space: nowrap;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+.k-guide-table thead th:first-child {
+  border-top-left-radius: 4px;
+}
+.k-guide-table thead th:last-child {
+  border-top-right-radius: 4px;
 }
 .k-guide-table tbody th {
   font-weight: 500;
   color: var(--ink);
   white-space: nowrap;
+}
+.k-guide-table tbody th .k-link {
+  color: inherit;
 }
 .k-guide .k-keys td {
   line-height: 1.6;

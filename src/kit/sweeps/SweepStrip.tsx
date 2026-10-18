@@ -1,6 +1,7 @@
 import { isSweepable } from "@kit/inputs/schema";
 import { useKit, useKitCopy, useKitSweeps, useSchema } from "@kit/state/context";
 import { Icon } from "@kit/ui/Icon";
+import { Link } from "@kit/ui/Link";
 import { describeWith } from "./adapter";
 import { HOTKEY_HINTS } from "./useSweeps";
 
@@ -43,7 +44,16 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
   if (!key || !def || def.unit === "choice") {
     return (
       <div className={cls} role="status">
-        <span className="sw-hint">Focus an input to sweep it · {HOTKEY_HINTS.undo} undoes</span>
+        <span className="sw-hint">
+          {copy.links.replayer ? (
+            <Link to={copy.links.replayer} title="How the replayer sweeps a parameter">
+              Focus an input to sweep it
+            </Link>
+          ) : (
+            "Focus an input to sweep it"
+          )}{" "}
+          · {HOTKEY_HINTS.undo} undoes
+        </span>
       </div>
     );
   }

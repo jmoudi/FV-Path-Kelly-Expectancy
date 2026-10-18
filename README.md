@@ -84,7 +84,7 @@ swapped without touching the others.
 | Sweeps | `src/kit/sweeps/` | Presets, plans and their sanitizers (`types.ts`, `engine.ts`, `sanitize.ts`, over the app's `PresetCatalog`); the frame-locked sweep clock (`runner.ts`: the next value only after the last one rendered, each value on screen at least its interval); the driver and the hotkeys (`useSweeps.ts`); the strip and the preset editor (`SweepStrip`, `SweepPanel`); and the `SweepAdapter` (`adapter.ts`) through which they ask the app for an input's context, its format and whether a build has rendered. |
 | State | `src/kit/state/` | `createAppStore(config)`: parameters with undo and redo, imported data, chart edits, default backend, presets and links, settings, parameter settings (`paramSettings`, `setParamSettings`, `resetParamSettings`; never read by the sweeps), and the snapshot of parameters a story moved (only one deck-moving story is active at a time). Sweep runs are saved as input, preset and pre-sweep value only (ticks are never saved), so a reload mid-sweep puts the input back. Validated on load, persisted locally under one key, exported and imported as one versioned JSON file; `#reset` in the address clears it. `<KitProvider>` with `useKit`, `useKitApi`, `useSchema`, `useKitSweeps`, `useKitCopy` is how kit components reach the store, the schema, the sweep adapter and the copy. |
 | Build | `src/kit/build/` | `defineBuildWorker` (the worker side) and `useBuild(input, { createWorker, build, settled })`: the build queue (`coalesce.ts`: one request in flight, the newest waiting, every answer newer than the last one shown rendered), `only` partial builds of the scenarios on screen during a sweep (`scope.ts`), and an inline fallback when the worker does not answer. |
-| Frames | `src/kit/ui/` | The section skeleton and its composition (`SectionFrame`, `Section`), the answer strip, the footer line and its tabbed panel, the view page (`ViewFrame`, `ViewPage`), the chart host with the editor in ⚙ and the ⊞ table (`ChartHost`, `Authoring`, `TableView`), the comparison grid (`DeskGrid`), portal menus, settings (`Settings`, `SettingsBody`) and the hotkey legend, dialogs, popovers, the guide page (`GuideFrame`: a rail of section links beside prose, tables and key rows, from the app's `GuideSection[]`; `guide.css`), routes (`route.ts`: a `RouteConfig`, `viewHref`, `sectionHref`, and `#<page>/<part>` for a page's part), the shell hooks (`Shell.tsx`: scroll spy, `[` / `]` between views, the crash screen), adapters from a `ScenarioView` to frame props (`scenarioProps.tsx`: KPIs into figures, sections into chips and the Views menu), the frames' default copy (`copy.ts`), and the deck (`deck/`: the two-row bar, the drawer, the linked value, the segmented switch), all through props. One dark theme, graphite: `theme.css` holds the colour tokens and the token-only type scale, `kit.css` reads only those tokens, `deck/deck.css` styles the deck frame; the chrome (focus ring, focused field, active chips, primary buttons, active tab) reads `--accent`, a cream of its own; icons are drawn (`Icon.tsx`). Stacking: deck 25, top bar 30, drawer 35, dialogs 50, popovers 70, menus 80. See `src/kit/ui/README.md` and `src/kit/ui/deck/README.md`. |
+| Frames | `src/kit/ui/` | The section skeleton and its composition (`SectionFrame`, `Section`), the answer strip, the footer line and its tabbed panel, the view page (`ViewFrame`, `ViewPage`), the chart host with the editor in ⚙ and the ⊞ table (`ChartHost`, `Authoring`, `TableView`), the comparison grid (`DeskGrid`), portal menus, settings (`Settings`, `SettingsBody`) and the hotkey legend, dialogs, popovers, the guide page (`GuideFrame`: a rail of section links beside prose, tables and key rows, from the app's `GuideSection[]`; `guide.css`), routes (`route.ts`: a `RouteConfig`, `viewHref`, `sectionHref`, `anchorHref`, and `#<page>/<part>` for a page's part), links (`Link.tsx`: `Link`, in-page smooth scroll with a brief mark or a route switch, never a reload; `rich()` for inline markup in copy), the shell hooks (`Shell.tsx`: scroll spy, `[` / `]` between views, the crash screen), adapters from a `ScenarioView` to frame props (`scenarioProps.tsx`: KPIs into figures, sections into chips and the Views menu), the frames' default copy (`copy.ts`), and the deck (`deck/`: the two-row bar, the drawer, the linked value, the segmented switch), all through props. One dark theme, graphite: `theme.css` holds the colour tokens and the token-only type scale, `kit.css` reads only those tokens, `deck/deck.css` styles the deck frame; the chrome (focus ring, focused field, active chips, primary buttons, active tab) reads `--accent`, a cream of its own; icons are drawn (`Icon.tsx`). Stacking: deck 25, top bar 30, drawer 35, dialogs 50, popovers 70, menus 80. See `src/kit/ui/README.md` and `src/kit/ui/deck/README.md`. |
 | Maths | `src/kit/math/stats.ts` | The error function and the normal distribution, Student-t, lgamma, binomial, the regularized incomplete Beta, a seeded RNG, linspace and logspace, integration. No domain. |
 
 ### The app (`src/app/`)
@@ -108,6 +108,15 @@ swapped without touching the others.
   Desk · Explain · Views ▾ · Settings · Guide, with Data, Import / export and ⚙ on the
   right; at 700px and below those three fold into one "⋯" menu (which also lists the
   Guide). The Views menu and "⋯" render above everything, so nothing clips them.
+- **Links.** Underlined text is a link, and no link reloads the page. A link to a part
+  of the open page (a section number on Explain, a Guide section, the "↓ <chart>"
+  under a section's figures) scrolls there smoothly below the top bar and deck and
+  marks the target for a moment; a link to another page or view (a figure's label, a
+  Desk row, a deck figure, a section number seen from a view) switches to it, at that
+  part when it names one; Back returns; Ctrl- or ⌘-click and a middle click open the
+  same address in a new tab. "Inputs for this section" links to the Guide's parameter
+  settings and the sweep strip's hint to the replayer. Chips, buttons, rails and the
+  top bar are not underlined.
 - **Guide.** `#guide` documents how the GUI works, in ten sections (the screen,
   parameters, editing a parameter by hand, parameter settings, the replayer, charts,
   pages, data and state, keys, for builders), each at `#guide/<section>`
@@ -240,19 +249,40 @@ swapped without touching the others.
   is imported.
 - Rates palette: optimistic = green, deck = ink (near white on graphite), break-even =
   red, wherever those rates are a series or an annotation; a test holds every chart to
-  it. Policy colours are reserved for policies; `ink2` is the neutral accent for asides.
-- Colour roles (one job per colour; tested in `tests/charts.test.ts`): figures, names,
-  titles and labels are ink (`--ink`, `--ink-2`, `--muted`), so no number on a page is
-  coloured and "yours" reads as ink against ink-2. The cream `--accent` (#e8e1a3)
-  marks only where to act: the focus ring, the focused field, active and linked chips,
-  primary buttons, the active tab, link-hover underlines; never in a chart. Amber, cyan
-  and violet (Coin, Spread, Spread + reserve) live on chart marks, legend swatches,
-  that policy's annotation lines and the 8px dot before a policy's name or figure.
-  Loss red and good green mark ruin and clean outcomes, messages, the heat map's sign
-  and the rates pair, as lines and dots; status bars fill at most 0.6. Ordered
-  scenarios use the neutral grey ramp, or one policy's colour told apart by dash.
-  Reference lines are 1px muted dashes (ink only for the deck's own value); grid lines
-  run across the value axis only; labels sit on a page-coloured halo, not in a box.
+  it. Policy colours are reserved for policies; `ink2` is the neutral role of guide
+  lines and of a sweep's band.
+- Colour roles (one job per colour; tested in `tests/charts.test.ts`): text, figures,
+  names, titles and labels are ink (`--ink`, `--ink-2`, `--muted`), so no number on a
+  page is coloured and "yours" reads as ink against ink-2. The cream `--accent`
+  (#e8e1a3) marks where to act and the landmarks the prose refers to: the focus ring,
+  the focused field, the sliders (fill at 55%, thumb, full accent and a halo on the
+  field being worked on; a sweep's band stays ink-2), active and linked chips, story
+  chips (underlined label, pressed in the accent), primary buttons, the active tab,
+  link underlines (45% at rest, full on hover and focus), the section number in an
+  eyebrow and on the rails, the Guide's section numbers and table-header tint, the
+  claim aside's rule (60%) and the inputs caption's rule; never in a chart. Amber,
+  cyan and violet (Coin, Spread, Spread + reserve) live on chart marks, legend
+  swatches, that policy's annotation lines (its mean and median markers) and the 8px
+  dot before a policy's name or figure (in the Guide too, `{{a:Coin}}`). Loss red and
+  good green mark ruin and clean outcomes, messages, the heat map's sign, the rates
+  pair (as lines and dots) and the Guide's callout rules (Note green, Careful red);
+  status bars fill at most 0.6. Ordered scenarios use the neutral grey ramp, or one
+  policy's colour told apart by dash. Reference lines are 1px dashes in their role:
+  optimistic green, the deck's own value ink, break-even red, a policy's mean or median
+  in its colour, guide lines (zero, no growth, start, coin flip, the median line, time
+  scales) ink-2, landmarks (strikes, season boundaries, the threshold) muted. A label
+  takes its line's or band's colour; a band (a series band or a shaded annotation) is
+  the colour of what it describes at 12%. Grid lines run across the value axis only;
+  labels sit on a page-coloured halo, not in a box. A measurement of every page's text
+  colours after this pass: ink, ink-2 and muted only, plus the accent section numbers.
+- Links: every in-app link is the kit's `Link` (`src/kit/ui/Link.tsx`), underlined;
+  copy strings carry them as inline markup, `[Section 04](#s-wing)`, rendered by
+  `rich()` wherever the page shows that copy (ledes, claims, notes, captions, help,
+  quoted rows, blurbs, the Guide). A test holds every "Section NN" in the copy to a
+  link to the section with that number, and every link to a section, view or Guide part
+  that exists. Sections are `s-<id>`, chart cards `chart-<id>`, a section's figures
+  `s-<id>-fig-<i>`, Guide sections `guide-<id>` (headings `guide-<id>-h`, sub-headings
+  `guide-<id>-<slug>`); `#el-<id>` links to any of them on the open page.
 - Type: every font size reads a token (`--fs-title` 36 · `--fs-view` 30 · `--fs-h` 20 ·
   `--fs-chart` 17 · `--fs-body` 15 · `--fs-ui` 13 · `--fs-label` 11.5 · `--fs-hero` 28 ·
   `--fs-kpi` 20), defined once in `:root`. Borders remain only on inputs, popovers, the

@@ -24,8 +24,9 @@
   height: 10px;
   min-width: 3px;
   border-radius: 2px;
-  background: color-mix(in srgb, var(--ink) 22%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 45%, transparent);
+  /* The sweep's colour is ink-2 (no policy, not the accent), so the band stays apart from the accent fill. */
+  background: color-mix(in srgb, var(--ink-2) 20%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink-2) 50%, transparent);
   pointer-events: none;
 }
 .nf-mark {
@@ -44,7 +45,7 @@
   margin-left: -1px;
   border: 0;
   border-radius: 1px;
-  background: var(--ink);
+  background: var(--accent);
   box-shadow: none;
 }
 /* While a sweep drives the field, the moving tick is the needle. */
@@ -65,9 +66,10 @@
 .nf.paused .nf-tick {
   background: var(--ink-2);
 }
+/* While a sweep drives the field, the fill keeps the accent (the value is still the field's) and the band and tick stay ink. */
 .nf.running .nf-track .nf-fill,
 .nf.paused .nf-track .nf-fill {
-  background: var(--ink-2);
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
 }
 
 /*

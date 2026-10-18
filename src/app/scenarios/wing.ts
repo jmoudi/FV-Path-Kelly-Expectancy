@@ -253,8 +253,8 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
     series: seasonSeries,
     height: 300,
     annotations: [
-      { kind: "vline", x: 1, text: "start: a bad season ends below", color: "muted", at: "start" },
-      { kind: "hline", y: 0.5, text: "median line", color: "muted", at: "end" },
+      { kind: "vline", x: 1, text: "start: a bad season ends below", color: "ink2", at: "start" },
+      { kind: "hline", y: 0.5, text: "median line", color: "ink2", at: "end" },
     ],
     stories: seasonStories,
   };
@@ -318,7 +318,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
     kpis: [
       { label: "Effective rate", value: pct2(r.effective), sub: matchesDeck ? `= deck q ${pct2(q)} · E[payout] ÷ width` : `deck q ${pct2(q)} · gap ${signedPp(r.effective - q)} · E[payout] ÷ width`, color: "ink", help: "The EV-matching full-loss rate for these inputs. The default realized ÷ priced sigma is solved so that it equals the deck's q." },
       { label: "Premium over fair per event", value: signedPp(r.premiumRate), sub: `c ÷ W ${pct2(r.fairRate)} − effective ${pct2(r.effective)} · EV ${signedPct(r.expectedPnlPerMaxLoss, 2)} of max loss`, help: "How far below the chain's fair rate the effective rate sits. Positive means these inputs assume the chain pays a premium for tail insurance, which is not an information edge; zero means fair pricing." },
-      { label: "Fair rate c ÷ W", value: pct2(r.fairRate), sub: "= b ÷ (1 + b), break-even", help: "The effective rate at which credit equals expected payout. Identical to the break-even loss rate in section 01." },
+      { label: "Fair rate c ÷ W", value: pct2(r.fairRate), sub: "= b ÷ (1 + b), break-even", help: "The effective rate at which credit equals expected payout. Identical to the break-even loss rate in [section 01](#s-binary)." },
       { label: "Breach / full gap", value: `${pct2(r.breach)} / ${pct2(r.fullGap)}`, sub: `beyond ${sigma(p.strikeDistance)} / ${sigma(dEnd)}` },
       {
         label: "Bad seasons that are partial",
@@ -339,7 +339,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
       },
       {
         title: "Fair pricing is break-even",
-        body: "If the market prices the wing fairly, credit = E[payout], so q_eff = c/W. And b/(1 + b) with b = c/(W − c) is also c/W. The break-even loss rate of section 01 and the fairly priced wing are the same number. Everything the deck assumes below that rate is a premium the chain pays for tail insurance, or a mispricing; the app cannot tell which, and section 03 says the record cannot either.",
+        body: "If the market prices the wing fairly, credit = E[payout], so q_eff = c/W. And b/(1 + b) with b = c/(W − c) is also c/W. The break-even loss rate of [section 01](#s-binary) and the fairly priced wing are the same number. Everything the deck assumes below that rate is a premium the chain pays for tail insurance, or a mispricing; the app cannot tell which, and [section 03](#s-calibration) says the record cannot either.",
       },
       {
         title: "Why the default realized ÷ priced sigma is not 1.00",
@@ -351,7 +351,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
       },
       {
         title: "One wing or two",
-        body: "This section models one wing: the move is signed toward the short strike. Section 06 models a condor, where either side can breach, so its thresholds are two-sided. Importing moves under Data uses the one-sided convention: positive numbers are moves toward the short strike.",
+        body: "This section models one wing: the move is signed toward the short strike. [Section 06](#s-correlation) models a condor, where either side can breach, so its thresholds are two-sided. Importing moves under Data uses the one-sided convention: positive numbers are moves toward the short strike.",
       },
     ],
     sourceFigures: [

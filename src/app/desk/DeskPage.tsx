@@ -7,6 +7,8 @@ import type { DeskView } from "./desk";
 import type { ScenarioView } from "@app/scenarios/types";
 import { allCharts } from "@app/scenarios/types";
 import { ChartHost } from "@kit/ui/ChartHost";
+import { Link } from "@kit/ui/Link";
+import { viewHref } from "@kit/ui/route";
 
 function chartById(scenarios: ScenarioView[], id: string): ChartSpec | undefined {
   for (const s of scenarios) {
@@ -23,9 +25,7 @@ function MarketBlock({ desk }: { desk: DeskView }) {
       <MarketSwitch customFocusId="param-lossRate" />
       <p className="desk-line muted">
         The market sets the deck's loss rate q, so every figure on this page and every section moves with it.{" "}
-        <a className="k-textlink" href={`#view/${desk.market.viewId}`}>
-          Which loss rate to plug in ↗
-        </a>
+        <Link to={viewHref(desk.market.viewId)}>Which loss rate to plug in ↗</Link>
       </p>
     </div>
   );
@@ -75,9 +75,7 @@ export function DeskPage({ desk, scenarios, pending }: { desk: DeskView; scenari
               <div className="k-fig-l">Growth-optimal at the deck's rate</div>
             </div>
             <p className="desk-line">{s.text}</p>
-            <a className="k-textlink" href={`#view/${s.viewId}`}>
-              How much to risk a night ↗
-            </a>
+            <Link to={viewHref(s.viewId)}>How much to risk a night ↗</Link>
           </div>
         </div>
       </section>
@@ -87,7 +85,7 @@ export function DeskPage({ desk, scenarios, pending }: { desk: DeskView; scenari
           Can the record tell
         </h2>
         <p className="desk-verdict">
-          <a href={`#view/${desk.calibration.viewId}`}>{desk.calibration.sentence}</a>
+          <Link to={viewHref(desk.calibration.viewId)}>{desk.calibration.sentence}</Link>
         </p>
       </section>
 

@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { Link } from "./Link";
 
 export interface GridColumn {
   id: string;
@@ -79,7 +80,7 @@ export function DeskGrid({ columns, groups, caption, busy }: { columns: GridColu
             {g.rows.map((r) => (
               <tr key={r.id}>
                 <th scope="row" className="k-grid-label">
-                  {r.href ? <a href={r.href}>{r.label}</a> : r.label}
+                  {r.href ? <Link to={r.href}>{r.label}</Link> : r.label}
                 </th>
                 {columns.map((c) => {
                   const cell = r.cells[c.id];

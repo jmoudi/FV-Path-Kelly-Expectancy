@@ -49,8 +49,8 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
     series: [{ field: "events", color: "ink", label: "Events needed" }],
     height: 320,
     annotations: [
-      { kind: "hline", y: perYear, text: `one year of events (${perYear})`, color: "muted", at: "end" },
-      { kind: "hline", y: perYear * 10, text: "ten years", color: "muted", at: "end" },
+      { kind: "hline", y: perYear, text: `one year of events (${perYear})`, color: "ink2", at: "end" },
+      { kind: "hline", y: perYear * 10, text: "ten years", color: "ink2", at: "end" },
       { kind: "point", x: Math.abs(qBE - qOpt), y: nOptBE, text: `optimistic vs break-even: ${fmtInt(nOptBE)} events`, color: "ink", at: "end" },
       { kind: "point", x: Math.abs(qBE - qDeck), y: nDeckBE, text: `deck vs break-even: ${fmtInt(nDeckBE)}`, color: "ink", at: "end" },
     ],
@@ -108,7 +108,7 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
   const bandAnn: Annotation[] = [
     { kind: "hline", y: qBE, text: `break-even ${pct2(qBE)}`, color: "loss", at: "start" },
     { kind: "hline", y: qOpt, text: `optimistic ${pct2(qOpt)}`, color: "good", at: "start" },
-    { kind: "vline", x: perYear * 10, text: "ten years", color: "muted", at: "end" },
+    { kind: "vline", x: perYear * 10, text: "ten years", color: "ink2", at: "end" },
   ];
   if (nStar != null) bandAnn.push({ kind: "point", x: nStar, y: qBE, text: `band clears break-even after ${fmtInt(nStar)} events (${years(nStar, perYear)})`, color: "ink", at: "start" });
   if (rec) bandAnn.push({ kind: "point", x: rec.events, y: rec.rate, text: `your record: ${rec.events} events, ${pct2(rec.rate)}`, color: "ink", at: "end" });
@@ -204,8 +204,8 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
     ],
     height: 300,
     annotations: [
-      { kind: "vline", x: 1, text: "start", color: "muted", at: "start" },
-      { kind: "hline", y: 0.5, text: "median line", color: "muted", at: "end" },
+      { kind: "vline", x: 1, text: "start", color: "ink2", at: "start" },
+      { kind: "hline", y: 0.5, text: "median line", color: "ink2", at: "end" },
     ],
     stories: symStories,
   };
@@ -267,11 +267,11 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
       },
       {
         title: "How the count is made",
-        body: `The observed frequency after n events has standard error √(q̄(1 − q̄)/n). Demanding the gap between two candidate rates to be z standard errors gives n = z² q̄(1 − q̄)/Δq². That is a loose bar. A one-sided test of “is it break-even?” at 5% with 80% power needs about ${fmtInt(nTest)} events. The Wilson band in the third chart is the same statement from the other side: how wide the uncertainty around an observed rate is after n events.`,
+        body: `The observed frequency after n events has standard error √(q̄(1 − q̄)/n). Demanding the gap between two candidate rates to be z standard errors gives n = z² q̄(1 − q̄)/Δq². That is a loose bar. A one-sided test of “is it break-even?” at 5% with 80% power needs about ${fmtInt(nTest)} events. The Wilson band ([Which rates my record cannot rule out](#view/confidence-band)) is the same statement from the other side: how wide the uncertainty around an observed rate is after n events.`,
       },
       {
         title: "Your own record",
-        body: "Import a trade log under Data in the top bar: one number per line, either 0/1 (1 = a full loss) or P&L per unit of max loss (+b for a clean win, −1 for a full loss). The record's effective rate and its band appear here, and the sizing section weights its robust curve by the record's posterior instead of the uniform band.",
+        body: "Import a trade log under Data in the top bar: one number per line, either 0/1 (1 = a full loss) or P&L per unit of max loss (+b for a clean win, −1 for a full loss). The record's effective rate and its band appear here, and the sizing section ([section 08](#s-chaining)) weights its robust curve by the record's posterior instead of the uniform band.",
       },
     ],
     sourceFigures: [

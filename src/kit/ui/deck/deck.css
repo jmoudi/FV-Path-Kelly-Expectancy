@@ -166,6 +166,14 @@
   color: var(--muted);
   white-space: nowrap;
 }
+/* A figure's label links to the view that explains it; it keeps the label's muted ink, the underline says link. */
+.dkb-fig dt .k-link {
+  color: inherit;
+}
+.dkb-fig dt .k-link:hover,
+.dkb-fig dt .k-link:focus-visible {
+  color: var(--ink);
+}
 .dkb[data-pending] .dkb-fig dd,
 .dkb-drawer[data-pending] .dkb-ftable td {
   opacity: 0.6;

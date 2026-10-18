@@ -33,7 +33,7 @@ export const PARAM_DEFS: ParamDef[] = [
     step: 0.0005,
     tier: "primary",
     group: "event",
-    help: "Probability that one name hits max loss on one night. The binary abstraction treats every bad event as a full loss, so this is expected loss as a fraction of max loss (section 04 derives it from a wing). Typing a value here makes the market state custom.",
+    help: "Probability that one name hits max loss on one night. The binary abstraction treats every bad event as a full loss, so this is expected loss as a fraction of max loss ([section 04](#s-wing) derives it from a wing). Typing a value here makes the market state custom.",
     definition: "q: expected loss per unit of max loss on one name-event. The breach rate overstates it, the full-gap rate understates it.",
     input: { sensitivityPx: 320, wheelStep: 0.0005, perHundredPx: 0.0025 },
     anchors: [
@@ -107,7 +107,7 @@ export const PARAM_DEFS: ParamDef[] = [
     tier: "secondary",
     section: "calibration",
     affectsAll: true,
-    help: "The better rate you would like to be true. Sections 03, 07 and 08 compare it with the deck's rate and with break-even.",
+    help: "The better rate you would like to be true. Sections [03](#s-calibration), [07](#s-axes) and [08](#s-chaining) compare it with the deck's rate and with break-even.",
     input: { perHundredPx: 0.0025 },
   },
   { key: "singleNameShare", label: "Single-name nights", unit: "pct", min: 0, max: 1, step: 0.05, tier: "secondary", section: "diversification", help: "Share of a season's nights that offer only one name." },
@@ -158,7 +158,7 @@ export const PARAM_DEFS: ParamDef[] = [
       input: { sensitivityPx: 160 },
     }),
   ),
-  { key: "symWinRate", label: "Win rate, symmetric system", unit: "pct", min: 0.5, max: 0.8, step: 0.01, tier: "secondary", section: "calibration", help: "Win rate of the frequent-outcome system section 03 compares with the tranche: a symmetric payoff, one trade per event, the same number of events as a season. The discussion's case is 60%." },
+  { key: "symWinRate", label: "Win rate, symmetric system", unit: "pct", min: 0.5, max: 0.8, step: 0.01, tier: "secondary", section: "calibration", help: "Win rate of the frequent-outcome system [section 03](#s-calibration) compares with the tranche: a symmetric payoff, one trade per event, the same number of events as a season. The discussion's case is 60%." },
   { key: "symStake", label: "Stake per trade, symmetric system", unit: "pct", min: 0.005, max: 0.25, step: 0.005, tier: "secondary", section: "calibration", help: "Share of that system's account won or lost on each trade. Its growth-optimal stake is 2p − 1; the chart compares shapes, so a modest stake keeps both seasons on one axis.", input: { decimals: 1 } },
   {
     key: "market",

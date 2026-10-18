@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useKit, useKitCopy } from "@kit/state/context";
 import { copyText, saveText } from "./download";
 import { QuickSettings } from "./SettingsBody";
+import { Link } from "./Link";
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -109,17 +110,17 @@ export function SettingsDialog({ onClose, guideHref }: { onClose: () => void; gu
       <QuickSettings />
       <p className="caption">
         Presets, parameter settings, the engine, your data, import and export and the hotkeys are on the{" "}
-        <a href="#settings" onClick={onClose}>
+        <Link to="#settings" onClick={onClose}>
           full settings page
-        </a>
+        </Link>
         .
         {guideHref && (
           <>
             {" "}
             How every control works:{" "}
-            <a href={guideHref} onClick={onClose}>
+            <Link to={guideHref} onClick={onClose}>
               the Guide
-            </a>
+            </Link>
             .
           </>
         )}
