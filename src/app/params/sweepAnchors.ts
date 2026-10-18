@@ -4,10 +4,13 @@
  * the sweep context of one parameter, and how its values and deltas read.
  * The engine (src/sweeps) is generic; this is where tranche knowledge enters.
  */
-import { breakEvenLossRate } from "../../model/binary";
-import { DEFAULT_PARAMS, type ParamDef, type Params } from "../../model/params";
-import type { SweepContext, SweepFormat } from "../../sweeps/engine";
-import { fmtInt, fmtMs, pct, sigma, typographic, x2, type DeckView } from "../../viewmodel/derived";
+import { breakEvenLossRate } from "@app/model/binary";
+import { DEFAULT_PARAMS, type Params } from "./params";
+import type { ParamDef } from "./schema";
+import type { SweepContext, SweepFormat } from "@kit/sweeps/engine";
+import { fmtInt, fmtMs, pct, sigma, x2 } from "@kit/charts/numbers";
+import { typographic } from "@kit/charts/format";
+import type { DeckView } from "@app/deck/deckView";
 
 export interface AnchorSource {
   params: Params;

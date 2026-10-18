@@ -1,11 +1,13 @@
 import { useEffect, useMemo } from "react";
-import { sweepContext, sweepFormat } from "../app/params/sweepAnchors";
-import type { TrackBand } from "../kit/inputs/SyntheticNumber";
-import { committed, due, RUNNER_DEFAULTS, skipped, startCursor, type Cursor } from "../kit/sweeps/runner";
-import { isSweepable, PARAM_BY_KEY, type Params } from "../model/params";
+import { sweepContext, sweepFormat } from "@app/params/sweepAnchors";
+import type { TrackBand } from "@kit/inputs/SyntheticNumber";
+import { committed, due, RUNNER_DEFAULTS, skipped, startCursor, type Cursor } from "@kit/sweeps/runner";
+import { isSweepable } from "@kit/inputs/schema";
+import { PARAM_BY_KEY } from "@app/params/schema";
+import type { Params } from "@app/params/params";
 import { registerSweepPlanner, useStore } from "../state/store";
-import { describePreset, nextIndex, planSweep } from "../sweeps/engine";
-import type { SweepPlan, SweepPreset } from "../sweeps/types";
+import { describePreset, nextIndex, planSweep } from "@kit/sweeps/engine";
+import type { SweepPlan, SweepPreset } from "@kit/sweeps/types";
 import { buildSettled } from "./useBuild";
 
 const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);

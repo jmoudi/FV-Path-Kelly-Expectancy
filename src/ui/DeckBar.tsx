@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { useDeckProps } from "../app/deck/useDeckProps";
-import { Deck } from "../kit/ui/deck";
+import { useDeckProps } from "@app/deck/useDeckProps";
+import { Deck } from "@kit/ui/deck";
 import { useStore } from "../state/store";
-import type { DeckView } from "../viewmodel/derived";
+import type { DeckView } from "@app/deck/deckView";
 import "./deck.css";
 
 /** The deck sits on every page except Settings. Read from the hash the way src/ui/route.ts does. */

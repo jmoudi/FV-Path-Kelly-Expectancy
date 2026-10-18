@@ -117,12 +117,13 @@ async function loadViewModel() {
   const { createServer } = await import("vite");
   const vite = await createServer({ root: ROOT, logLevel: "error", appType: "custom", server: { middlewareMode: true, hmr: false, watch: null }, optimizeDeps: { noDiscovery: true, include: [] } });
   try {
-    const [{ buildAll }, { DEFAULT_PARAMS, EMPTY_DATASETS }, parity, resolve, points, probe] = await Promise.all([
-      vite.ssrLoadModule("/src/viewmodel/index.ts"),
-      vite.ssrLoadModule("/src/model/params.ts"),
+    const [{ buildAll }, { DEFAULT_PARAMS }, { EMPTY_DATASETS }, parity, resolve, points, probe] = await Promise.all([
+      vite.ssrLoadModule("/src/app/scenarios/index.ts"),
+      vite.ssrLoadModule("/src/app/params/params.ts"),
+      vite.ssrLoadModule("/src/app/params/datasets.ts"),
       vite.ssrLoadModule("/src/kit/charts/parity.ts"),
-      vite.ssrLoadModule("/src/charts/resolve.ts"),
-      vite.ssrLoadModule("/src/charts/backends/types.ts"),
+      vite.ssrLoadModule("/src/kit/charts/resolve.ts"),
+      vite.ssrLoadModule("/src/kit/charts/backends/types.ts"),
       vite.ssrLoadModule("/src/kit/charts/probe.ts"),
     ]);
     return { built: buildAll(DEFAULT_PARAMS, EMPTY_DATASETS), parity, resolve, points, probe };

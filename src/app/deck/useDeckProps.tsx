@@ -3,12 +3,13 @@
  * into the kit frame's props. The kit lays out; this file decides what goes where.
  */
 import { useMemo } from "react";
-import type { DeckProps, DrawerSection, InputGroup } from "../../kit/ui/deck";
-import { PARAM_DEFS, type Params } from "../../model/params";
+import type { DeckProps, DrawerSection, InputGroup } from "@kit/ui/deck";
+import { PARAM_DEFS } from "@app/params/schema";
+import type { Params } from "@app/params/params";
 import { useStore } from "../../state/store";
 import { Help } from "../../ui/Help";
 import { ParamInput } from "../../ui/ParamInput";
-import type { DeckView } from "../../viewmodel/derived";
+import type { DeckView } from "./deckView";
 import { CleanSeasonField, CleanSeasonText } from "./CleanSeason";
 import { DeckStrip } from "./DeckStrip";
 import { deckLayout } from "./layout";

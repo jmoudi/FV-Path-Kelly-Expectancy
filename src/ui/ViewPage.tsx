@@ -1,9 +1,9 @@
-import { kpiItem, sectionNumber } from "../app/figures";
-import { AnswerStrip } from "../kit/ui/AnswerStrip";
-import { TabbedPanel, type PanelTab } from "../kit/ui/TabbedPanel";
-import { ViewFrame } from "../kit/ui/ViewFrame";
-import type { ScenarioView } from "../viewmodel/types";
-import { allCharts } from "../viewmodel/types";
+import { kpiItem, sectionNumber } from "@app/frames";
+import { AnswerStrip } from "@kit/ui/AnswerStrip";
+import { TabbedPanel, type PanelTab } from "@kit/ui/TabbedPanel";
+import { ViewFrame } from "@kit/ui/ViewFrame";
+import type { ScenarioView } from "@app/scenarios/types";
+import { allCharts } from "@app/scenarios/types";
 import { ChartHost } from "./ChartHost";
 import { ParamInput } from "./ParamInput";
 import { ActionButton, Notes, SourceFigures } from "./Section";

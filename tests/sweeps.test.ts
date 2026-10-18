@@ -1,14 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { anchorValue, deltaText, sweepContext, sweepFormat, valueText } from "../src/app/params/sweepAnchors";
-import { BuildQueue, SettleTracker } from "../src/kit/build/coalesce";
-import { WheelAccumulator, wheelAllowed } from "../src/kit/inputs/wheelGate";
-import { committed, due, startCursor } from "../src/kit/sweeps/runner";
-import { breakEvenLossRate } from "../src/model/binary";
-import { DEFAULT_PARAMS, PARAM_BY_KEY, type Params } from "../src/model/params";
-import { describePreset, planSweep, resolveRange, valueAt, type SweepContext } from "../src/sweeps/engine";
-import { migratePresetId, sanitizePreset, sanitizePresets } from "../src/sweeps/sanitize";
-import { DEFAULT_PRESETS, type SweepPreset } from "../src/sweeps/types";
-import { buildAll } from "../src/viewmodel";
+import { anchorValue, deltaText, sweepContext, sweepFormat, valueText } from "@app/params/sweepAnchors";
+import { BuildQueue, SettleTracker } from "@kit/build/coalesce";
+import { WheelAccumulator, wheelAllowed } from "@kit/inputs/wheelGate";
+import { committed, due, startCursor } from "@kit/sweeps/runner";
+import { breakEvenLossRate } from "@app/model/binary";
+import { DEFAULT_PARAMS, type Params } from "@app/params/params";
+import { PARAM_BY_KEY } from "@app/params/schema";
+import { describePreset, planSweep, resolveRange, valueAt, type SweepContext } from "@kit/sweeps/engine";
+import { migratePresetId, sanitizePreset, sanitizePresets } from "@kit/sweeps/sanitize";
+import { DEFAULT_PRESETS, PRESET_CATALOG } from "@app/params/presets";
+import type { SweepPreset } from "@kit/sweeps/types";
+import { buildAll } from "@app/scenarios";
 
 const preset = (id: string) => DEFAULT_PRESETS.find((p) => p.id === id)!;
 const P = DEFAULT_PARAMS;
@@ -170,11 +172,11 @@ describe("saved presets", () => {
       { id: "bounce-mid", name: "Oscillate in the middle band", kind: "pingpong", range: { mode: "fraction", lo: 0.3, hi: 0.7 }, stepFraction: 0.02, intervalMs: 250, smooth: true, scenarios: [] },
       { id: "p-abc123", name: "Mine", kind: "pingpong", range: { mode: "absolute", lo: 0.02, hi: 0.03 }, stepFraction: 0.1, intervalMs: 500, smooth: false, scenarios: [] },
     ];
-    const out = sanitizePresets(old);
+    const out = sanitizePresets(old, PRESET_CATALOG);
     expect(out.map((p) => p.id)).toEqual(["optimistic-to-break-even", "around-current", "p-abc123"]);
     expect(out[2]).toEqual({ id: "p-abc123", name: "Mine", kind: "pingpong", range: { mode: "absolute", lo: 0.02, hi: 0.03 }, step: { size: 0.1, unit: "share" }, intervalMs: 500, scenarios: [] });
-    expect(migratePresetId("loop-full")).toBe("optimistic-to-break-even");
-    expect(migratePresetId("p-abc123")).toBe("p-abc123");
+    expect(migratePresetId("loop-full", PRESET_CATALOG)).toBe("optimistic-to-break-even");
+    expect(migratePresetId("p-abc123", PRESET_CATALOG)).toBe("p-abc123");
   });
   it("round-trip the new format, anchors included", () => {
     for (const p of DEFAULT_PRESETS) expect(sanitizePreset(JSON.parse(JSON.stringify(p)))).toEqual(p);

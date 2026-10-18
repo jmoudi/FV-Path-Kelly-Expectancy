@@ -1,5 +1,5 @@
-import { formatNumber } from "../charts/format";
-import type { ChartSpec, Cell, ColumnSpec } from "../charts/spec";
+import { formatNumber } from "@kit/charts/format";
+import type { ChartSpec, Cell, ColumnSpec } from "@kit/charts/spec";
 
 /**
  * The HTML-table backend: the numbers behind any chart, or a table spec on its own.

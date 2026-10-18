@@ -1,10 +1,19 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+// Two layers: src/kit (generic) and src/app (this explainer). Kept in step with tsconfig "paths".
+const dir = (p: string) => decodeURIComponent(new URL(p, import.meta.url).pathname);
+
 // `base: "./"` keeps every asset reference relative, so the built `dist/`
 // can be served from any sub-path (GitHub Pages, a file:// open, an artifact host).
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@kit": dir("./src/kit"),
+      "@app": dir("./src/app"),
+    },
+  },
   base: "./",
   build: {
     target: "es2020",

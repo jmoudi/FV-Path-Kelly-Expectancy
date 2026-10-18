@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { BuildQueue, SettleTracker, type Dispatch } from "../kit/build/coalesce";
-import type { Datasets, Params } from "../model/params";
+import { BuildQueue, SettleTracker, type Dispatch } from "@kit/build/coalesce";
+import type { Datasets } from "@app/params/datasets";
+import type { Params } from "@app/params/params";
 import { useStore } from "../state/store";
-import { buildAll, type BuildResult } from "../viewmodel";
-import { allCharts } from "../viewmodel/types";
+import { buildAll, type BuildResult } from "@app/scenarios";
+import { allCharts } from "@app/scenarios/types";
 
 interface State {
   result: BuildResult | null;
@@ -132,7 +133,7 @@ export function useBuild(params: Params, datasets: Datasets): State {
     let watchdog = 0;
     if (!failedRef.current) {
       try {
-        const w = new Worker(new URL("../viewmodel/worker.ts", import.meta.url), { type: "module" });
+        const w = new Worker(new URL("../app/worker.ts", import.meta.url), { type: "module" });
         w.onmessage = (e: MessageEvent<{ id: number; out?: BuildResult; error?: string }>) => {
           answeredRef.current = true;
           receive(queue, e.data.id, e.data.out, e.data.error);

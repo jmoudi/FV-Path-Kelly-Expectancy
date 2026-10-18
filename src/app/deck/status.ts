@@ -4,10 +4,12 @@
  * Values come formatted from the view-model (DeckView); before the first build the
  * labels are there and the values wait.
  */
-import type { Definition, Figure, FigureRow, LegendItem, StatusLead } from "../../kit/ui/deck";
-import type { ParamDef, Params } from "../../model/params";
-import { POLICY_LEGEND, POLICY_META, YOUR_POLICY, policyDetail } from "../../model/policies";
-import { x2, type DeckView } from "../../viewmodel/derived";
+import type { Definition, Figure, FigureRow, LegendItem, StatusLead } from "@kit/ui/deck";
+import type { ParamDef } from "@app/params/schema";
+import type { Params } from "@app/params/params";
+import { POLICY_LEGEND, POLICY_META, YOUR_POLICY, policyDetail } from "@app/model/policies";
+import { x2 } from "@kit/charts/numbers";
+import type { DeckView } from "./deckView";
 
 /** The CSS colour of a palette role ("c" → "var(--c)"); the theme sets the variables. */
 export const roleColor = (role: string | undefined): string | undefined => (role ? `var(--${role})` : undefined);

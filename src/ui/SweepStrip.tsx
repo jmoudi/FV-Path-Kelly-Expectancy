@@ -1,5 +1,7 @@
-import { valueText } from "../app/params/sweepAnchors";
-import { DEFAULT_PARAMS, isSweepable, PARAM_BY_KEY, type Params } from "../model/params";
+import { valueText } from "@app/params/sweepAnchors";
+import { DEFAULT_PARAMS, type Params } from "@app/params/params";
+import { isSweepable } from "@kit/inputs/schema";
+import { PARAM_BY_KEY } from "@app/params/schema";
 import { useStore } from "../state/store";
 import { describeFor, HOTKEY_HINTS } from "./useSweeps";
 

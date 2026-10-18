@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { tickMultiple, tickPercent } from "../src/charts/format";
-import { linearTicks, logTicks, resolveAxes } from "../src/charts/resolve";
-import { applyOverride, f, sanitizeOverride, table, type ChartSpec, type Story } from "../src/charts/spec";
-import { breakEvenLossRate } from "../src/model/binary";
-import { DEFAULT_PARAMS, EMPTY_DATASETS } from "../src/model/params";
+import { tickMultiple, tickPercent } from "@kit/charts/format";
+import { linearTicks, logTicks, resolveAxes } from "@kit/charts/resolve";
+import { applyOverride, f, sanitizeOverride, table, type ChartSpec, type Story } from "@kit/charts/spec";
+import { breakEvenLossRate } from "@app/model/binary";
+import { DEFAULT_PARAMS } from "@app/params/params";
+import { EMPTY_DATASETS } from "@app/params/datasets";
 import { useStore } from "../src/state/store";
-import { buildAll } from "../src/viewmodel";
-import { fmtMs, formatNumber, MINUS, pct1, signedPct1, signedPp, smallPct, x2 } from "../src/viewmodel/derived";
-import type { ScenarioView } from "../src/viewmodel/types";
+import { buildAll } from "@app/scenarios";
+import { fmtMs, pct1, signedPct1, signedPp, smallPct, x2 } from "@kit/charts/numbers";
+import { formatNumber, MINUS } from "@kit/charts/format";
+import type { ScenarioView } from "@app/scenarios/types";
 
 const spec: ChartSpec = {
   id: "t",
@@ -456,18 +458,18 @@ describe("story rules in the store", () => {
 // ---------------------------------------------------------------------------
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { planBars, stepVertices } from "../src/kit/charts/bars";
-import { estimateTextWidth, overlaps, placeLabels } from "../src/kit/charts/collide";
-import { compareProbes } from "../src/kit/charts/parity";
-import { BarAccumulator, type RenderProbe } from "../src/kit/charts/probe";
-import { buildOption } from "../src/charts/backends/echarts";
-import { buildFigure } from "../src/charts/backends/plotlyFigure";
-import { bandPoints, barPoints, linePoints } from "../src/charts/backends/types";
-import { buildVegaSpec } from "../src/charts/backends/vegaSpec";
-import { formatNumber as chartFormat, tickMultiple as tickX, tickPercent as tickPct, tickPlain } from "../src/charts/format";
-import { legendLayout, resolveChart } from "../src/charts/resolve";
-import { THEME } from "../src/charts/theme";
-import { formatNumber as appFormat } from "../src/viewmodel/derived";
+import { planBars, stepVertices } from "@kit/charts/bars";
+import { estimateTextWidth, overlaps, placeLabels } from "@kit/charts/collide";
+import { compareProbes } from "@kit/charts/parity";
+import { BarAccumulator, type RenderProbe } from "@kit/charts/probe";
+import { buildOption } from "@kit/charts/backends/echarts";
+import { buildFigure } from "@kit/charts/backends/plotlyFigure";
+import { bandPoints, barPoints, linePoints } from "@kit/charts/backends/types";
+import { buildVegaSpec } from "@kit/charts/backends/vegaSpec";
+import { formatNumber as chartFormat, tickMultiple as tickX, tickPercent as tickPct, tickPlain } from "@kit/charts/format";
+import { legendLayout, resolveChart } from "@kit/charts/resolve";
+import { THEME } from "@kit/charts/theme";
+import { formatNumber as appFormat } from "@kit/charts/format";
 import { TableView } from "../src/ui/TableView";
 
 describe("chart rendering", () => {

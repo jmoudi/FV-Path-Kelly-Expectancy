@@ -1,11 +1,11 @@
-import { MarketSwitch } from "../app/deck/MarketSwitch";
-import { deskColumns, deskGroups } from "../app/desk/grid";
-import type { ChartSpec } from "../charts/spec";
-import { DeskGrid } from "../kit/ui/DeskGrid";
-import { pct, x2 } from "../viewmodel/derived";
-import type { DeskView } from "../viewmodel/desk";
-import type { ScenarioView } from "../viewmodel/types";
-import { allCharts } from "../viewmodel/types";
+import { MarketSwitch } from "@app/deck/MarketSwitch";
+import { deskColumns, deskGroups } from "@app/desk/grid";
+import type { ChartSpec } from "@kit/charts/spec";
+import { DeskGrid } from "@kit/ui/DeskGrid";
+import { pct, x2 } from "@kit/charts/numbers";
+import type { DeskView } from "@app/desk/desk";
+import type { ScenarioView } from "@app/scenarios/types";
+import { allCharts } from "@app/scenarios/types";
 import { ChartHost } from "./ChartHost";
 
 function chartById(scenarios: ScenarioView[], id: string): ChartSpec | undefined {

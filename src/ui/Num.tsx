@@ -1,4 +1,4 @@
-import type { Unit } from "../model/params";
+import type { Unit } from "@kit/inputs/schema";
 import { NumberField } from "./NumberField";
 
 /**

@@ -1,8 +1,11 @@
 import { create } from "zustand";
-import { sanitizeOverride, type BackendId, type SpecOverride, type Story } from "../charts/spec";
-import { DEFAULT_PARAMS, EMPTY_DATASETS, PARAM_BY_KEY, sanitizeDatasets, sanitizeParams, type Datasets, type Params } from "../model/params";
-import { migratePresetId, sanitizePreset, sanitizePresets } from "../sweeps/sanitize";
-import { defaultPresets, type PersistedRun, type SweepPlan, type SweepPreset, type SweepRun } from "../sweeps/types";
+import { sanitizeOverride, type BackendId, type SpecOverride, type Story } from "@kit/charts/spec";
+import { DEFAULT_PARAMS, type Params } from "@app/params/params";
+import { EMPTY_DATASETS, sanitizeDatasets, type Datasets } from "@app/params/datasets";
+import { PARAM_BY_KEY, sanitizeParams } from "@app/params/schema";
+import { migratePresetId, sanitizePreset, sanitizePresets } from "@kit/sweeps/sanitize";
+import { PRESET_CATALOG, defaultPresets } from "@app/params/presets";
+import type { PersistedRun, SweepPlan, SweepPreset, SweepRun } from "@kit/sweeps/types";
 
 export { sanitizePreset };
 
@@ -185,7 +188,7 @@ function sanitizeLinks(input: unknown, presets: SweepPreset[]): Record<string, s
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
     if (!PARAM_BY_KEY[k] || typeof v !== "string") continue;
-    const id = migratePresetId(v);
+    const id = migratePresetId(v, PRESET_CATALOG);
     if (ids.has(id)) out[k] = id;
   }
   return out;
@@ -232,7 +235,7 @@ function pushHistory(past: Params[], prev: Params): Params[] {
 }
 
 const initial = load();
-const initialPresets = sanitizePresets(initial.presets);
+const initialPresets = sanitizePresets(initial.presets, PRESET_CATALOG);
 const initialOverrides = sanitizeOverrides(initial.overrides);
 /**
  * A reload in the middle of a sweep puts each swept input back where it was before
@@ -410,7 +413,7 @@ export const useStore = create<AppState>((set, get) => {
     },
     setActiveInput: (activeInput) => set({ activeInput }),
     upsertPreset: (p) => {
-      const clean = sanitizePreset(p);
+      const clean = sanitizePreset(p, PRESET_CATALOG);
       if (!clean) return;
       const presets = get().presets.some((x) => x.id === clean.id) ? get().presets.map((x) => (x.id === clean.id ? clean : x)) : [...get().presets, clean];
       persist({ presets });
@@ -539,7 +542,7 @@ export const useStore = create<AppState>((set, get) => {
       const params = sanitizeParams(obj.params);
       const overrides = sanitizeOverrides(obj.overrides);
       const datasets = sanitizeDatasets(obj.datasets ?? get().datasets);
-      const presets = obj.presets ? sanitizePresets(obj.presets) : get().presets;
+      const presets = obj.presets ? sanitizePresets(obj.presets, PRESET_CATALOG) : get().presets;
       const links = sanitizeLinks(obj.links ?? get().links, presets);
       const ui = sanitizeUi(obj.ui ?? get().ui);
       const defaultBackend = VALID_BACKENDS.includes(obj.defaultBackend as BackendId) ? (obj.defaultBackend as BackendId) : get().defaultBackend;

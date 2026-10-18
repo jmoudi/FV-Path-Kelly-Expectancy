@@ -1,8 +1,10 @@
-import { Segmented, type SegmentOption } from "../../kit/ui/deck";
-import { DISCUSSION_P_CLEAN, marketPatch, type Market } from "../../model/params";
-import { POLICY_META } from "../../model/policies";
+import { Segmented, type SegmentOption } from "@kit/ui/deck";
+import { DISCUSSION_P_CLEAN, marketPatch, type Market } from "@app/params/params";
+import { POLICY_META } from "@app/model/policies";
 import { useStore } from "../../state/store";
-import { MARKET_LINE, marketState, pct, pct2, signedPp } from "../../viewmodel/derived";
+import { MARKET_LINE } from "@app/copy/market";
+import { marketState } from "@app/scenarios/derived";
+import { pct, pct2, signedPp } from "@kit/charts/numbers";
 
 /**
  * The market switch: Fair market (q = b/(1+b)) · Discussion case (55% clean Coin

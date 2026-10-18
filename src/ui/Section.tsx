@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { kpiItem, sectionNumber, viewChips } from "../app/figures";
-import type { PanelTab } from "../kit/ui/TabbedPanel";
-import { SectionFrame } from "../kit/ui/SectionFrame";
+import { kpiItem, sectionNumber, viewChips } from "@app/frames";
+import type { PanelTab } from "@kit/ui/TabbedPanel";
+import { SectionFrame } from "@kit/ui/SectionFrame";
 import { useStore } from "../state/store";
-import type { ChartSpec } from "../charts/spec";
-import type { Action, Note, ScenarioView } from "../viewmodel/types";
-import { viewOfChart } from "../viewmodel/types";
+import type { ChartSpec } from "@kit/charts/spec";
+import type { Action, Note, ScenarioView } from "@app/scenarios/types";
+import { viewOfChart } from "@app/scenarios/types";
 import { ChartHost } from "./ChartHost";
 import { ParamInput } from "./ParamInput";
 import { TableView } from "./TableView";

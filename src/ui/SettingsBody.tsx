@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { BACKEND_INFO } from "../charts/registry";
-import type { BackendId } from "../charts/spec";
-import { KeyLegend, Segmented, SettingRow, SettingsGroup, SettingsLayout, type KeyBinding } from "../kit/ui/Settings";
-import { PARAM_DEFS } from "../model/params";
+import { BACKEND_INFO } from "@kit/charts/registry";
+import type { BackendId } from "@kit/charts/spec";
+import { KeyLegend, Segmented, SettingRow, SettingsGroup, SettingsLayout, type KeyBinding } from "@kit/ui/Settings";
+import { PARAM_DEFS } from "@app/params/schema";
 import { useStore } from "../state/store";
 import { DataBody, ImportExportBody } from "./Dialogs";
 import { Num } from "./Num";

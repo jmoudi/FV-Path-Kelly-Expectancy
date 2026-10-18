@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { parseNumberList, recordStats } from "../model/calibration";
+import { parseNumberList, recordStats } from "@app/model/calibration";
 import { useStore } from "../state/store";
-import { pct2 } from "../viewmodel/derived";
+import { pct2 } from "@kit/charts/numbers";
 import { copyText, saveText } from "./download";
 import { QuickSettings } from "./SettingsBody";
 

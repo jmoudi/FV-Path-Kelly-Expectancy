@@ -1,4 +1,6 @@
-import { DEFAULT_PARAMS, inputConfig, PARAM_BY_KEY, type Params } from "../model/params";
+import { DEFAULT_PARAMS, type Params } from "@app/params/params";
+import { inputConfig } from "@kit/inputs/schema";
+import { PARAM_BY_KEY } from "@app/params/schema";
 import { useStore } from "../state/store";
 import { Help } from "./Help";
 import { NumberField } from "./NumberField";

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { sectionNumber, viewMenu, viewOrder } from "../app/figures";
-import { LinkGroups, MenuButton, MenuItems } from "../kit/ui/Menu";
+import { sectionNumber, viewMenu, viewOrder } from "@app/frames";
+import { LinkGroups, MenuButton, MenuItems } from "@kit/ui/Menu";
 import { useStore } from "../state/store";
 import { DeckBar } from "./DeckBar";
 import { DeskPage } from "./DeskPage";
@@ -12,7 +12,7 @@ import { FullSettings } from "./SettingsBody";
 import { useBuild } from "./useBuild";
 import { isEditableTarget, useSweepEngine, useSweepHotkeys } from "./useSweeps";
 import { ViewPage } from "./ViewPage";
-import type { ScenarioView } from "../viewmodel/types";
+import type { ScenarioView } from "@app/scenarios/types";
 
 function useScrollSpy(ids: string[], enabled: boolean): string {
   const [active, setActive] = useState("");

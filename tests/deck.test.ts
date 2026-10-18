@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { deckLayout } from "../src/app/deck/layout";
-import { deckDefinitions, deckFigureRows, deckLegend, deckStatus } from "../src/app/deck/status";
-import { DEFAULT_PARAMS, inputConfig, PARAM_BY_KEY, PARAM_DEFS } from "../src/model/params";
-import { buildAll } from "../src/viewmodel";
+import { deckLayout } from "@app/deck/layout";
+import { deckDefinitions, deckFigureRows, deckLegend, deckStatus } from "@app/deck/status";
+import { DEFAULT_PARAMS } from "@app/params/params";
+import { inputConfig } from "@kit/inputs/schema";
+import { PARAM_BY_KEY, PARAM_DEFS } from "@app/params/schema";
+import { buildAll } from "@app/scenarios";
 
 describe("deck layout from the schema", () => {
   const layout = deckLayout();

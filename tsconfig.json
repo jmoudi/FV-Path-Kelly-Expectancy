@@ -14,7 +14,8 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "paths": { "@kit/*": ["./src/kit/*"], "@app/*": ["./src/app/*"] }
   },
   "include": ["src", "tests", "vite.config.ts"]
 }
