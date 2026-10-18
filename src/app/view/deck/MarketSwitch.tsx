@@ -3,6 +3,7 @@ import type { Market } from "@app/model/params";
 import { useStore } from "@app/store";
 import { MARKET_LINE } from "@app/data/copy/market";
 import { marketSwitch } from "@app/scenarios/controls";
+import { useAppBus } from "@app/view/bus";
 
 /**
  * The market switch: Fair market (q = b/(1+b)) · Discussion case (55% clean Coin
@@ -14,10 +15,14 @@ import { marketSwitch } from "@app/scenarios/controls";
 export function MarketSwitch({ customFocusId }: { customFocusId?: string }) {
   const params = useStore((s) => s.params);
   const setParams = useStore((s) => s.setParams);
+  const bus = useAppBus();
   const view = marketSwitch(params);
   const onChange = (v: Market) => {
     const patch = view.patchFor(v);
-    if (patch) setParams(patch);
+    if (patch) {
+      setParams(patch, { source: "switch" });
+      if (v !== view.selected) bus.emit("market:switched", { from: view.selected, to: v });
+    }
     if (v === "custom" && customFocusId) document.getElementById(customFocusId)?.focus();
   };
   // The premium sentence comes from the view-model (marketState().line), the one source the Desk and the drawer share.

@@ -64,7 +64,7 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
       <div className={`${cls} named`} role="group" aria-label={`${def.label}: not swept`}>
         {name} <span className="sw-label">not swept</span>{" "}
         {value !== dflt && (
-          <button type="button" className="chip tiny" onClick={() => setParam(key, dflt)} title={copy.resetToDefaultTitle}>
+          <button type="button" className="chip tiny" onClick={() => setParam(key, dflt, "reset")} title={copy.resetToDefaultTitle}>
             <Icon name="restore" size={10} /> default
           </button>
         )}

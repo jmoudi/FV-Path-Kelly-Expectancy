@@ -9,7 +9,7 @@ import { DataDialog, DataSettings } from "@app/view/DataDialog";
 import { ImportExportDialog, SettingsDialog } from "@kit/ui/Dialogs";
 import { ErrorBoundary } from "@kit/ui/ErrorBoundary";
 import { Icon } from "@kit/ui/Icon";
-import { setViewOrder, useRoute, type Route, type RouteConfig } from "@kit/ui/route";
+import { useRoute, type Route, type RouteConfig } from "@kit/ui/route";
 import { Section } from "@kit/ui/Section";
 import { FullSettings } from "@kit/ui/SettingsBody";
 import { useBuild } from "@kit/build/useBuild";
@@ -17,6 +17,8 @@ import { BUILD } from "@app/build";
 import { useSweepEngine, useSweepHotkeys } from "@kit/sweeps/useSweeps";
 import { ViewPage } from "@kit/ui/ViewPage";
 import { GuideFrame } from "@kit/ui/GuideFrame";
+import { Notices } from "@kit/ui/Notices";
+import { useAnnouncements } from "./announce";
 import { GUIDE_LEDE, GUIDE_SECTIONS } from "@app/data/copy/guide";
 import type { ScenarioView } from "@app/scenarios/types";
 
@@ -112,10 +114,11 @@ export function App() {
   const active = useScrollSpy(ids, route.page === "explain");
   useSweepEngine();
   useSweepHotkeys();
-  useViewKeys(dialog != null);
-
-  // The reading order of the views, for whichever key handler steps through them.
-  useEffect(() => setViewOrder(viewOrder(scenarios)), [scenarios]);
+  // The reading order of the views, for [ and ].
+  const order = useMemo(() => viewOrder(scenarios), [scenarios]);
+  useViewKeys(dialog != null, order);
+  // Imports and stories that move the deck, as notices (the kit's <Notices> shows them).
+  useAnnouncements();
 
   // Scroll to a section when the hash names one (after the sections exist).
   const hasResult = !!result;
@@ -134,7 +137,7 @@ export function App() {
       fallback={(err, retry) => <CrashScreen error={err} retry={retry} />}
     >
       <TopBar route={route} scenarios={scenarios} onDialog={setDialog} />
-      <DeckBar deck={result?.deck ?? null} pending={pending} />
+      <DeckBar deck={result?.deck ?? null} pending={pending} hidden={route.page === "settings" || route.page === "guide"} />
 
       {error && <div className="page status-line err">The model could not run: {error}</div>}
       {route.page === "settings" ? (
@@ -168,6 +171,7 @@ export function App() {
       {dialog === "io" && <ImportExportDialog onClose={() => setDialog(null)} />}
       {dialog === "settings" && <SettingsDialog onClose={() => setDialog(null)} guideHref="#guide" />}
       {dialog === "data" && <DataDialog onClose={() => setDialog(null)} />}
+      <Notices />
     </ErrorBoundary>
   );
 }

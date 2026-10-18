@@ -24,7 +24,7 @@ const KEYS: KeyBinding[] = [
   { keys: [K.prev, K.next], action: "Previous or next preset", scope: "on the active parameter" },
   { keys: [K.all], action: "Pause or resume every sweep" },
   { keys: ["Enter"], action: "Commit a typed value", scope: "in a box" },
-  { keys: ["Esc"], action: "Cancel typing in a box; otherwise close a popover, a menu, a dialog or the drawer" },
+  { keys: ["Esc"], action: "Cancel typing in a box; otherwise close a popover, a menu, a dialog or the drawer, and dismiss the notices" },
   { keys: ["↑", "↓"], action: "One step; with Shift, one fine step", scope: "in a box or on a track" },
   { keys: ["←", "→"], action: "One step; with Shift, one fine step", scope: "on a track" },
   { keys: ["PgUp", "PgDn"], action: "Ten steps", scope: "in a box or on a track" },
@@ -51,9 +51,11 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           ["Views", "`#view/<id>`", "One responsibility per page: a few charts with their context beside them."],
           ["Settings", "`#settings`, and quick settings behind ⚙", "Everything that is not a parameter's value."],
           ["Guide", "`#guide`", "This page."],
+          ["Notices", "bottom right, for a few seconds", "A line when an import worked or was refused, and when a story moved the deck or put it back, with the values that moved."],
         ],
       },
       { kind: "p", text: "Menus, popovers and dialogs draw above everything, so nothing clips them; Esc closes them." },
+      { kind: "p", text: "A **notice** goes after 6 seconds; a click or Esc dismisses it sooner, and pointing at the stack holds it." },
     ],
   },
   {
@@ -271,7 +273,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "builders",
     title: "For builders",
     body: [
-      { kind: "p", text: "The code is two layers: `src/kit` is generic (charts, the parameter schema and the synthetic input, parameter settings, the replayer, the store, the build worker, the page frames, this page's frame) and `src/app` is this explainer. `src/kit/README.md` lists the kit's areas, where an app plugs in, and a checklist for a second explainer. This page's text is `src/app/copy/guide.ts`, drawn by the kit's `GuideFrame`." },
+      { kind: "p", text: "The code is two layers: `src/kit` is generic (charts, the parameter schema and the synthetic input, parameter settings, the replayer, the store, the build worker, the page frames, this page's frame) and `src/app` is this explainer. `src/kit/README.md` lists the kit's areas, where an app plugs in, and a checklist for a second explainer; `ARCHITECTURE.md` the layers inside `src/app` (model, data, scenarios, view), the event bus and how to add a parameter, a chart, a view, a page or an event. This page's text is `src/app/data/copy/guide.ts`, drawn by the kit's `GuideFrame`." },
     ],
   },
 ];

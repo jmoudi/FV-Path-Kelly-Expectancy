@@ -1,0 +1,76 @@
+/* The notice stack (Notices.tsx): bottom-right, above every layer (deck 25, top bar 30,
+   drawer 35, dialogs 50, popovers 70, menus 80, notices 90). Tokens only. The stack
+   itself lets clicks through; each notice takes its own. Opacity is the only motion. */
+.k-notices {
+  position: fixed;
+  right: var(--gutter-r);
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  width: min(380px, calc(100vw - var(--gutter-l) - var(--gutter-r)));
+  pointer-events: none;
+}
+.k-notice {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 10px 10px 14px;
+  background: var(--raised);
+  color: var(--ink);
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--ink-2);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.35);
+  font-size: var(--fs-ui);
+  line-height: 1.45;
+  cursor: pointer;
+  animation: k-notice-in 160ms ease-out;
+  transition: opacity 160ms ease-in;
+}
+.k-notice.warn {
+  border-left-color: color-mix(in srgb, var(--loss) 55%, var(--ink-2));
+}
+.k-notice.error {
+  border-left-color: var(--loss);
+}
+.k-notice.leaving {
+  opacity: 0;
+}
+.k-notice-text {
+  flex: 1;
+  min-width: 0;
+}
+.k-notice-x {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: -2px -2px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.k-notice-x:hover,
+.k-notice-x:focus-visible {
+  color: var(--ink);
+}
+@keyframes k-notice-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .k-notice {
+    animation: none;
+    transition: none;
+  }
+}

@@ -12,7 +12,7 @@ function useCleanSeason() {
   const commit = (text: string): boolean => {
     const patch = link.solve(text);
     if (!patch) return false;
-    setParams(patch);
+    setParams(patch, { source: "link" });
     return true;
   };
   return { ...link, commit };
