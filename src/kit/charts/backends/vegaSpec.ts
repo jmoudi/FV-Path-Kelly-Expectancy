@@ -8,7 +8,7 @@ import { stepVertices } from "../bars";
 import { formatNumber } from "../format";
 import { LABEL_FONT_PX, LEGEND_ROW_PX, resolveChart, type ResolvedAxis, type ResolvedChart } from "../resolve";
 import { fieldFormat, fieldLabel, type ChartSpec, type Row, type SeriesSpec } from "../spec";
-import { THEME, barFill, emphasisOpacity, emphasisWidth, heatPalette, roleColor } from "../theme";
+import { THEME, barFill, barStroke, emphasisOpacity, emphasisWidth, heatPalette, roleColor } from "../theme";
 import { BAND_ALPHA, barPoints, categories, d3Format, linePoints, markOf, numberOrNull, seriesName } from "./types";
 
 export type VL = Record<string, unknown>;
@@ -119,14 +119,17 @@ function barLayer(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec, legend: Leg
   const posFmt = rc.axes.x.formatter;
   const values: Row[] = pts.map((p) => {
     const ci = categorical ? cats.findIndex((c) => String(c) === String(p.pos)) : -1;
+    const role = s.colors ? s.colors[Math.max(0, ci) % s.colors.length] : s.color;
     return {
       __key: s.field,
       pos: categorical ? p.pos : p.shifted,
       top: p.top,
       bottom: p.bottom,
       value: p.value,
-      // The fill carries its own alpha (status bars at most 0.6, ink bars in ink2); the mark adds the emphasis.
-      __color: barFill(s.colors ? s.colors[Math.max(0, ci) % s.colors.length] : s.color, 1),
+      // The fill carries its own alpha (status bars 0.7, ink bars in ink2, references half); the mark adds the emphasis.
+      __color: barFill(role, 1),
+      // Status bars carry a 1px edge in the full colour.
+      __stroke: barStroke(role, 1) ?? "transparent",
       __t: formatNumber(p.value, fmt),
       __p: categorical ? (rc.axes.x.labels[ci] ?? String(p.pos)) : posFmt(p.pos as number),
     };
@@ -149,6 +152,10 @@ function barLayer(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec, legend: Leg
   const c = s.colors ? null : legendColor(spec, s, legend);
   if (c) enc.color = c;
   else enc.color = { field: "__color", type: "nominal", scale: null, legend: null };
+  if (values.some((v) => v.__stroke !== "transparent")) {
+    enc.stroke = { field: "__stroke", type: "nominal", scale: null, legend: null };
+    enc.strokeWidth = { value: 1 };
+  }
   return { data: { values }, mark: { ...m, clip: true }, encoding: enc };
 }
 
@@ -315,8 +322,11 @@ export function buildVegaSpec(spec: ChartSpec, width = 720): { vl: VL; resolved:
   const legend: LegendInfo | null = rc.legend
     ? { domain: legendList.map((s) => seriesName(spec, s)), range: legendList.map((s) => (markOf(spec, s) === "bar" ? barFill(s.color, 1) : roleColor(s.color))), symbol: legendList.every((s) => markOf(spec, s) === "bar") ? "square" : "stroke", columns: rc.legend.columns }
     : null;
-  // The box is fixed by the spec: legend rows beyond the first come out of the plot.
-  const plotHeight = Math.max(60, height - Math.max(0, (rc.legend?.gridRows ?? 1) - 1) * LEGEND_ROW_PX);
+  // The box is fixed by the spec: legend rows beyond the first come out of the plot. Rows
+  // kept free for the legend of the chart beside this one pad the top.
+  const reserved = Math.max(rc.legendRows.grid, 1);
+  const plotHeight = Math.max(60, height - (reserved - 1) * LEGEND_ROW_PX);
+  const extraTop = (rc.legendRows.grid - (rc.legend?.gridRows ?? 0)) * LEGEND_ROW_PX;
   const layers: VL[] = [];
   for (const s of spec.series) {
     const b = s.band ? bandLayer(spec, rc, s) : null;
@@ -325,7 +335,7 @@ export function buildVegaSpec(spec: ChartSpec, width = 720): { vl: VL; resolved:
   for (const s of spec.series) layers.push(markOf(spec, s) === "bar" ? barLayer(spec, rc, s, legend) : lineLayer(spec, rc, s, legend));
   layers.push(...annotationLayers(rc));
   return {
-    vl: { $schema: "https://vega.github.io/schema/vega-lite/v5.json", width: "container", height: plotHeight, config: CONFIG, layer: layers },
+    vl: { $schema: "https://vega.github.io/schema/vega-lite/v5.json", width: "container", height: plotHeight, config: CONFIG, layer: layers, ...(extraTop > 0 ? { padding: { top: 5 + extraTop, right: 5, bottom: 5, left: 5 } } : {}) },
     resolved: rc,
   };
 }

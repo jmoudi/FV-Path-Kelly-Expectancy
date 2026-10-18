@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { BACKEND_INFO } from "@kit/charts/registry";
 import { resolveAxes } from "@kit/charts/resolve";
 import { fieldFormat, numericFields, toCsv, type BackendId, type ChartSpec, type Emphasis, type MarkType, type NumberFormat, type ScaleType, type SpecOverride } from "@kit/charts/spec";
@@ -63,7 +63,7 @@ export function Authoring({ base, spec, override, onClose }: Props) {
     return (
       <Num
         id={`${base.id}-${axis}-${idx}`}
-        label={idx === 0 ? "from" : "to"}
+        ariaLabel={`${axis} axis ${idx === 0 ? "from" : "to"}`}
         value={cur}
         placeholder="auto"
         min={spec[axis].scale === "log" ? Math.max(1e-9, lo) : lo}
@@ -129,15 +129,21 @@ export function Authoring({ base, spec, override, onClose }: Props) {
       )}
 
       {base.kind === "xy" && (
-        <div>
+        <div className="ranges">
           <h5>Axis ranges</h5>
-          {(["x", "y"] as const).map((axis) => (
-            <div key={axis} className="row" style={{ marginTop: 6, alignItems: "flex-end" }}>
-              <span style={{ minWidth: 48, color: "var(--ink-2)" }}>{axis} axis</span>
-              {domainInput(axis, 0)}
-              {domainInput(axis, 1)}
-            </div>
-          ))}
+          {/* One fixed grid: the axis, then "from" and "to" as column heads over their boxes; a row never wraps. */}
+          <div className="range-grid">
+            <span />
+            <span className="range-h">from</span>
+            <span className="range-h">to</span>
+            {(["x", "y"] as const).map((axis) => (
+              <Fragment key={axis}>
+                <span className="range-axis">{axis} axis</span>
+                <div className="range-cell">{domainInput(axis, 0)}</div>
+                <div className="range-cell">{domainInput(axis, 1)}</div>
+              </Fragment>
+            ))}
+          </div>
           {!base.x.categorical && fields.length > 1 && (
             <div className="row" style={{ marginTop: 6 }}>
               <label htmlFor={`${base.id}-xfield`}>x field</label>

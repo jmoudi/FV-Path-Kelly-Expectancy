@@ -7,7 +7,7 @@ import { DEFAULT_PARAMS } from "@app/params/params";
 import { EMPTY_DATASETS } from "@app/params/datasets";
 import { useStore } from "@app/store";
 import { buildAll } from "@app/scenarios";
-import { fmtMs, pct1, probPct, signedPct1, signedPp, smallPct, x2 } from "@kit/charts/numbers";
+import { fixedPct, fmtMs, pct1, probPct, signedPct1, signedPp, smallPct, x2 } from "@kit/charts/numbers";
 import { formatNumber, MINUS } from "@kit/charts/format";
 import type { ScenarioView } from "@app/scenarios/types";
 
@@ -304,7 +304,12 @@ describe("the whole build", () => {
     expect(chained.rows[1].cells.reserve.value).toBeGreaterThan(1.03);
     expect(chained.rows[1].cells.reserve.value).toBeLessThan(1.15);
     expect(chained.rows[1].cells.coin.value).toBe(0);
-    expect(chained.rows[3].cells.reserve.text).toBe("7%");
+    // One precision for the whole grid: every figure has two decimals, so a column's decimal points line up.
+    expect(chained.rows[3].cells.reserve.text).toBe("7.17%");
+    for (const g of desk.groups) for (const r of g.rows) for (const c of Object.values(r.cells)) expect(c.text, `${g.id}/${r.id}`).toMatch(/^(< )?\d+\.\d\d[×%]$/);
+    expect(fixedPct(0)).toBe("0.00%");
+    expect(fixedPct(0.00004)).toBe("< 0.01%");
+    expect(fixedPct(0.00051)).toBe("0.05%");
     expect(desk.calibration.sentence).toMatch(/^80 events a year separate 2\.52% from 3\.38% in about 19 years/);
     expect(desk.calibration.viewId).toBe("events-needed");
     expect(desk.sizing.chartId).toBe("chain-heat");
@@ -473,7 +478,7 @@ import { bandPoints, barPoints, linePoints } from "@kit/charts/backends/types";
 import { buildVegaSpec } from "@kit/charts/backends/vegaSpec";
 import { formatNumber as chartFormat, tickMultiple as tickX, tickPercent as tickPct, tickPlain } from "@kit/charts/format";
 import { legendLayout, resolveChart } from "@kit/charts/resolve";
-import { THEME, barFill } from "@kit/charts/theme";
+import { THEME, barFill, barStroke } from "@kit/charts/theme";
 import { formatNumber as appFormat } from "@kit/charts/format";
 import { TableView } from "@kit/ui/TableView";
 import { Figure } from "@kit/ui/AnswerStrip";
@@ -710,20 +715,22 @@ describe("chart rendering", () => {
 
   it("uses the rates palette: optimistic green, deck ink, break-even red", () => {
     // A gap between two rates ("optimistic vs break-even") is neither rate and stays neutral.
-    const role = (t: string) =>
-      / vs /.test(t) ? null : /^(optimistic|true rate .*\(optimistic\))/.test(t) ? "good" : /^(break-even|fair \/ break-even|fair c ÷ W|true rate .*\(break-even\))/.test(t) ? "loss" : /^deck q/.test(t) ? "ink" : null;
+    // The deck's rate is ink; where it is the reference beside the chart's subject it steps
+    // down the ink family: a half-opacity ink-2 bar, or a thin ramp-2 line under a thick white curve.
+    const role = (t: string): string[] | null =>
+      / vs /.test(t) ? null : /^(optimistic|true rate .*\(optimistic\))/.test(t) ? ["good"] : /^(break-even|fair \/ break-even|fair c ÷ W|true rate .*\(break-even\))/.test(t) ? ["loss"] : /^deck q/.test(t) ? ["ink", "ink2", "ramp2"] : null;
     let checked = 0;
     for (const c of xy) {
       for (const s of c.series) {
         const want = s.label ? role(s.label) : null;
         if (!want) continue;
-        expect(s.color, `${c.id}: ${s.label}`).toBe(want);
+        expect(want, `${c.id}: ${s.label}`).toContain(s.color);
         checked++;
       }
       for (const a of c.annotations ?? []) {
         const want = a.text ? role(a.text) : null;
         if (!want) continue;
-        expect(a.color, `${c.id}: ${a.text}`).toBe(want);
+        expect(want, `${c.id}: ${a.text}`).toContain(a.color);
         checked++;
       }
       // Ink is not black on the graphite theme.
@@ -738,8 +745,17 @@ describe("chart rendering", () => {
   it("holds the colour-role policy: policy trio, status pair, neutral ramps, a cream accent outside the charts", () => {
     // The decided values (the review's colour-role policy, section C).
     expect(THEME.roles).toMatchObject({ a: "#dfa54d", b: "#63cfe9", c: "#8976cd", loss: "#df6768", good: "#5cb572", ink2: "#b4bac1", ramp1: "#e4e8ed", ramp2: "#babec3", ramp3: "#8f9397", ramp4: "#66696d" });
-    expect([THEME.surface, THEME.raised, THEME.raised2, THEME.hairline, THEME.grid, THEME.ink2]).toEqual(["#1a1d21", "#22262b", "#2a2f35", "#30363d", "#1f2226", "#b4bac1"]);
-    expect(THEME.diverging).toEqual(["#ad4b4b", "#733a39", "#27292c", "#2f5838", "#38804b"]);
+    expect([THEME.surface, THEME.raised, THEME.raised2, THEME.hairline, THEME.grid, THEME.ink2]).toEqual(["#1a1d21", "#22262b", "#2a2f35", "#383e46", "#1f2226", "#b4bac1"]);
+    // The heat map's ends are dark enough that ink cell labels keep 4.5:1, and matched in lightness.
+    expect(THEME.diverging).toEqual(["#a03f40", "#6a3231", "#27292c", "#274f30", "#2b7440"]);
+    const lum = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const contrast = (a: string, b: string) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+    for (const cell of THEME.diverging) expect(contrast(THEME.ink, cell), cell).toBeGreaterThanOrEqual(4.5);
+    // A hairline still draws an input's edge on the raised fill.
+    expect(contrast(THEME.hairline, THEME.raised)).toBeGreaterThanOrEqual(1.4);
     expect(THEME.sequential).toEqual(["#202429", "#393e42", "#54595e", "#767b80", "#9a9fa5", "#bfc5ca"]);
     expect(THEME.binary).toEqual(["#2a2f35", "#df6768"]);
     expect(THEME.accent).toBe("#e8e1a3");
@@ -750,10 +766,14 @@ describe("chart rendering", () => {
       return (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
     };
     for (const h of [THEME.roles.ramp1, THEME.roles.ramp2, THEME.roles.ramp3, THEME.roles.ramp4, ...THEME.sequential]) expect(chroma(h), h).toBeLessThan(0.06);
-    // Status bars fill at most 0.6; an ink bar is drawn in secondary ink, never as a white slab.
-    expect(barFill("loss", 1)).toBe("rgba(223,103,104,0.6)");
-    expect(barFill("good", 0.5)).toBe("rgba(92,181,114,0.3)");
+    // Status bars fill at 0.7 with a 1px edge in the full colour; an ink bar is drawn in
+    // secondary ink, never as a white slab; a reference bar (ink-2) at half opacity.
+    expect(barFill("loss", 1)).toBe("rgba(223,103,104,0.7)");
+    expect(barFill("good", 0.5)).toBe("rgba(92,181,114,0.35)");
+    expect(barStroke("good", 1)).toBe("rgba(92,181,114,1)");
+    expect(barStroke("ink", 1)).toBeNull();
     expect(barFill("ink", 1)).toBe("rgba(180,186,193,1)");
+    expect(barFill("ink2", 1)).toBe("rgba(180,186,193,0.5)");
     // Hero figures are never painted: a KPI's colour may only name the policy it belongs to.
     for (const sc of scenarios) for (const k of sc.kpis) expect(["a", "b", "c", "ink", undefined], `${sc.id}: ${k.label}`).toContain(k.color);
     // A transition between two policies ("Coin → Spread") belongs to neither.

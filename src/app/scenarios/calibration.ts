@@ -115,7 +115,7 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
   const band: ChartSpec = {
     id: "cal-band",
     title: "Confidence band as the record grows",
-    subtitle: `x name-events observed (log) · y loss rate · band = Wilson interval at ${z}σ around an observed rate equal to the deck's`,
+    subtitle: `x name-events observed (log) · y loss rate · band = Wilson interval at ${z}σ around the deck's rate`,
     kind: "xy",
     data: table([f("n", "Name-events observed", "int"), f("lo", "Lower bound", "pct2"), f("hat", "Observed rate", "pct2"), f("hi", "Upper bound", "pct2")], bandRows),
     mark: "line",

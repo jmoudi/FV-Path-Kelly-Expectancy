@@ -58,15 +58,26 @@ export function Railroad({ spec, width }: FigureProps) {
   const squeeze = Math.min(1, (plotH / 2 - 4) / extent);
   const fanH = extent * squeeze;
 
-  const splitPath = (x: number, off: number) => {
+  // A track in three pieces: it splits off the trunk, runs as a rail through the station
+  // and merges back. The rail carries the weight; the split and the merge are drawn light,
+  // so a row of stations reads as tracks, not as a chain of loops.
+  const trackPaths = (x: number, off: number) => {
     const x0 = x - pitch * 0.46;
-    const x1 = x - pitch * 0.15;
-    const x2 = x + pitch * 0.15;
+    const x1 = x - pitch * 0.2;
+    const x2 = x + pitch * 0.2;
     const x3 = x + pitch * 0.46;
     const d = (x1 - x0) * 0.55;
     const y = cy + off * squeeze;
-    return `M${x0},${cy} C${x0 + d},${cy} ${x1 - d},${y} ${x1},${y} L${x2},${y} C${x2 + d},${y} ${x3 - d},${cy} ${x3},${cy}`;
+    return {
+      split: `M${x0},${cy} C${x0 + d},${cy} ${x1 - d},${y} ${x1},${y}`,
+      rail: `M${x1},${y} L${x2},${y}`,
+      merge: `M${x2},${y} C${x2 + d},${y} ${x3 - d},${cy} ${x3},${cy}`,
+    };
   };
+  // The rail's weight is the name's share of the tranche (at least a hairline); the split
+  // and merge curves are a hairline at low alpha, so the merge points stay light.
+  const railW = Math.max(1.5, nameW);
+  const curveW = 1;
 
   const labelEvery = pitch >= 26 ? 1 : pitch >= 16 ? 2 : 5;
   const gapStart = gapped ? xAt(gapSlot) - pitch * 0.5 + 3 : 0;
@@ -102,14 +113,18 @@ export function Railroad({ spec, width }: FigureProps) {
         const x = xAt(slot);
         return (
           <g key={night}>
-            <rect x={x - pitch * 0.15} y={cy - fanH - 2} width={pitch * 0.3} height={2 * fanH + 4} rx={3} fill={withAlpha(TOKENS.ink, 0.05)} />
-            {/* Each track: a quiet band as wide as the name's share, and a 1.5px line through it. */}
-            {offsets.map((off, i) => (
-              <g key={i}>
-                <path d={splitPath(x, off)} fill="none" stroke={withAlpha(trackColor, 0.22)} strokeWidth={nameW} strokeLinecap="round" />
-                <path d={splitPath(x, off)} fill="none" stroke={withAlpha(trackColor, 0.7)} strokeWidth={1.5} strokeLinecap="round" />
-              </g>
-            ))}
+            <rect x={x - pitch * 0.2} y={cy - fanH - 2} width={pitch * 0.4} height={2 * fanH + 4} rx={3} fill={withAlpha(TOKENS.ink, 0.05)} />
+            {/* Each track: light split and merge curves, and the rail as wide as the name's share. */}
+            {offsets.map((off, i) => {
+              const t = trackPaths(x, off);
+              return (
+                <g key={i}>
+                  <path d={t.split} fill="none" stroke={withAlpha(trackColor, 0.2)} strokeWidth={curveW} strokeLinecap="round" />
+                  <path d={t.merge} fill="none" stroke={withAlpha(trackColor, 0.2)} strokeWidth={curveW} strokeLinecap="round" />
+                  <path d={t.rail} fill="none" stroke={withAlpha(trackColor, 0.55)} strokeWidth={railW} strokeLinecap="butt" />
+                </g>
+              );
+            })}
             {(night === 1 || night === n || (night - 1) % labelEvery === 0) && (
               <text x={x} y={top + plotH + 16} textAnchor="middle" fill={TOKENS.muted} style={mono}>
                 {night}
@@ -134,8 +149,8 @@ export function Railroad({ spec, width }: FigureProps) {
         </text>
       )}
       {/* Inside the log: the names on one night, under the first station. */}
-      <line x1={first - pitch * 0.15} x2={first + pitch * 0.15} y1={top + plotH + 24} y2={top + plotH + 24} stroke={TOKENS.ink2} strokeWidth={1} />
-      <text x={first - pitch * 0.15} y={top + plotH + 38} textAnchor="start" fill={TOKENS.ink2} style={text}>
+      <line x1={first - pitch * 0.2} x2={first + pitch * 0.2} y1={top + plotH + 24} y2={top + plotH + 24} stroke={TOKENS.ink2} strokeWidth={1} />
+      <text x={first - pitch * 0.2} y={top + plotH + 38} textAnchor="start" fill={TOKENS.ink2} style={text}>
         {insideLabel}
       </text>
       <text x={W - right} y={top + plotH + (wide ? 38 : 52)} textAnchor="end" fill={TOKENS.muted} style={text}>

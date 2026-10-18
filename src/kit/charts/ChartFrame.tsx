@@ -14,7 +14,7 @@ export interface ChartFrameProps {
   toolsPinned?: boolean;
   /** A row of story links under the title. */
   stories?: ReactNode;
-  /** One line after the stories (beside them when there is room): the active story's answer. */
+  /** After the stories (beside them when there is room): the active story's answer, whole. */
   storyNote?: ReactNode;
   /** Plot-box height in px. Fixed: the content (plot, table, error) never changes it. */
   boxHeight: number;
@@ -46,9 +46,9 @@ export const ChartFrame = forwardRef<HTMLElement, ChartFrameProps>(function Char
         </div>
         {p.tools && <div className="k-chart-tools">{p.tools}</div>}
       </figcaption>
-      {/* The answer line keeps its slot whenever there are stories, so picking one moves
-          nothing. It shares the stories' line where the row has room for it (a wide chart),
-          and takes the next line otherwise, so no empty line sits over a wide plot. */}
+      {/* A picked story's answer: beside the stories where the row has room for it (a wide
+          chart), on the next line otherwise, wrapped over as many lines as it needs, never
+          cut. With no story active the slot is empty and takes no room. */}
       {(p.storyNote || p.stories) && (
         <div className="k-chart-stories">
           {p.stories}

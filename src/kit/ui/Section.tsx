@@ -3,7 +3,9 @@ import { kpiItem, sectionNumber, viewChips } from "./scenarioProps";
 import type { PanelTab } from "./TabbedPanel";
 import { SectionFrame } from "./SectionFrame";
 import { useKit } from "@kit/state/context";
-import type { ChartSpec } from "@kit/charts/spec";
+import { applyOverride, type ChartSpec } from "@kit/charts/spec";
+import { legendNames, showLegend } from "@kit/charts/resolve";
+import { useMedia } from "./deck/useMedia";
 import type { Action, Note, ScenarioView } from "@kit/charts/scenario";
 import { viewOfChart } from "@kit/charts/scenario";
 import { ChartHost } from "./ChartHost";
@@ -106,8 +108,8 @@ export function SourceFigures({ view }: { view: ScenarioView }) {
           {view.sourceFigures.map((s) => (
             <tr key={s.label}>
               <td>{s.label}</td>
-              <td className="mono">{s.quoted}</td>
-              <td className="mono">{s.computed}</td>
+              <td className="num">{s.quoted}</td>
+              <td className="num">{s.computed}</td>
               <td className={`agree${s.agrees ? "" : " no"}`}>
                 {s.agrees ? "yes" : "no"}
                 {!s.agrees && s.why && <span className="why">{s.why}</span>}
@@ -154,9 +156,26 @@ export function sectionPanels(view: ScenarioView): PanelTab[] {
   return tabs;
 }
 
+/**
+ * Side by side, a secondary chart's neighbour in its pair (the charts go two to a row, the
+ * last one alone when the count is odd): the neighbour's legend entries, as drawn with its
+ * edits, so both plots keep the same legend rows free and their frames start on one line.
+ */
+function usePairLegends(charts: ChartSpec[]): (i: number) => string[] | undefined {
+  const sideBySide = useMedia("(min-width: 901px)");
+  const overrides = useKit((s) => s.overrides);
+  return (i) => {
+    const j = i % 2 === 0 ? i + 1 : i - 1;
+    if (!sideBySide || j >= charts.length) return undefined;
+    const peer = applyOverride(charts[j], overrides[charts[j].id]);
+    return peer.kind === "xy" && showLegend(peer) ? legendNames(peer) : undefined;
+  };
+}
+
 /** A section of the Explain page: the scenario's view-model in the kit's section skeleton. */
 export function Section({ view }: { view: ScenarioView }) {
   const chart = (c: ChartSpec) => <ChartHost key={c.id} spec={c} viewId={viewOfChart(view, c.id)?.id} />;
+  const peerLegend = usePairLegends(view.secondary);
   return (
     <SectionFrame
       id={`s-${view.id}`}
@@ -170,7 +189,7 @@ export function Section({ view }: { view: ScenarioView }) {
       actions={view.actions?.length ? view.actions.map((a) => <ActionButton key={a.label} a={a} />) : undefined}
       inputs={view.localParams.length ? view.localParams.map((k) => <ParamInput key={k} k={k} compact />) : undefined}
       primary={view.primary.map(chart)}
-      secondary={view.secondary.map(chart)}
+      secondary={view.secondary.map((c, i) => <ChartHost key={c.id} spec={c} viewId={viewOfChart(view, c.id)?.id} legendPeer={peerLegend(i)} />)}
       panels={sectionPanels(view)}
     />
   );

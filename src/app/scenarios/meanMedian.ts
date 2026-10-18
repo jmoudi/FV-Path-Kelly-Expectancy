@@ -5,7 +5,7 @@ import type { Params } from "@app/params/params";
 import { POLICY_IDS, type PolicyId } from "@app/model/policies";
 import { sampleFromDistribution, weightedQuantile } from "@app/model/season";
 import { fig } from "./discussion";
-import { methodLabel, type Derived } from "./derived";
+import type { Derived } from "./derived";
 import { near } from "@kit/charts/scenario";
 import { pct, pct1, signedPct1, smallPct, x2 } from "@kit/charts/numbers";
 import type { ScenarioView } from "./types";
@@ -91,7 +91,7 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
   const stems: ChartSpec = {
     id: "mm-stems",
     title: `Exact outcomes, ${P.spread.name}`,
-    subtitle: `x season end, tranche units · y probability of that exact end · ${P.spread.label}, ${methodLabel(d.season.spread.dist.method)}`,
+    subtitle: "x season end, tranche units · y probability of that exact end",
     kind: "xy",
     data: table([f("end", "Season end, tranche units", "x"), f("spread", P.spread.label, "pct1"), f("reserve", P.reserve.label, "pct1")], [...stemRows.values()].sort((a, b) => (a.end as number) - (b.end as number))),
     mark: "bar",

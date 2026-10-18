@@ -298,14 +298,21 @@ kbd {
 .k-inputs + .k-primary {
   margin-top: 20px;
 }
+/* No row gap: side by side, two charts share the grid's rows through a subgrid, and a
+   row gap would also open between a chart's own rows, so a stories row neither chart
+   uses cost 48px of empty space over the plot. Pairs are set apart by the top margin of
+   the next pair instead. */
 .k-secondary {
   margin-top: 56px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-block) var(--gutter-2col);
+  gap: 0 var(--gutter-2col);
 }
 .k-secondary > :last-child:nth-child(odd) {
   grid-column: 1 / -1;
+}
+.k-secondary > :nth-child(n + 3) {
+  margin-top: var(--space-block);
 }
 /* Side by side, two charts share their rows (title block, stories, plot box, foot), so
    their plot boxes start on one line whatever their subtitles wrap to. Spacing is the
@@ -333,6 +340,9 @@ kbd {
 @media (max-width: 900px) {
   .k-secondary {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .k-secondary > :nth-child(n + 2) {
+    margin-top: var(--space-block);
   }
 }
 .k-section-foot {
@@ -438,7 +448,6 @@ kbd {
   z-index: 1;
   padding: 0 0 0 8px;
   background: var(--bg);
-  font-family: var(--font-mono);
   font-size: var(--fs-label);
   line-height: 1.4;
   color: var(--muted);
@@ -500,41 +509,35 @@ kbd {
 .k-story.on::before {
   content: "✓ ";
 }
-/* One line: the answer shortens with an ellipsis (its full text is the hover title), the
-   badge and undo stay whole, so a story never changes the chart's height. */
+/* The answer is read whole: it wraps over as many lines as it needs, the badge and undo
+   on the line under it. With no story active it takes no room at all (an empty line
+   reserved under the chips is dead space over the plot); picking a story is the one
+   thing that moves the plot, by the answer's height, and only for its row. */
 .k-chart-note {
   flex: 1 1 320px;
-  min-height: 1.5em;
   display: flex;
-  flex-wrap: nowrap;
-  gap: 14px;
+  flex-wrap: wrap;
+  gap: 2px 14px;
   align-items: baseline;
   font-size: var(--fs-ui);
   line-height: 1.5;
   color: var(--ink-2);
   min-width: 0;
 }
+.k-chart-note:empty {
+  display: none;
+}
 .k-chart-note > * {
   flex-shrink: 0;
   white-space: nowrap;
 }
 .k-chart-note > .k-note-text {
-  flex: 0 1 auto;
+  flex: 1 1 100%;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-@media (max-width: 700px) {
-  .k-chart-note {
-    flex-wrap: wrap;
-    gap: 2px 14px;
-  }
-  .k-chart-note > .k-note-text {
-    white-space: normal;
-  }
+  white-space: normal;
 }
 .k-chart-badge {
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--fs-label);
   color: var(--muted);
 }
@@ -666,17 +669,17 @@ kbd {
   gap: 56px;
   min-width: 0;
 }
+/* The side panel is never a scroll box: it sticks beside the charts only while it fits
+   the window under the bars (ViewFrame measures it), and scrolls with the page otherwise. */
 .k-view-aside {
-  position: sticky;
-  top: calc(var(--topbar-h) + var(--deck-h) + 24px);
-  max-height: calc(100vh - var(--topbar-h) - var(--deck-h) - 48px);
-  overflow: auto;
-  overscroll-behavior: contain;
   display: grid;
   gap: 28px;
   align-content: start;
   min-width: 0;
-  padding-right: 4px;
+}
+.k-view-aside.sticky {
+  position: sticky;
+  top: calc(var(--topbar-h) + var(--deck-h) + 24px);
 }
 .k-view-blurb {
   margin: 0;
@@ -688,10 +691,8 @@ kbd {
     grid-template-columns: minmax(0, 1fr);
     gap: 48px;
   }
-  .k-view-aside {
+  .k-view-aside.sticky {
     position: static;
-    max-height: none;
-    overflow: visible;
   }
 }
 
@@ -736,12 +737,16 @@ kbd {
   font-weight: 600;
   color: var(--ink);
 }
-/* A name that wraps (a phone) keeps its dot on the first line. */
+/* The dot is inline, before the first word: a name that wraps (a phone) keeps it on its
+   first line, right against the text, however the lines are aligned. */
 .k-grid-name.dot {
-  align-items: flex-start;
+  display: inline;
+  text-wrap: balance;
 }
 .k-grid-name.dot::before {
-  margin-top: 4px;
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: 1px;
 }
 .k-grid-sub {
   display: block;
@@ -800,10 +805,32 @@ kbd {
   font-size: var(--fs-hero);
   font-weight: var(--fw-hero);
 }
+/* From the decimal point on (".85%", ".09×"), a figure sits in one left-aligned slot as
+   wide as a headline cell's ".00×" (a figure's ".00%" fits too): the decimal points of a
+   column stack, whatever the row's size and unit, and the headline row ends flush. */
+.k-grid-frac {
+  display: inline-block;
+  width: calc(var(--fs-hero) * 2.1);
+  text-align: left;
+}
+.k-grid-sub {
+  text-wrap: balance;
+}
+.k-grid-sub.short {
+  display: none;
+}
 @media (max-width: 560px) {
   .k-grid th,
   .k-grid td {
     padding: 8px 8px;
+  }
+  /* A narrow column takes the short form of the parameters line, on one line. */
+  .k-grid-sub.has-short {
+    display: none;
+  }
+  .k-grid-sub.short {
+    display: block;
+    white-space: nowrap;
   }
   .k-grid col.k-grid-labels {
     width: auto;
@@ -896,6 +923,11 @@ kbd {
 .k-settings.compact {
   grid-template-columns: minmax(0, 1fr);
   gap: 28px;
+}
+/* In a dialog the groups sit under the dialog's own title: their headings are labels. */
+.k-settings.compact .k-settings-h {
+  font-size: var(--fs-ui);
+  font-weight: 600;
 }
 .k-settings-group {
   display: grid;

@@ -181,6 +181,12 @@ export interface ChartSpec {
   stories?: Story[];
   /** Highlight rows in a table where this field equals the value. */
   highlightRow?: { field: string; value: Cell };
+  /**
+   * Set at render time, never stored: the legend entries of the chart beside this one in
+   * a pair. The plot keeps as many legend rows free above it as the taller of the two
+   * legends needs, so the two plot frames start on one line.
+   */
+  legendPeer?: string[];
 }
 
 /** What the authoring layer can change. Stored separately from the base spec. */

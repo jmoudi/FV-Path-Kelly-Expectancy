@@ -29,7 +29,7 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
   const railroadFig = figureSpec({
     id: "axes-railroad",
     title: "The railroad: nights as stations, names as parallel tracks",
-    subtitle: `x night, one station each · tracks = the ${k} name${k === 1 ? "" : "s"} on a night · width ∝ share at risk · ${yours.label}`,
+    subtitle: `x night · tracks = the ${k} name${k === 1 ? "" : "s"} on a night · ${yours.label}`,
     figure: "railroad",
     data: table(
       [f("losses", "Names at max loss on the night", "int"), f("prob", "Probability of the night", "pct2"), f("factor", "Station factor on the tranche", "num"), f("log", "Its log, one term of the season's sum", "num")],
@@ -46,7 +46,7 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
   const gridChart: ChartSpec = {
     id: "axes-grid",
     title: "One season as a grid: names by nights",
-    subtitle: `x night (outside the log) · y name on the night (inside the log) · one sampled season of ${yours.label} · red = full loss`,
+    subtitle: "x night · y name on the night · red = full loss",
     kind: "heatmap",
     data: table([f("night", "Night", "int"), f("name", "Name"), f("outcome", "Outcome (1 = full loss)", "int")], gridRows),
     mark: "bar",
@@ -55,13 +55,13 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
     series: [],
     heat: { xField: "night", yField: "name", valueField: "outcome", palette: "binary", cellLabels: false },
     height: Math.max(90, 34 * k + 20),
-    caption: "Dark cells won, red cells lost everything they risked.",
+    caption: `One sampled season of ${yours.label}.`,
   };
   const pathRows: Row[] = grid.path.map((v, t) => ({ night: t, tranche: v }));
   const pathChart: ChartSpec = {
     id: "axes-path",
     title: "The tranche under that same grid",
-    subtitle: `x night · y tranche, start = 1 · the same sampled season · one factor per night that contains all ${k} name${k === 1 ? "" : "s"}`,
+    subtitle: "x night · y tranche, start = 1 · the same sampled season",
     kind: "xy",
     data: table([f("night", "Night", "int"), f("tranche", "Tranche, start = 1", "x")], pathRows),
     mark: "step",
@@ -107,8 +107,9 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
   const gOpt = seasonLogGrowth(Math.min(1, k * Math.min(fOpt, fMax)), k, alt, b, n, p.sharedOutcome);
   const hump: ChartSpec = {
     id: "axes-hump",
-    title: "Log growth per season against the fraction risked per name",
-    subtitle: `x fraction of the tranche per name · y log growth per season of surviving paths · ${k} name${k === 1 ? "" : "s"} a night, ${n} nights · axis ends where ${k} names fill the tranche`,
+    title: "Log growth against the fraction risked per name",
+    subtitle: "x fraction per name · y log growth per season of surviving paths",
+    caption: `${k} name${k === 1 ? "" : "s"} a night over ${n} nights; the axis ends where ${k} names fill the tranche.`,
     kind: "xy",
     data: table([f("f", "Fraction of the tranche per name", "pct"), ...rates.map((qq, i) => f(`g${i}`, `q = ${pct2(qq)}`, "pct1"))], humpRows),
     mark: "line",
@@ -167,7 +168,8 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
     x: { field: "names", categorical: true },
     y: { field: "deck", label: "Log growth per season", format: "pct1" },
     series: [
-      { field: "deck", color: "ink", label: `deck q ${pct2(q)}` },
+      // The deck's rate is the reference here (secondary ink, half opacity); the optimistic bars carry the news.
+      { field: "deck", color: "ink2", label: `deck q ${pct2(q)}` },
       { field: "opt", color: "good", label: `optimistic q ${pct2(alt)}` },
     ],
     height: 260,
@@ -239,7 +241,7 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
   const calendarFig = figureSpec({
     id: "axes-calendar",
     title: "Capital in use each night of one sampled season",
-    subtitle: `x trading day, five a week, ${n} days · bars = share of the tranche in use that night, one segment per name at the Kelly fraction ${pct1(fstar)} (capped at 1/names) · red segment = a name at max loss · line = cumulative log growth of this sampled season · dashed = its expectation`,
+    subtitle: "x trading day · bars = tranche in use, a segment per name · red = a name at max loss · line = cumulative log growth · dashed = expected",
     figure: "calendar",
     data: table(
       [

@@ -5,9 +5,9 @@
  */
 import { eventsToResolve } from "@app/model/calibration";
 import type { Params } from "@app/params/params";
-import { POLICY_IDS, type PolicyId, type PolicyMeta } from "@app/model/policies";
+import { POLICY_IDS, policyDetailShort, type PolicyId, type PolicyMeta } from "@app/model/policies";
 import type { Summary } from "@app/model/season";
-import { fmtInt, pct, pct1, pct2, probPct, x2, years } from "@kit/charts/numbers";
+import { fixedPct, fmtInt, pct, pct1, pct2, x2, years } from "@kit/charts/numbers";
 import type { Derived, MarketState } from "@app/scenarios/derived";
 
 export type DeskRowId = "mean" | "median" | "p10" | "pBelow" | "ruin";
@@ -38,6 +38,8 @@ export interface DeskGroup {
 export interface DeskPolicy extends PolicyMeta {
   label: string;
   detail: string;
+  /** The detail in the fewest words, for a phone's narrow column: "3 names, 50%". */
+  detailShort: string;
   yours: boolean;
 }
 
@@ -91,11 +93,12 @@ function cell(id: DeskRowId, s: Summary): DeskCell {
       return { value: s.median, text: x2(s.median) };
     case "p10":
       return { value: s.p10, text: x2(s.p10) };
-    // The two probability rows follow one rule (whole percent, two figures below 1%).
+    // One rule for the grid: every figure has two decimals, the probabilities like the
+    // multiples, so each row reads at one precision and a column's decimal points line up.
     case "pBelow":
-      return { value: s.pBelow, text: probPct(s.pBelow) };
+      return { value: s.pBelow, text: fixedPct(s.pBelow) };
     case "ruin":
-      return { value: s.pRuin, text: probPct(s.pRuin) };
+      return { value: s.pRuin, text: fixedPct(s.pRuin) };
   }
 }
 
@@ -127,7 +130,7 @@ export function buildDesk(p: Params, d: Derived): DeskView {
     ? `${d.market.sizingNote} You risk ${pct(p.riskPerNight)} a night.${d.robust.risk > 0 ? ` Averaged over loss rates ${d.bandLabel}, which still reach the optimistic rate, the robust optimum is ${pct(d.robust.risk)}.` : ""}`
     : `You risk ${pct(p.riskPerNight)} a night. Robust optimum ${pct(d.robust.risk)}, averaged over loss rates ${d.bandLabel}; growth-optimal at the deck's rate alone ${pct(d.nightKelly.risk)}${ratioToKelly != null ? `, so you sit at ${ratioToKelly.toFixed(2).replace("-", "−")}× that` : ""}. Kelly per name ${pct1(d.kelly)}.`;
   return {
-    policies: d.policies.map((x) => ({ id: x.id, name: x.name, color: x.color, label: x.label, detail: x.detail, yours: x.id === d.yours })),
+    policies: d.policies.map((x) => ({ id: x.id, name: x.name, color: x.color, label: x.label, detail: x.detail, detailShort: policyDetailShort(x.id, p), yours: x.id === d.yours })),
     yours: d.yours,
     threshold: p.thresholdBelow,
     seasons: N,

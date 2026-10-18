@@ -61,7 +61,6 @@
 }
 .k-ps-title .sym,
 .k-ps-name .sym {
-  font-family: var(--font-mono);
   font-weight: 400;
   color: var(--muted);
 }
@@ -96,17 +95,13 @@
   display: flex;
   justify-content: flex-end;
 }
+/* The popover's slider choice: the kit's select (26px, no OS chevron, the drawn one; theme.css). */
 .k-ps-select {
-  background: var(--raised);
-  border: 1px solid var(--hairline);
-  border-radius: 6px;
-  padding: 2px 6px;
-  font-size: var(--fs-ui);
   width: 104px;
 }
 .popover .k-ps-select,
 .popover .k-ps .nf-box {
-  background: var(--surface);
+  background-color: var(--surface);
 }
 /* Settings boxes never carry a sweep marker: no reserved slot, room for "0.05 pp". */
 .k-ps .nf .nf-boxwrap .nf-box,
@@ -168,16 +163,51 @@
   margin-left: 6px;
 }
 .k-ps-range {
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--fs-label);
-  color: var(--muted);
+  color: var(--ink-2);
   white-space: nowrap;
+}
+.k-ps-defaults {
+  display: block;
+  color: var(--muted);
+}
+/* The table's boxes are empty until a setting is the person's own: no fill at rest, and
+   the default they stand for appears as the placeholder only on the row being worked on. */
+.k-ps-table .nf-box {
+  background: transparent;
+}
+.k-ps-table .nf-box:hover,
+.k-ps-table .nf-box:focus {
+  background: var(--raised);
+}
+.k-ps-table tr:not(:hover):not(:focus-within) .nf-box::placeholder {
+  color: transparent;
+}
+.k-ps-table tr:not(.changed) .k-ps-reset .btn {
+  visibility: hidden;
+}
+/* On a wide screen with a pointer, a row at rest shows only what is the person's own: an
+   empty box has no edge and a slider left at its default no switch, until the row is
+   pointed at or worked in (the boxes stay focusable, and focus shows the row). The
+   column heads say what each box is. */
+@media (hover: hover) and (min-width: 1101px) {
+  .k-ps-table tr:not(:hover):not(:focus-within) .nf-box:placeholder-shown {
+    border-color: transparent;
+  }
+  .k-ps-table tr:not(:hover):not(:focus-within) .seg:has(> button:first-child.on) {
+    opacity: 0;
+  }
 }
 .k-ps-table tr.changed .k-ps-name {
   color: var(--accent);
 }
 .k-ps-reset {
   text-align: right;
+}
+/* The slider's three-way switch stays on one line. */
+.k-ps-table .seg {
+  flex-wrap: nowrap;
 }
 
 /* Narrow screens: each parameter is a block, its settings a two-column grid of labelled boxes. */
@@ -227,8 +257,16 @@
     top: 8px;
     right: 0;
   }
-  .k-ps-table .k-ps-select {
-    width: 100%;
-    max-width: 104px;
+  .k-ps-table .k-ps-range {
+    white-space: normal;
+  }
+  .k-ps-table .k-ps-slider {
+    grid-column: span 2;
+  }
+  .k-ps-defaults {
+    display: inline;
+  }
+  .k-ps-defaults::before {
+    content: " · ";
   }
 }

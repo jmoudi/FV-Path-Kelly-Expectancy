@@ -14,18 +14,18 @@
 }
 
 /*
- * The preset's range: a band across the track. A sweep's range is often a small part
- * of the schema range (optimistic to break-even is a tenth of q's), so while a band is
- * drawn the round thumb becomes a needle that leaves the band visible around it.
+ * The preset's range: a band along the track, 4px over the 2px line, centred on it. A
+ * sweep's range is often a small part of the schema range (optimistic to break-even is a
+ * tenth of q's), so while a band is drawn the round thumb becomes a needle that leaves
+ * the band visible around it; the needle takes the accent while the field has focus.
  */
 .nf-band {
   position: absolute;
-  top: 4px;
-  height: 10px;
+  top: 7px;
+  height: 4px;
   min-width: 3px;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--ink) 22%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 45%, transparent);
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--ink) 30%, transparent);
   pointer-events: none;
 }
 .nf-mark {
@@ -46,6 +46,9 @@
   border-radius: 1px;
   background: var(--ink);
   box-shadow: none;
+}
+.nf.banded:focus-within .nf-track .nf-thumb {
+  background: var(--accent);
 }
 /* While a sweep drives the field, the moving tick is the needle. */
 .nf.running .nf-track .nf-thumb,
@@ -161,7 +164,6 @@
   margin-left: 4px;
 }
 .sw .sw-value {
-  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
@@ -177,7 +179,6 @@
   }
   .sw .sw-narrow {
     display: inline;
-    font-family: var(--font-mono);
   }
   .sweep-strip.sw.compact {
     width: auto;
@@ -228,7 +229,6 @@
   text-overflow: ellipsis;
 }
 .sw .sw-keys {
-  font-family: var(--font-mono);
   margin-left: auto;
 }
 

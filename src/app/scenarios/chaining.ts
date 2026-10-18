@@ -43,7 +43,8 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const heat: ChartSpec = {
     id: "chain-heat",
     title: "Log growth per season by risk a night and true loss rate",
-    subtitle: `x true loss rate per name · y tranche at risk a night · cell = log growth per season of surviving paths, ${k} name${k === 1 ? "" : "s"} a night · cells where a season wipes the tranche more than 1% of the time say so · outline = your deck`,
+    subtitle: "x true loss rate per name · y tranche at risk a night · cell = log growth per season of surviving paths · outline = your deck",
+    caption: `${k} name${k === 1 ? "" : "s"} a night.`,
     kind: "heatmap",
     data: table([f("risk", "Tranche at risk a night", "pct"), f("q", "True loss rate per name", "pct2"), f("growth", "Log growth per season", "pct1"), f("label", "Label")], gridRows),
     mark: "bar",
@@ -98,7 +99,8 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const sweep: ChartSpec = {
     id: "chain-sweep",
     title: "Growth averaged over the loss-rate band",
-    subtitle: `x tranche at risk a night · y log growth per season of surviving paths · thick = averaged over a loss rate drawn ${d.bandLabel}`,
+    subtitle: "x tranche at risk a night · y log growth per season of surviving paths",
+    caption: `The band: a loss rate drawn ${d.bandLabel}.`,
     kind: "xy",
     data: table(
       [f("risk", "Tranche at risk a night", "pct"), ...sweepRates.map((qq, i) => f(`g${i}`, `q = ${pct2(qq)}`, "pct1")), f("robust", "averaged over the band", "pct1")],
@@ -109,7 +111,8 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
     y: { field: "robust", label: "Log growth per season", format: "pct", domain: [Math.floor(sweepMin * 20) / 20, null], zero: false },
     series: [
       { field: "g0", color: "good", label: `optimistic q = ${pct2(sweepRates[0])}` },
-      { field: "g1", color: "ink", label: `deck q = ${pct2(sweepRates[1])}`, dash: true },
+      // The deck's rate is a reference under the thick averaged curve: a thin dashed grey, never a second white line.
+      { field: "g1", color: "ramp2", label: `deck q = ${pct2(sweepRates[1])}`, dash: true, width: 1.5 },
       { field: "g2", color: "loss", label: `break-even q = ${pct2(sweepRates[2])}` },
       { field: "robust", color: "ink", label: "averaged over the band", emphasis: "strong" },
     ],
@@ -165,7 +168,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const growthChart: ChartSpec = {
     id: "chain-curve",
     title: "Mean and median as seasons are chained",
-    subtitle: `x seasons chained · y tranche after that many seasons · steps = one per season`,
+    subtitle: "x seasons chained · y tranche after that many seasons",
     kind: "xy",
     data: table(
       [
@@ -213,7 +216,8 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const endDist: ChartSpec = {
     id: "chain-dist",
     title: `Where the tranche stands after ${N} season${N === 1 ? "" : "s"}`,
-    subtitle: `x tranche after ${N} season${N === 1 ? "" : "s"} (log) · y probability per log bin · ${methodLabel(d.chained[d.yours].dist.method)} · ruin mass off the chart: ${P.coin.name} ${smallPct(hists.coin.zeroMass)}, ${P.spread.name} ${smallPct(hists.spread.zeroMass)}, ${P.reserve.name} ${smallPct(hists.reserve.zeroMass)}`,
+    subtitle: `x tranche after ${N} season${N === 1 ? "" : "s"} (log) · y probability per log bin`,
+    caption: `Ruin mass off the chart: ${P.coin.name} ${smallPct(hists.coin.zeroMass)}, ${P.spread.name} ${smallPct(hists.spread.zeroMass)}, ${P.reserve.name} ${smallPct(hists.reserve.zeroMass)}.`,
     kind: "xy",
     data: table([f("mid", "Tranche after N seasons", "x"), ...ids.map((id) => f(id, P[id].label, "pct1"))], histRows),
     mark: "bar",
@@ -287,7 +291,8 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const nav: ChartSpec = {
     id: "chain-nav",
     title: "Refilling the tranche from NAV each season",
-    subtitle: `x share of NAV allocated to the tranche per season · y NAV log growth per season, E[log(1 − f + f·X)] with X the season-end multiple · ${P.coin.name} at p ${navPs.map((pp) => pct(pp)).join(", ")} · dots = growth-optimal share, f* ≈ 2p − 1 for a double-or-nothing · curves below ${signedPct1(navFloor)} are cut`,
+    subtitle: `x share of NAV allocated to the tranche per season · y NAV log growth per season · ${P.coin.name} at p ${navPs.map((pp) => pct(pp)).join(", ")} · dots = growth-optimal share`,
+    caption: `Curves below ${signedPct1(navFloor)} are cut.`,
     kind: "xy",
     data: table(
       [f("share", "Share of NAV allocated per season", "pct"), ...navPs.map((pp, i) => f(`coin${i}`, `${P.coin.name}, p = ${pct(pp)}`, "pct1")), f("coinDeck", `${P.coin.name} at the deck's p = ${pct(d.pClean)}`, "pct1"), f("yours", yours.label, "pct1")],

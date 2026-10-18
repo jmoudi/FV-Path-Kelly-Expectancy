@@ -1,7 +1,8 @@
 /*
  * The guide page (GuideFrame.tsx): a rail of section links beside one prose column.
  * Type from the theme's scale only; no boxes, structure from type, spacing and one
- * hairline between sections.
+ * hairline between sections. The rail is Explain's rail (theme.css .rail): the same
+ * caption, the same "01" numbers, the active item in ink with no fill.
  */
 .k-guide {
   display: grid;
@@ -23,9 +24,9 @@
 }
 .k-guide-rail-title {
   font-size: var(--fs-label);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
   padding: 0 10px 8px;
 }
 .k-guide-rail a {
@@ -41,7 +42,7 @@
   line-height: 1.3;
 }
 .k-guide-rail a .n {
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--fs-label);
   color: var(--muted);
 }
@@ -50,7 +51,6 @@
 }
 .k-guide-rail a.on {
   color: var(--ink);
-  background: var(--surface);
 }
 .k-guide-rail a.on .n {
   color: var(--ink);
@@ -88,7 +88,7 @@
   align-items: baseline;
 }
 .k-guide-h2 .n {
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--fs-label);
   font-weight: 400;
   color: var(--muted);
@@ -124,6 +124,8 @@
   display: grid;
   gap: 4px;
 }
+/* A token (a key, an address, a name in the code) is a chip; a longer quote of what the
+   screen shows is set in the same face without the chip, so it wraps like text. */
 .k-guide code {
   font-family: var(--font-mono);
   font-size: var(--fs-ui);
@@ -132,6 +134,16 @@
   border-radius: 4px;
   padding: 0 4px;
   overflow-wrap: anywhere;
+}
+.k-guide code.quote {
+  background: none;
+  padding: 0;
+  color: var(--ink-2);
+}
+/* A tool's drawn icon inside a sentence, at the text's size and colour. */
+.k-guide-icon {
+  color: var(--ink);
+  margin: 0 1px;
 }
 .k-guide a {
   color: var(--ink);

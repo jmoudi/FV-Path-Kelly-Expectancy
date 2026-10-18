@@ -17,7 +17,7 @@ export const THEME = {
   surface: "#1a1d21",
   raised: "#22262b",
   raised2: "#2a2f35",
-  hairline: "#30363d",
+  hairline: "#383e46",
   grid: "#1f2226",
   ink: "#e8e9eb",
   ink2: "#b4bac1",
@@ -44,8 +44,12 @@ export const THEME = {
   } satisfies Record<ColorRole, string>,
   /** Sequential ramp (neutral) for magnitudes, dark to light. */
   sequential: ["#202429", "#393e42", "#54595e", "#767b80", "#9a9fa5", "#bfc5ca"],
-  /** Diverging ramp: muted loss red <- graphite -> muted gain green, ends matched in lightness. */
-  diverging: ["#ad4b4b", "#733a39", "#27292c", "#2f5838", "#38804b"],
+  /**
+   * Diverging ramp: muted loss red <- graphite -> muted gain green, evenly spaced in
+   * OKLCH lightness (0.50 · 0.39 · 0.28 · 0.39 · 0.50), so neither sign glows more, and
+   * dark enough at both ends that ink cell labels keep 4.5:1 (4.7:1 on the green end).
+   */
+  diverging: ["#a03f40", "#6a3231", "#27292c", "#274f30", "#2b7440"],
   /** Two-state cells: won (graphite) and lost (loss red). */
   binary: ["#2a2f35", "#df6768"],
 };
@@ -82,18 +86,30 @@ export function emphasisWidth(e: Emphasis | undefined, base = 2): number {
   return e === "muted" ? Math.max(1, base - 1) : e === "strong" ? base + 1 : base;
 }
 
-/** Status colours may fill a bar at most at this opacity, so a red or green bar never outshouts the data. */
-export const STATUS_BAR_ALPHA = 0.6;
+/**
+ * Status colours fill a bar at this opacity, edged by a 1px line in the full colour
+ * (barStroke): the bar reads as clean red or green, never muddy, and still does not
+ * outshout the data.
+ */
+export const STATUS_BAR_ALPHA = 0.7;
+/** A reference bar (secondary ink: the deck's rate beside a scenario) fills at this opacity. */
+export const REFERENCE_BAR_ALPHA = 0.5;
 
 /**
- * A bar's fill: status roles at most STATUS_BAR_ALPHA, ink bars in secondary ink (a
- * near-white slab is the brightest mark on the page and carries no news), the rest
- * at the emphasis opacity.
+ * A bar's fill: status roles at STATUS_BAR_ALPHA, ink bars in secondary ink (a
+ * near-white slab is the brightest mark on the page and carries no news), bars in
+ * secondary ink as references at REFERENCE_BAR_ALPHA, the rest at the emphasis opacity.
  */
 export function barFill(role: ColorRole | undefined, op: number): string {
   if (role === "loss" || role === "good") return withAlpha(roleColor(role), STATUS_BAR_ALPHA * op);
+  if (role === "ink2") return withAlpha(THEME.roles.ink2, REFERENCE_BAR_ALPHA * op);
   if (!role || role === "ink") return withAlpha(THEME.roles.ink2, op);
   return withAlpha(roleColor(role), op);
+}
+
+/** A bar's 1px edge: status bars only, in the full status colour at the emphasis opacity; null for the rest. */
+export function barStroke(role: ColorRole | undefined, op: number): string | null {
+  return role === "loss" || role === "good" ? withAlpha(roleColor(role), op) : null;
 }
 
 export function withAlpha(hex: string, alpha: number): string {

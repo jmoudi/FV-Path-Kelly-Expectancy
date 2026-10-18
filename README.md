@@ -240,7 +240,9 @@ swapped without touching the others.
   is imported.
 - Rates palette: optimistic = green, deck = ink (near white on graphite), break-even =
   red, wherever those rates are a series or an annotation; a test holds every chart to
-  it. Policy colours are reserved for policies; `ink2` is the neutral accent for asides.
+  it. Where the deck's rate is the reference beside a chart's subject it steps down the
+  ink family: a half-opacity ink-2 bar, or a thin dashed ramp-2 line under a thick white
+  curve. Policy colours are reserved for policies; `ink2` is the neutral accent for asides.
 - Colour roles (one job per colour; tested in `tests/charts.test.ts`): figures, names,
   titles and labels are ink (`--ink`, `--ink-2`, `--muted`), so no number on a page is
   coloured and "yours" reads as ink against ink-2. The cream `--accent` (#e8e1a3)
@@ -249,10 +251,21 @@ swapped without touching the others.
   and violet (Coin, Spread, Spread + reserve) live on chart marks, legend swatches,
   that policy's annotation lines and the 8px dot before a policy's name or figure.
   Loss red and good green mark ruin and clean outcomes, messages, the heat map's sign
-  and the rates pair, as lines and dots; status bars fill at most 0.6. Ordered
-  scenarios use the neutral grey ramp, or one policy's colour told apart by dash.
-  Reference lines are 1px muted dashes (ink only for the deck's own value); grid lines
-  run across the value axis only; labels sit on a page-coloured halo, not in a box.
+  and the rates pair, as lines and dots; status bars fill at 0.7 with a 1px edge in the
+  full colour. The heat map's ends sit at matched lightness, dark enough that ink cell
+  labels keep 4.5:1. Ordered scenarios use the neutral grey ramp, or one policy's colour
+  told apart by dash. Reference lines are 1px muted dashes (ink only for the deck's own
+  value); grid lines run across the value axis only; a label sits on a halo in the
+  colour under it (the page, an area fill, a band), never in a box, and a vertical line
+  that would run through a band's title starts under it.
+- Surfaces: one graphite ramp (`--bg` · `--surface` · `--raised` · `--raised-2` ·
+  `--hairline`, one step apart); the hairline keeps 1.4:1 on `--raised`, so an input's
+  edge holds; the top bar and the deck are opaque. A focused box shows one 2px accent
+  ring over its own border.
+- Numbers in the page (figures, the Desk grid, deck and section boxes, tables, the
+  market switch) are IBM Plex Sans with tabular figures; IBM Plex Mono is left to the
+  chart canvases, code chips, key caps and the JSON box. The Desk grid gives every
+  figure two decimals and stacks the decimal points of a column.
 - Type: every font size reads a token (`--fs-title` 36 · `--fs-view` 30 · `--fs-h` 20 ·
   `--fs-chart` 17 · `--fs-body` 15 · `--fs-ui` 13 · `--fs-label` 11.5 · `--fs-hero` 28 ·
   `--fs-kpi` 20), defined once in `:root`. Borders remain only on inputs, popovers, the
@@ -260,7 +273,9 @@ swapped without touching the others.
 - Chart conventions: bars on a numeric axis are drawn at their exact positions with a
   px thickness; annotation labels never overlap (vertical-line labels closer than 14px
   alternate top and bottom, horizontal-line labels stack, point labels move aside);
-  legends wrap above the plot instead of printing over it; a step chart can change
+  legends wrap above the plot instead of printing over it, and two charts side by side
+  keep the same legend rows free, so their plot frames start on one line; subtitles
+  carry the encoding only, facts about the data go in the caption; a step chart can change
   level after each point or midway (`step: "middle"`); a series with `band` fills down
   to its lower edge. Chart numbers print through `src/kit/charts/format.ts`; the text
   helpers (`pct`, `x2`, `signedPp`, …) are in `src/kit/charts/numbers.ts`.

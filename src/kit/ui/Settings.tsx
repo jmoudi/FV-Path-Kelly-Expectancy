@@ -45,7 +45,8 @@ export function KeyLegend({ bindings }: { bindings: KeyBinding[] }) {
     <table className="k-keys">
       <tbody>
         {bindings.map((b) => (
-          <tr key={b.action}>
+          // Two bindings may share an action ("one step" on ↑↓ and on ←→): the keys make the row unique.
+          <tr key={b.keys.join("/") + b.action}>
             <td className="k-keys-keys">
               {b.keys.map((k, i) => (
                 <span key={k}>

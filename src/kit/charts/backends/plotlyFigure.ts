@@ -6,7 +6,7 @@ import { spanOfPx } from "../bars";
 import { formatNumber } from "../format";
 import { LABEL_FONT_PX, LEGEND_ROW_PX, resolveChart, type ResolvedAxis, type ResolvedChart } from "../resolve";
 import { fieldFormat, fieldLabel, type ChartSpec, type SeriesSpec } from "../spec";
-import { THEME, barFill, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
+import { THEME, barFill, barStroke, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
 import { BAND_ALPHA, bandPoints, barPoints, categories, d3Format, linePoints, markOf, numberOrNull, seriesName, showLegend } from "./types";
 
 export type PTrace = Record<string, unknown>;
@@ -91,7 +91,10 @@ function barTrace(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): PTrace {
   const pos = pts.map((p) => (categorical ? catText(rc, p.pos) : p.shifted));
   const len = pts.map((p) => p.top - p.bottom);
   const base = pts.map((p) => p.bottom);
-  const colors = s.colors ? pts.map((p) => barFill(s.colors![Math.max(0, rc.axes.x.categories.findIndex((c) => String(c) === String(p.pos))) % s.colors!.length], op)) : barFill(s.color, op);
+  const roleAt = (p: (typeof pts)[number]) => (s.colors ? s.colors[Math.max(0, rc.axes.x.categories.findIndex((c) => String(c) === String(p.pos))) % s.colors.length] : s.color);
+  const colors = s.colors ? pts.map((p) => barFill(roleAt(p), op)) : barFill(s.color, op);
+  // Status bars carry a 1px edge in the full colour; the rest none.
+  const edges = pts.map((p) => barStroke(roleAt(p), op));
   const trace: PTrace = {
     name,
     meta: s.field,
@@ -101,7 +104,7 @@ function barTrace(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): PTrace {
     y: rc.horizontal ? pos : len,
     base,
     showlegend: s.legend !== false,
-    marker: { color: colors, line: { width: 0 } },
+    marker: { color: colors, line: edges.some(Boolean) ? { color: edges.map((e) => e ?? "rgba(0,0,0,0)"), width: edges.map((e) => (e ? 1 : 0)) } : { width: 0 } },
     customdata: pts.map((p) => formatNumber(p.value, fmt ?? "auto")),
     hovertemplate: `%{customdata}<extra>${name}</extra>`,
   };
@@ -283,11 +286,10 @@ export function buildFigure(spec: ChartSpec, width = 720): { data: PTrace[]; lay
   };
   if (spec.kind === "heatmap" && spec.heat) return { ...heatFigure(spec, base), resolved: null };
   const rc = resolveChart(spec, width);
-  if (rc.legend) {
-    // Entries wrap left to right above the plot; the plot moves down by the legend's rows.
-    base.margin = { ...MARGIN, t: MARGIN.t + rc.legend.gridRows * LEGEND_ROW_PX + 4 };
-    base.legend = { ...(base.legend as PLayout), x: 0, xanchor: "left", y: 1, yanchor: "bottom", traceorder: "normal" };
-  }
+  // Entries wrap left to right above the plot; the plot moves down by the legend's rows
+  // (or by the rows of the legend of the chart beside it).
+  if (rc.legendRows.grid > 0) base.margin = { ...MARGIN, t: MARGIN.t + rc.legendRows.grid * LEGEND_ROW_PX + 4 };
+  if (rc.legend) base.legend = { ...(base.legend as PLayout), x: 0, xanchor: "left", y: 1, yanchor: "bottom", traceorder: "normal" };
   const data: PTrace[] = [];
   // Bands first, so the lines draw over their fill.
   for (const s of spec.series) if (s.band) data.push(...bandTraces(spec, rc, s));

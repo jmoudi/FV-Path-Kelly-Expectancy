@@ -38,7 +38,7 @@ function stickyInset(): number {
  * lazily when scrolled near the viewport, swaps backends on demand, shows the numbers
  * (⊞) inside the same plot box, and hosts the stories and the chart-definition popover.
  */
-export function ChartHost({ spec: base, viewId }: { spec: ChartSpec; viewId?: string }) {
+export function ChartHost({ spec: base, viewId, legendPeer }: { spec: ChartSpec; viewId?: string; legendPeer?: string[] }) {
   const clearOverride = useKit((s) => s.clearOverride);
   return (
     <ErrorBoundary
@@ -60,12 +60,12 @@ export function ChartHost({ spec: base, viewId }: { spec: ChartSpec; viewId?: st
         </ChartFrame>
       )}
     >
-      <ChartCard base={base} viewId={viewId} />
+      <ChartCard base={base} viewId={viewId} legendPeer={legendPeer} />
     </ErrorBoundary>
   );
 }
 
-function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
+function ChartCard({ base, viewId, legendPeer }: { base: ChartSpec; viewId?: string; legendPeer?: string[] }) {
   const copy = useKitCopy();
   const override = useKit((s) => s.overrides[base.id]);
   const clearOverride = useKit((s) => s.clearOverride);
@@ -77,6 +77,10 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
   const before = useKit((s) => s.storyPrev[base.id]);
   const paramsNow = useKit((s) => (s.storyPrev[base.id] ? s.params : null));
   const spec = useMemo(() => applyOverride(base, override), [base, override]);
+  // What the backend draws: the spec, with the legend rows of the chart beside it in a pair.
+  // Keyed by the entries' text: the section hands over a new array on every render.
+  const peerKey = legendPeer?.join("\u0000") ?? "";
+  const drawn = useMemo(() => (peerKey ? { ...spec, legendPeer: peerKey.split("\u0000") } : spec), [spec, peerKey]);
   // A figure is drawn by the figure registry, never by a backend; ⊞ still shows its data.
   const isFigure = base.kind === "figure";
   const isTable = base.kind === "table";
@@ -90,8 +94,8 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
   const plotRef = useRef<HTMLDivElement>(null);
   const gearRef = useRef<HTMLButtonElement>(null);
   const handleRef = useRef<RenderHandle | null>(null);
-  const specRef = useRef(spec);
-  specRef.current = spec;
+  const specRef = useRef(drawn);
+  specRef.current = drawn;
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState<BackendId | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -151,12 +155,12 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
   useEffect(() => {
     if (!handleRef.current || mounted !== effective) return;
     try {
-      handleRef.current.update(spec);
+      handleRef.current.update(drawn);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [spec, mounted, effective]);
+  }, [drawn, mounted, effective]);
 
   useEffect(() => {
     const el = plotRef.current;

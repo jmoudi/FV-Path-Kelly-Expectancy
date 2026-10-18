@@ -233,6 +233,11 @@ export interface ResolvedChart {
   bars: BarPlan | null;
   /** The legend above the plot, or null when there is none. */
   legend: LegendLayout | null;
+  /**
+   * Legend rows kept free above the plot: the chart's own, or more when the chart beside
+   * it (spec.legendPeer) wraps its legend into more rows. 0 when neither has a legend.
+   */
+  legendRows: { flow: number; grid: number };
 }
 
 /** Height of one legend row, and the legend's font size, in px. */
@@ -256,6 +261,11 @@ export interface LegendLayout {
 export function showLegend(spec: ChartSpec): boolean {
   if (spec.legend === false) return false;
   return spec.series.filter((s) => s.legend !== false).length >= 2;
+}
+
+/** The legend's entries, in order: every named series that is not kept out of it. */
+export function legendNames(spec: ChartSpec): string[] {
+  return spec.series.filter((s) => s.legend !== false).map((s) => s.label ?? fieldLabel(spec.data, s.field));
 }
 
 /**
@@ -484,11 +494,8 @@ export function resolveChart(spec: ChartSpec, containerWidth = 720): ResolvedCha
     fixed,
   );
   for (const p of placed) labelled[p.item].a.label = p.value;
-  const legend = showLegend(spec)
-    ? legendLayout(
-        spec.series.filter((s) => s.legend !== false).map((s) => s.label ?? fieldLabel(spec.data, s.field)),
-        plot.width,
-      )
-    : null;
-  return { axes, horizontal, h, v, plot, annotations: kept.map((k) => k.a), bars, legend };
+  const legend = showLegend(spec) ? legendLayout(legendNames(spec), plot.width) : null;
+  const peer = spec.legendPeer && spec.legendPeer.length >= 2 ? legendLayout(spec.legendPeer, plot.width) : null;
+  const legendRows = { flow: Math.max(legend?.flowRows ?? 0, peer?.flowRows ?? 0), grid: Math.max(legend?.gridRows ?? 0, peer?.gridRows ?? 0) };
+  return { axes, horizontal, h, v, plot, annotations: kept.map((k) => k.a), bars, legend, legendRows };
 }

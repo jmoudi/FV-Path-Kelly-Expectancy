@@ -5,10 +5,13 @@
  * paragraphs, sub-headings, lists, small tables and key rows. No boxes; prose stays
  * within the measure (--prose-max). Sections are addressed as #<page>/<id>.
  *
- * Inline markup in any text: `code` (keys, addresses, names in the code), **term**,
- * and [label](#href) links.
+ * Inline markup in any text: `code` (keys, addresses, names in the code; a quote with a
+ * space in it is set without the chip), **term**, [label](#href) links, and {icon:name}
+ * for a tool's drawn icon (the kit's Icon set), so the text shows the tool as the screen
+ * draws it.
  */
 import { Fragment, useEffect, useMemo, type ReactNode } from "react";
+import { Icon, type IconName } from "./Icon";
 import { KeyLegend, type KeyBinding } from "./Settings";
 import { useScrollSpy } from "./Shell";
 import "./guide.css";
@@ -41,14 +44,35 @@ export interface GuideFrameProps {
   page?: string;
 }
 
-const INLINE = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)\s]+\))/g;
+const INLINE = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)\s]+\)|\{icon:[a-z]+\})/g;
 
-/** `code`, **term** and [label](href) inside a text. */
+/** What a screen reader says for an icon in the text (the drawn icon itself is decorative). */
+const ICON_WORD: Partial<Record<IconName, string>> = { open: "open in its view", table: "show the numbers", settings: "settings", play: "run", pause: "pause", stop: "stop", restore: "back to the value before", next: "next", more: "more" };
+
+/** Section numbers as Explain writes them: "01", "02", … */
+export const guideNumber = (i: number) => String(i + 1).padStart(2, "0");
+
+/** `code`, **term**, [label](href) and {icon:name} inside a text. */
 export function inline(text: string): ReactNode {
   const parts = text.split(INLINE);
   return parts.map((part, i) => {
     if (!part) return null;
-    if (part.startsWith("`") && part.endsWith("`")) return <code key={i}>{part.slice(1, -1)}</code>;
+    if (part.startsWith("`") && part.endsWith("`")) {
+      const body = part.slice(1, -1);
+      return (
+        <code key={i} className={/\s/.test(body) ? "quote" : undefined}>
+          {body}
+        </code>
+      );
+    }
+    const icon = /^\{icon:([a-z]+)\}$/.exec(part);
+    if (icon)
+      return (
+        <Fragment key={i}>
+          <Icon name={icon[1] as IconName} size={13} className="k-guide-icon" />
+          <span className="sr-only">{ICON_WORD[icon[1] as IconName] ?? icon[1]}</span>
+        </Fragment>
+      );
     if (part.startsWith("**") && part.endsWith("**")) return <strong key={i}>{part.slice(2, -2)}</strong>;
     const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(part);
     if (link) return <a key={i} href={link[2]}>{link[1]}</a>;
@@ -136,7 +160,7 @@ export function GuideFrame({ title, lede, sections, current, page = "guide" }: G
               }
             }}
           >
-            <span className="n">{i + 1}</span>
+            <span className="n">{guideNumber(i)}</span>
             <span>{s.title}</span>
           </a>
         ))}
@@ -150,7 +174,7 @@ export function GuideFrame({ title, lede, sections, current, page = "guide" }: G
           <section key={s.id} id={`g-${s.id}`} className="k-guide-sec" aria-labelledby={`g-${s.id}-h`}>
             <h2 className="k-guide-h2" id={`g-${s.id}-h`}>
               <span className="n" aria-hidden="true">
-                {i + 1}
+                {guideNumber(i)}
               </span>
               {s.title}
             </h2>

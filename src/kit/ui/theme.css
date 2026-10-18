@@ -18,7 +18,7 @@
   --surface: #1a1d21;
   --raised: #22262b;
   --raised-2: #2a2f35;
-  --hairline: #30363d;
+  --hairline: #383e46; /* one step up the surface ramp: 1.41:1 on --raised, so an input's edge holds */
   --grid: #1f2226;
   --ink: #e8e9eb;
   --ink-2: #b4bac1;
@@ -109,6 +109,16 @@ textarea {
   outline: 2px solid var(--accent);
   outline-offset: 0;
 }
+/* A bordered control's ring lies over its own 1px border, so a focused box shows one 2px
+   ring, never a border inside a ring. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.btn:focus-visible,
+.chip:focus-visible,
+.dkb-btn:focus-visible {
+  outline-offset: -1px;
+}
 input[type="checkbox"],
 input[type="radio"] {
   accent-color: var(--accent);
@@ -118,9 +128,6 @@ input[type="radio"] {
     transition: none !important;
     animation: none !important;
   }
-}
-.mono {
-  font-family: var(--font-mono);
 }
 /* An 8px identity dot before a policy name: the policy's colour lives here, not in the text. */
 .dot {
@@ -159,8 +166,8 @@ input[type="radio"] {
   height: var(--topbar-h);
   padding-left: var(--gutter-l);
   padding-right: var(--gutter-r);
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  backdrop-filter: blur(10px);
+  /* Opaque: a heading scrolled under the bar never ghosts through it. */
+  background: var(--bg);
   border-bottom: 1px solid var(--hairline);
   /* Menus render through a portal, so nothing here needs to overflow. */
   min-width: 0;
@@ -301,7 +308,7 @@ input[type="radio"] {
   line-height: 1.3;
 }
 .rail a .n {
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--fs-label);
   color: var(--muted);
 }
@@ -379,7 +386,6 @@ input[type="radio"] {
   flex-wrap: wrap;
 }
 .param-label .sym {
-  font-family: var(--font-mono);
   color: var(--muted);
 }
 .badge-all {
@@ -390,6 +396,7 @@ input[type="radio"] {
 .param select,
 .dataset select,
 .field-select,
+.k-ps-select,
 .authoring select,
 .mini-field select {
   appearance: none;
@@ -405,7 +412,8 @@ input[type="radio"] {
 /* A select in a field row is the height of a number box (26px) with the same border and fill. */
 .param select,
 .dataset select,
-.field-select {
+.field-select,
+.k-ps-select {
   height: 26px;
   background-color: var(--raised);
   border: 1px solid var(--hairline);
@@ -418,6 +426,7 @@ input[type="radio"] {
 .param select:hover,
 .dataset select:hover,
 .field-select:hover,
+.k-ps-select:hover,
 .authoring select:hover,
 .mini-field select:hover {
   border-color: var(--muted);
@@ -625,7 +634,6 @@ input[type="radio"] {
 .table td {
   padding: 6px 10px;
   text-align: right;
-  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   border-bottom: 1px solid var(--grid);
   color: var(--ink-2);
@@ -635,12 +643,10 @@ input[type="radio"] {
 .table th.text {
   text-align: left;
 }
-.table td.text {
-  font-family: var(--font-ui);
-}
+/* The highlighted row (your row) is a quiet fill, not a rule: a rule reads as a section break. */
 .table tr.hl td {
   color: var(--ink);
-  box-shadow: inset 0 -1px 0 var(--muted);
+  background: var(--raised);
 }
 .table td.emph {
   color: var(--ink);
@@ -686,8 +692,8 @@ input[type="radio"] {
   color: var(--ink-2);
   vertical-align: top;
 }
-.figs td.mono {
-  font-family: var(--font-mono);
+.figs td.num {
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
   overflow-wrap: anywhere;
 }
@@ -775,18 +781,47 @@ input[type="radio"] {
   border: 1px solid var(--hairline);
   border-radius: 5px;
   padding: 0 6px;
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--fs-ui);
   width: 92px;
 }
 .authoring select {
-  font-family: var(--font-ui);
   width: auto;
   padding-right: 24px;
 }
-/* The editor's range boxes hold "−0.500" whole beside the run marker's reserved slot. */
-.authoring .nf.compact .nf-box {
-  width: 92px;
+/* The editor's boxes never carry a sweep marker: no reserved slot, so 80px holds
+   "−0.500×" whole. */
+.authoring .nf.compact .nf-box,
+.authoring .nf .nf-boxwrap .nf-box {
+  width: 80px;
+  padding-left: 7px;
+}
+.authoring .nf .nf-run {
+  display: none;
+}
+/* Axis ranges: a fixed grid (axis · from · to), each cell a box and, once set, its "auto". */
+.authoring .range-grid {
+  display: grid;
+  grid-template-columns: 56px auto auto;
+  justify-content: start;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 6px;
+}
+.authoring .range-h {
+  font-size: var(--fs-label);
+  color: var(--muted);
+}
+.authoring .range-axis {
+  color: var(--ink-2);
+}
+.authoring .range-cell,
+.authoring .range-cell .nf-with-clear {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 .authoring .series-list {
   display: grid;
@@ -820,7 +855,6 @@ input[type="radio"] {
   color: var(--muted);
 }
 .backend-tag {
-  font-family: var(--font-mono);
   font-size: var(--fs-label);
   color: var(--muted);
 }
@@ -939,11 +973,21 @@ textarea.json,
 }
 
 /* Above or below the plot, or as a sheet, the editor is wide and short: groups in columns. */
+.popover.band,
+.popover.sheet {
+  container-type: inline-size;
+}
 .popover.band .authoring,
 .popover.sheet .authoring {
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 14px 28px;
   align-items: start;
+}
+/* The ranges' grid needs two columns' width; it takes them wherever there are two. */
+@container (min-width: 488px) {
+  .authoring > .ranges {
+    grid-column: span 2;
+  }
 }
 .popover.band .authoring > .row:first-child,
 .popover.sheet .authoring > .row:first-child,
@@ -974,11 +1018,9 @@ textarea.json,
   align-items: baseline;
 }
 .nf-label .sym {
-  font-family: var(--font-mono);
   color: var(--muted);
 }
 .nf-short {
-  font-family: var(--font-mono);
   color: var(--ink-2);
   font-size: var(--fs-label);
 }
@@ -1030,7 +1072,6 @@ textarea.json,
 }
 .nf-box {
   width: 84px;
-  font-family: var(--font-mono);
   font-size: var(--fs-ui);
   background: var(--raised);
   border: 1px solid var(--hairline);
@@ -1226,11 +1267,15 @@ textarea.json,
   max-width: var(--prose-max);
   font-size: var(--fs-body);
 }
+/* A sentence that is a link: a hairline underline at rest, the accent on hover. */
 .desk-verdict a {
   color: var(--ink);
   text-decoration: underline;
-  text-decoration-color: var(--muted);
+  text-decoration-color: var(--hairline);
   text-underline-offset: 4px;
+}
+.desk-verdict a:hover {
+  text-decoration-color: var(--accent);
 }
 .desk-market {
   display: grid;

@@ -122,11 +122,10 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
     tooltip: false,
     width: 1.2,
   }));
-  const ruined = paths.filter((x) => x[x.length - 1] === 0).length;
   const fan: ChartSpec = {
     id: "binary-fan",
     title: `The railroad: ${p.fanPaths} sampled seasons (${coin.name})`,
-    subtitle: `x night · y tranche, start = 1 · ${p.fanPaths} sampled seasons · red = ruined (${ruined} in this draw)`,
+    subtitle: `x night · y tranche, start = 1 · ${p.fanPaths} sampled seasons · red = ruined`,
     kind: "xy",
     data: table([f("night", "Night", "int"), ...paths.map((_, i) => f(`p${i}`, `Season ${i + 1}`, "x"))], fanRows),
     mark: "step",

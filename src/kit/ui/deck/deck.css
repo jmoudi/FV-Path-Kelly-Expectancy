@@ -7,8 +7,8 @@
   position: sticky;
   top: calc(var(--topbar-h, 52px) + env(safe-area-inset-top, 0px));
   z-index: 25;
-  background: color-mix(in srgb, var(--bg) 94%, transparent);
-  backdrop-filter: blur(10px);
+  /* Opaque, like the top bar: what scrolls under the deck never shows through. */
+  background: var(--bg);
   border-bottom: 1px solid var(--hairline);
 }
 .dkb-row {
@@ -250,7 +250,7 @@
 }
 .lv-value {
   font: inherit;
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
   background: none;
   border: 0;
@@ -272,7 +272,7 @@
   height: 16px;
   padding: 0 4px;
   font: inherit;
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
   text-align: right;
   background: var(--raised);
@@ -321,7 +321,7 @@
 }
 .seg-hint {
   font-size: var(--fs-label);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -378,6 +378,17 @@
   flex-wrap: wrap;
   white-space: normal;
   row-gap: 4px;
+}
+/* Idle or paused, the parameter's name takes the first line and the controls the second,
+   whole: the preset chip shortens before any control drops onto a line of its own. (On a
+   phone the name is its symbol and the controls are icons: one line holds them all.) */
+@media (min-width: 701px) {
+  .dkb-drawer-top .sweep-strip.sw.compact.named:not(.sweeping) > .sw-name:first-child {
+    flex: 1 0 100%;
+  }
+}
+.dkb-drawer-top .sweep-strip.sw.compact .sw-preset {
+  max-width: 200px;
 }
 .dkb-drawer-body {
   flex: 1 1 auto;
@@ -445,12 +456,9 @@
   margin-top: -4px;
   font-size: var(--fs-ui);
 }
-.dkb-linked .sym {
-  font-family: var(--font-mono);
-}
 .lv-box {
   margin-left: auto;
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--fs-ui);
   text-align: right;
 }

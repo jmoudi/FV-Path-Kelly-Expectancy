@@ -6,7 +6,7 @@ import { BarAccumulator, exposeProbe, inRange, type AxisProbe, type RenderProbe,
 import { formatNumber } from "../format";
 import { LABEL_FONT_PX, LEGEND_ROW_PX, resolveChart, screenPx, type ResolvedAxis, type ResolvedChart, type ScreenAnnotation } from "../resolve";
 import { fieldFormat, fieldLabel, type ChartSpec, type SeriesSpec } from "../spec";
-import { THEME, barFill, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
+import { THEME, barFill, barStroke, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
 import { BAND_ALPHA, bandPoints, barPoints, linePoints, markOf, numberOrNull, seriesName, type Backend, type RenderHandle } from "./types";
 
 echarts.use([
@@ -29,11 +29,26 @@ echarts.use([
 type EOption = Record<string, unknown>;
 
 /**
- * Read per build, so configureTheme() reaches it. Labels are knocked out of what they
- * cross by a page-coloured halo round the glyphs: a box, even in the page colour, shows
- * as a dark tag wherever a label sits on a band or an area fill.
+ * Labels are knocked out of the lines they cross by a halo round the glyphs, in the
+ * colour of whatever lies under the label (the page, an area fill, a band): a box, or a
+ * page-coloured halo on a fill, shows as a dark tag. Read per build, so configureTheme()
+ * reaches it.
  */
-const labelHalo = () => withAlpha(THEME.page, 0.9);
+type RGB = [number, number, number];
+const rgbOf = (hex: string): RGB => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as RGB;
+const over = (base: RGB, hex: string, alpha: number): RGB => {
+  const c = rgbOf(hex);
+  return base.map((b, i) => b * (1 - alpha) + c[i] * alpha) as RGB;
+};
+const rgbText = (c: RGB) => `rgb(${c.map((v) => Math.round(v)).join(",")})`;
+/**
+ * Area fills and annotation bands draw at these opacities (the halo under a label
+ * recomputes their colour): an area's colour at AREA_ALPHA × emphasis, laid at
+ * AREA_OPACITY (said here, not left to the library's default), a band at XBAND_ALPHA.
+ */
+const AREA_ALPHA = 0.16;
+const AREA_OPACITY = 0.7;
+const XBAND_ALPHA = 0.1;
 /** The grid's insets in px; the plot box is what remains of the container. */
 const GRID = { left: 66, right: 22, top: 18, legendTop: 14, bottom: 46 };
 const ANNOTATIONS_ID = "__annotations";
@@ -96,10 +111,16 @@ function lineSeries(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): EOption 
     case "scatter":
       return { ...common, type: "scatter", symbolSize: 9, itemStyle: { color: withAlpha(color, op), borderColor: THEME.surface, borderWidth: 1.5 } };
     case "area":
-      return { ...common, type: "line", showSymbol: false, lineStyle, areaStyle: { color: withAlpha(color, 0.16 * op) }, itemStyle: { color }, emphasis: { focus: "none" }, stack: spec.stack ? "total" : undefined };
+      return { ...common, type: "line", showSymbol: false, lineStyle, areaStyle: { color: withAlpha(color, AREA_ALPHA * op), opacity: AREA_OPACITY }, itemStyle: { color }, emphasis: { focus: "none" }, stack: spec.stack ? "total" : undefined };
     default:
       return { ...common, type: "line", step, showSymbol: false, connectNulls: false, lineStyle, itemStyle: { color }, emphasis: { focus: "none" } };
   }
+}
+
+/** A bar's fill and, for a status bar, its 1px edge in the full colour. */
+function barStyle(role: SeriesSpec["color"] | undefined, op: number): EOption {
+  const edge = barStroke(role, op);
+  return edge ? { color: barFill(role, op), borderColor: edge, borderWidth: 1 } : { color: barFill(role, op) };
 }
 
 /** Bars on a categorical axis: the library's own bars, grouped by the plan. */
@@ -112,7 +133,7 @@ function categoryBars(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): EOptio
     const p = byCat.get(String(c));
     const value = p ? p.value : null;
     const itemRole = s.colors ? s.colors[i % s.colors.length] : s.color;
-    return { value, itemStyle: { color: barFill(itemRole, op) } };
+    return { value, itemStyle: barStyle(itemRole, op) };
   });
   const mode = rc.bars?.mode;
   return {
@@ -120,7 +141,7 @@ function categoryBars(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): EOptio
     name: seriesName(spec, s),
     type: "bar",
     data,
-    itemStyle: { color: barFill(s.color, op), borderRadius: rc.horizontal ? [0, 2, 2, 0] : [2, 2, 0, 0] },
+    itemStyle: { ...barStyle(s.color, op), borderRadius: rc.horizontal ? [0, 2, 2, 0] : [2, 2, 0, 0] },
     barCategoryGap: "25%",
     barGap: mode === "overlay" ? "-100%" : "0%",
     stack: mode === "stack" ? "total" : undefined,
@@ -147,10 +168,10 @@ function numericBars(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): EOption
     clip: true,
     z: 2,
     // The series colour, for the legend; each bar carries its own below.
-    itemStyle: { color: barFill(s.color, op) },
+    itemStyle: barStyle(s.color, op),
     dimensions: ["pos", "top", "bottom", "value"],
     encode: horizontal ? { x: 1, y: 0, tooltip: [3] } : { x: 0, y: 1, tooltip: [3] },
-    data: pts.map((p, i) => ({ value: [p.shifted, p.top, p.bottom, p.value], itemStyle: { color: barFill(s.colors ? s.colors[i % s.colors.length] : s.color, op) } })),
+    data: pts.map((p, i) => ({ value: [p.shifted, p.top, p.bottom, p.value], itemStyle: barStyle(s.colors ? s.colors[i % s.colors.length] : s.color, op) })),
     renderItem: (params: { coordSys: { x: number; y: number; width: number; height: number } }, api: { value: (d: number) => number; coord: (v: number[]) => number[]; style: () => Record<string, unknown> }) => {
       const pos = api.value(0);
       const top = api.value(1);
@@ -192,20 +213,50 @@ function bandSeries(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): EOption 
   };
 }
 
+/** The value on a numeric screen axis `px` from its start (the left edge, or the top for the vertical axis). */
+function valueAtPx(ax: ResolvedAxis, px: number, len: number, vertical: boolean): number | null {
+  if (ax.categorical || len <= 0) return null;
+  const f = (vertical ? len - px : px) / len;
+  if (ax.scale === "log") {
+    const lo = Math.log10(ax.min);
+    const hi = Math.log10(ax.max);
+    return Math.pow(10, lo + f * (hi - lo));
+  }
+  return ax.min + f * (ax.max - ax.min);
+}
+
+/** Where a band's title sits, in grid px: centred at the top of the band, as the resolver placed it. */
+function bandTitleBox(a: ScreenAnnotation, rc: ResolvedChart, gridW: number): { x0: number; x1: number; y1: number } | null {
+  if (a.kind !== "xband" || !a.text || !a.label) return null;
+  const x0 = screenPx(Math.max(Math.min(a.x!, a.x2!), rc.h.min), rc.h, gridW, false) ?? 0;
+  const x1 = screenPx(Math.min(Math.max(a.x!, a.x2!), rc.h.max), rc.h, gridW, false) ?? gridW;
+  const mid = (x0 + x1) / 2;
+  const half = (a.label.box.x1 - a.label.box.x0) / 2;
+  return { x0: mid - half, x1: mid + half, y1: a.label.box.y1 };
+}
+
 /** Reference lines, dots and shaded bands, on an empty helper series. Labels are drawn separately. */
-function annotationSeries(rc: ResolvedChart): EOption {
-  const lines: EOption[] = [];
+function annotationSeries(rc: ResolvedChart, grid: { width: number; height: number }): EOption {
+  // A line is one entry (a whole axis value) or a segment between two coordinates.
+  const lines: (EOption | EOption[])[] = [];
   const points: EOption[] = [];
   const areas: unknown[] = [];
+  // A vertical line that runs through a band's title starts under it, so no dash shows in the title's gaps.
+  const titles = rc.annotations.map((a) => bandTitleBox(a, rc, grid.width)).filter((b): b is NonNullable<typeof b> => !!b);
   for (const a of rc.annotations) {
     const color = roleColor(a.color ?? "muted");
     // Reference lines are 1px: they frame the data, they are not data.
     const lineStyle = { color, type: a.dash === false ? "solid" : "dashed", width: 1 };
-    if (a.kind === "vline") lines.push({ xAxis: a.x, lineStyle, label: { show: false } });
-    else if (a.kind === "hline") lines.push({ yAxis: a.y, lineStyle, label: { show: false } });
+    if (a.kind === "vline") {
+      const X = screenPx(a.x, rc.h, grid.width, false);
+      const under = X == null ? undefined : titles.find((t) => X >= t.x0 - 1 && X <= t.x1 + 1);
+      const top = under ? valueAtPx(rc.v, under.y1 + 3, grid.height, true) : null;
+      if (under && top != null) lines.push([{ coord: [a.x, top], lineStyle, label: { show: false } }, { coord: [a.x, rc.v.min] }]);
+      else lines.push({ xAxis: a.x, lineStyle, label: { show: false } });
+    } else if (a.kind === "hline") lines.push({ yAxis: a.y, lineStyle, label: { show: false } });
     else if (a.kind === "point") points.push({ coord: [a.x, a.y], symbol: "circle", symbolSize: 11, itemStyle: { color: roleColor(a.color ?? "ink"), borderColor: THEME.surface, borderWidth: 2 }, label: { show: false } });
-    else if (a.kind === "xband") areas.push([{ xAxis: a.x, itemStyle: { color: withAlpha(color, 0.1) } }, { xAxis: a.x2 }]);
-    else if (a.kind === "yband") areas.push([{ yAxis: a.y, itemStyle: { color: withAlpha(color, 0.1) } }, { yAxis: a.y2 }]);
+    else if (a.kind === "xband") areas.push([{ xAxis: a.x, itemStyle: { color: withAlpha(color, XBAND_ALPHA) } }, { xAxis: a.x2 }]);
+    else if (a.kind === "yband") areas.push([{ yAxis: a.y, itemStyle: { color: withAlpha(color, XBAND_ALPHA) } }, { yAxis: a.y2 }]);
   }
   const out: EOption = { id: ANNOTATIONS_ID, name: ANNOTATIONS_ID, type: "line", data: [], silent: true, tooltip: { show: false }, z: 5 };
   // precision: ECharts rounds mark-line coordinates to 2 decimals by default, which
@@ -216,8 +267,61 @@ function annotationSeries(rc: ResolvedChart): EOption {
   return out;
 }
 
+/**
+ * The colour under a point of the plot (grid px): the page, under any band series that
+ * covers it, any area fill whose curve lies above it, and any annotation band across it,
+ * in the order they are drawn. A label's halo takes this colour, so it hides the lines it
+ * crosses and nothing else.
+ */
+function backgroundAt(spec: ChartSpec, rc: ResolvedChart, grid: { width: number; height: number }, gx: number, gy: number): RGB {
+  let c = rgbOf(THEME.page);
+  const toGrid = (p: [unknown, unknown]): [number, number] | null => {
+    const X = typeof p[0] === "number" ? screenPx(p[0], rc.h, grid.width, false) : null;
+    const Y = typeof p[1] === "number" ? screenPx(p[1], rc.v, grid.height, true) : null;
+    return X == null || Y == null ? null : [X, Y];
+  };
+  const inside = (poly: [number, number][]) => {
+    let hit = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i];
+      const [xj, yj] = poly[j];
+      if (yi > gy !== yj > gy && gx < ((xj - xi) * (gy - yi)) / (yj - yi || 1e-9) + xi) hit = !hit;
+    }
+    return hit;
+  };
+  for (const s of spec.series) {
+    if (!s.band) continue;
+    for (const run of bandPoints(spec, rc, s)) {
+      const poly = run.map((p) => toGrid(p)).filter((p): p is [number, number] => !!p);
+      if (poly.length > 2 && inside(poly)) c = over(c, roleColor(s.color), BAND_ALPHA);
+    }
+  }
+  if (!rc.horizontal)
+    for (const s of spec.series) {
+      if (markOf(spec, s) !== "area") continue;
+      const pts = linePoints(spec, rc, s)
+        .map((p) => toGrid(p))
+        .filter((p): p is [number, number] => !!p);
+      for (let i = 1; i < pts.length; i++) {
+        const [x0, y0] = pts[i - 1];
+        const [x1, y1] = pts[i];
+        if (gx < Math.min(x0, x1) || gx > Math.max(x0, x1)) continue;
+        const curve = x1 === x0 ? Math.min(y0, y1) : y0 + ((gx - x0) / (x1 - x0)) * (y1 - y0);
+        if (gy > curve) c = over(c, roleColor(s.color), AREA_ALPHA * emphasisOpacity(s.emphasis) * AREA_OPACITY);
+        break;
+      }
+    }
+  for (const a of rc.annotations) {
+    if (a.kind !== "xband") continue;
+    const x0 = screenPx(Math.max(Math.min(a.x!, a.x2!), rc.h.min), rc.h, grid.width, false) ?? 0;
+    const x1 = screenPx(Math.min(Math.max(a.x!, a.x2!), rc.h.max), rc.h, grid.width, false) ?? grid.width;
+    if (gx >= x0 && gx <= x1) c = over(c, roleColor(a.color ?? "muted"), XBAND_ALPHA);
+  }
+  return c;
+}
+
 /** Annotation labels as text at the placements the resolver chose, in container px. */
-function labelGraphics(rc: ResolvedChart, grid: { left: number; top: number; width: number; height: number }): EOption[] {
+function labelGraphics(spec: ChartSpec, rc: ResolvedChart, grid: { left: number; top: number; width: number; height: number }): EOption[] {
   const out: EOption[] = [];
   const px = (a: ScreenAnnotation, which: "x" | "y") => (which === "x" ? screenPx(a.x, rc.h, grid.width, false) : screenPx(a.y, rc.v, grid.height, true));
   for (const a of rc.annotations) {
@@ -241,6 +345,13 @@ function labelGraphics(rc: ResolvedChart, grid: { left: number; top: number; wid
       y = px(a, "y") ?? 0;
     }
     const color = a.kind === "xband" ? THEME.muted : roleColor(a.color ?? (a.kind === "point" || a.kind === "label" ? "ink" : "muted"));
+    // The label's centre in grid px, for the colour under it.
+    const w = l.box.x1 - l.box.x0;
+    const hgt = l.box.y1 - l.box.y0;
+    const cx = x + l.dx + (l.align === "left" ? w / 2 : l.align === "right" ? -w / 2 : 0);
+    const cy = y + l.dy + (l.baseline === "top" ? hgt / 2 : l.baseline === "bottom" ? -hgt / 2 : 0);
+    // A band's title needs no halo: no line runs through it (a vertical line starts under it).
+    const halo = a.kind === "xband" ? null : rgbText(backgroundAt(spec, rc, grid, cx, cy));
     out.push({
       type: "text",
       silent: true,
@@ -253,9 +364,8 @@ function labelGraphics(rc: ResolvedChart, grid: { left: number; top: number; wid
         font: `${LABEL_FONT_PX}px ${THEME.fontUi}`,
         align: l.align,
         verticalAlign: l.baseline,
-        // The halo hides the lines behind the text (a band's edges never cut through its label).
-        stroke: labelHalo(),
-        lineWidth: 4,
+        // The halo hides the lines behind the glyphs, in the colour under the label (never a dark outline on a fill).
+        ...(halo ? { stroke: halo, lineWidth: 4 } : {}),
       },
     });
   }
@@ -265,8 +375,8 @@ function labelGraphics(rc: ResolvedChart, grid: { left: number; top: number; wid
 function xyOption(spec: ChartSpec, width: number, height: number): EOption {
   const rc = resolveChart(spec, width);
   const legend = !!rc.legend;
-  // The plot starts below however many rows the legend wraps into.
-  const top = rc.legend ? GRID.legendTop + rc.legend.flowRows * LEGEND_ROW_PX : GRID.top;
+  // The plot starts below however many rows the legend wraps into (or the legend of the chart beside it).
+  const top = rc.legendRows.flow > 0 ? GRID.legendTop + rc.legendRows.flow * LEGEND_ROW_PX : GRID.top;
   const grid = { left: GRID.left, top, width: Math.max(10, width - GRID.left - GRID.right), height: Math.max(10, height - top - GRID.bottom) };
   const series: EOption[] = [];
   for (const s of spec.series) {
@@ -279,7 +389,7 @@ function xyOption(spec: ChartSpec, width: number, height: number): EOption {
     if (markOf(spec, s) === "bar") series.push(categoryAxis ? categoryBars(spec, rc, s) : numericBars(spec, rc, s));
     else series.push(lineSeries(spec, rc, s));
   }
-  series.push(annotationSeries(rc));
+  series.push(annotationSeries(rc, grid));
   const seriesFmt = new Map(spec.series.map((s) => [seriesName(spec, s), fieldFormat(spec.data, s.field)]));
   // Series that opt out of the readout (the sampled paths of a fan: forty identical rows say nothing).
   const quiet = new Set(spec.series.filter((s) => s.tooltip === false).map((s) => s.field));
@@ -338,7 +448,7 @@ function xyOption(spec: ChartSpec, width: number, height: number): EOption {
           .map((p) => {
             const y = valueOf(p) as number;
             const fmt = seriesFmt.get(p.seriesName);
-            return `<div style="display:flex;gap:8px;align-items:center"><span style="width:8px;height:8px;border-radius:2px;background:${p.color};display:inline-block"></span><span style="color:${THEME.ink2}">${p.seriesName}</span><span style="margin-left:auto;font-family:${THEME.fontMono}">${formatNumber(y, fmt ?? "auto")}</span></div>`;
+            return `<div style="display:flex;gap:8px;align-items:center"><span style="width:8px;height:8px;border-radius:2px;background:${p.color};display:inline-block"></span><span style="color:${THEME.ink2}">${p.seriesName}</span><span style="margin-left:auto;font-variant-numeric:tabular-nums">${formatNumber(y, fmt ?? "auto")}</span></div>`;
           })
           .join("");
         return head + body;
@@ -347,7 +457,7 @@ function xyOption(spec: ChartSpec, width: number, height: number): EOption {
     xAxis: axisOption(rc.h, "x", rc.h === rc.axes.y),
     yAxis: axisOption(rc.v, "y", rc.v === rc.axes.y),
     series,
-    graphic: { elements: labelGraphics(rc, grid) },
+    graphic: { elements: labelGraphics(spec, rc, grid) },
   };
 }
 
@@ -410,7 +520,7 @@ function heatOption(spec: ChartSpec, width: number): EOption {
       textStyle: { color: THEME.ink, fontSize: 12 },
       extraCssText: "font-size: var(--fs-ui);",
       formatter: (p: { value: unknown[] }) =>
-        `${fieldLabel(spec.data, h.xField)} ${catLabel(xs[p.value[0] as number], xFmt)}<br/>${fieldLabel(spec.data, h.yField)} ${catLabel(ys[p.value[1] as number], yFmt)}<br/><b style="font-family:${THEME.fontMono}">${labelOf(p)}</b>`,
+        `${fieldLabel(spec.data, h.xField)} ${catLabel(xs[p.value[0] as number], xFmt)}<br/>${fieldLabel(spec.data, h.yField)} ${catLabel(ys[p.value[1] as number], yFmt)}<br/><b style="font-variant-numeric:tabular-nums">${labelOf(p)}</b>`,
     },
     xAxis: {
       type: "category",
@@ -623,7 +733,13 @@ export const backend: Backend = {
   mount(el, spec): RenderHandle {
     const chart = echarts.init(el, undefined, { renderer: "canvas" });
     let current = spec;
-    const draw = () => chart.setOption(buildOption(current, chart.getWidth(), chart.getHeight()), { notMerge: true });
+    const draw = () => {
+      const option = buildOption(current, chart.getWidth(), chart.getHeight());
+      chart.setOption(option, { notMerge: true });
+      // Where the plot starts inside the box, for layout checks (two charts of a pair share it).
+      const top = (option.grid as { top?: number } | undefined)?.top;
+      if (typeof top === "number") el.dataset.plotTop = String(top);
+    };
     draw();
     const handle: RenderHandle = {
       update(next) {

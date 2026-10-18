@@ -7,10 +7,12 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useKit, useSchema } from "@kit/state/context";
+import { Icon } from "@kit/ui/Icon";
 import { Popover } from "@kit/ui/Popover";
 import { toDisplay, suffix as unitSuffix } from "./display";
 import { Num } from "./Num";
-import { effectiveSettings, hasSettings, type ParamSettingKey, type ParamSettings as Settings } from "./paramSettings";
+import { effectiveSettings, hasSettings, schemaSettings, type ParamSettingKey, type ParamSettings as Settings } from "./paramSettings";
+import { Segmented } from "@kit/ui/Settings";
 import type { ParamDef } from "./schema";
 import "./param-settings.css";
 
@@ -56,8 +58,17 @@ export function rangeText(def: ParamDef<any>): string {
   return `${toDisplay(def.min, def.unit, d)}${sign} – ${toDisplay(def.max, def.unit, d)}${sign}`;
 }
 
-/** One setting's box (or the slider's select) for one parameter. */
-function SettingField({ def, which, user, idBase }: { def: ParamDef<any>; which: ParamSettingKey; user: Settings | undefined; idBase: string }) {
+/** "step 0.05 pp · drag 0.25 pp": the defaults a parameter sets for itself, said once per row of the table (the rest follow from the step). */
+export function defaultsText(def: ParamDef<any>): string {
+  const d = schemaSettings(def);
+  return `step ${deltaText(def, d.step)} · drag ${deltaText(def, d.dragPerHundredPx)}${d.slider ? "" : " · no slider"}`;
+}
+
+/**
+ * One setting's box (or the slider's choice) for one parameter. In the popover the slider
+ * is a select; in the table a three-way switch (default · on · off).
+ */
+function SettingField({ def, which, user, idBase, inTable }: { def: ParamDef<any>; which: ParamSettingKey; user: Settings | undefined; idBase: string; inTable?: boolean }) {
   const setParamSettings = useKit((s) => s.setParamSettings);
   const key = def.key;
   // What a blank box stands for: the value this setting resolves to without the person's own.
@@ -71,6 +82,19 @@ function SettingField({ def, which, user, idBase }: { def: ParamDef<any>; which:
   const aria = `${text.label} for ${def.label}`;
   if (which === "slider") {
     const v = user?.slider;
+    if (inTable)
+      return (
+        <Segmented<"" | "on" | "off">
+          ariaLabel={aria}
+          value={v == null ? "" : v ? "on" : "off"}
+          options={[
+            { value: "", label: "default", title: `The parameter's default: ${fallback.slider ? "on" : "off"}` },
+            { value: "on", label: "on" },
+            { value: "off", label: "off" },
+          ]}
+          onChange={(x) => setParamSettings(key, { slider: x === "" ? null : x === "on" })}
+        />
+      );
     return (
       <select id={id} className="k-ps-select" value={v == null ? "" : v ? "on" : "off"} aria-label={aria} onChange={(e) => setParamSettings(key, { slider: e.target.value === "" ? null : e.target.value === "on" })}>
         <option value="">default ({fallback.slider ? "on" : "off"})</option>
@@ -195,7 +219,7 @@ export function ParamSettingsButton({ k }: { k: string }) {
           setOpen((v) => !v);
         }}
       >
-        ⚙
+        <Icon name="settings" size={12} />
       </button>
       {open && (
         <Popover anchor={ref.current} beside={field} onClose={() => setOpen(false)} label={`Settings for ${def.label}`} width={360} id={`ps-pop-${k}`}>
@@ -249,7 +273,7 @@ export function ParamSettingsTable() {
         <thead>
           <tr>
             <th scope="col">Parameter</th>
-            <th scope="col">Range</th>
+            <th scope="col">Range and defaults</th>
             {cols.map((c) => (
               <th key={c} scope="col">
                 {SETTING_TEXT[c].label}
@@ -269,14 +293,17 @@ export function ParamSettingsTable() {
                   <span>{def.label}</span>
                   {def.short && <span className="sym">{def.short}</span>}
                 </th>
+                {/* The range, and the defaults said once: the boxes stay empty until a setting is the person's own. */}
                 <td className="k-ps-range">
-                  {rangeText(def)}
+                  <span>{rangeText(def)}</span>
+                  <span className="k-ps-defaults">{defaultsText(def)}</span>
                 </td>
                 {cols.map((c) => (
-                  <td key={c} data-label={SETTING_TEXT[c].label}>
-                    <SettingField def={def} which={c} user={user} idBase={`pst-${def.key}`} />
+                  <td key={c} data-label={SETTING_TEXT[c].label} className={c === "slider" ? "k-ps-slider" : undefined}>
+                    <SettingField def={def} which={c} user={user} idBase={`pst-${def.key}`} inTable />
                   </td>
                 ))}
+                {/* Reset shows only on a row that has settings of its own; the slot stays, so nothing moves. */}
                 <td className="k-ps-reset">
                   <button type="button" className="btn small quiet" disabled={!user} onClick={() => resetParamSettings(def.key)} aria-label={`Reset the settings for ${def.label}`}>
                     Reset

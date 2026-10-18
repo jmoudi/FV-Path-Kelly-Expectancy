@@ -61,6 +61,18 @@ export function probPct(v: number): string {
   return pct(v, 1 - Math.floor(Math.log10(p)));
 }
 
+/**
+ * A probability at a fixed precision, for a column of figures whose decimal points line
+ * up: 0.45 → "45.00%", 0.00051 → "0.05%", exactly zero "0.00%", and a value above zero
+ * that the precision would show as zero "< 0.01%", never "0.00%".
+ */
+export function fixedPct(v: number, dd = 2): string {
+  if (!Number.isFinite(v)) return formatNumber(v);
+  const least = Math.pow(10, -dd) / 100;
+  if (v > 0 && v < least / 2) return `< ${pct(least, dd)}`;
+  return pct(v, dd);
+}
+
 /** A time interval: sub-second in milliseconds, seconds otherwise. */
 export function fmtMs(ms: number): string {
   if (!Number.isFinite(ms)) return formatNumber(ms);

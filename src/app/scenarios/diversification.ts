@@ -5,7 +5,7 @@ import type { Params } from "@app/params/params";
 import { POLICY_IDS, type PolicyId } from "@app/model/policies";
 import { samplePaths, scheduleDistribution, summarize, type Distribution } from "@app/model/season";
 import { fig } from "./discussion";
-import { methodLabel, type Derived } from "./derived";
+import type { Derived } from "./derived";
 import { movesDeck, near } from "@kit/charts/scenario";
 import { pct, pct1, signedPct1, smallPct, x2 } from "@kit/charts/numbers";
 import { typographic } from "@kit/charts/format";
@@ -80,7 +80,7 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
   const shape: ChartSpec = {
     id: "div-shape",
     title: "Season end, cumulative",
-    subtitle: `x season end, tranche units · y share of seasons ending at or below · ${methodLabel(d.season.spread.dist.method)}`,
+    subtitle: "x season end, tranche units · y share of seasons ending at or below",
     kind: "xy",
     data: table(
       [f("end", "Season end, tranche units", "x"), ...ids.map((id) => f(id, P[id].label, "pct1")), f("halfFull", "Half the nights one name, whole tranche on it", "pct1"), f("halfCapped", `Half the nights one name, capped at 1/${k}`, "pct1")],
@@ -117,7 +117,7 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
     return {
       id: `div-fan-${id}`,
       title: `Railroad, ${pol.label}`,
-      subtitle: `x night · y tranche, start = 1 · ${p.fanPaths} sampled seasons · red = ruined · mean ${x2(s.mean)}`,
+      subtitle: `x night · y tranche, start = 1 · ${p.fanPaths} sampled seasons · red = ruined`,
       kind: "xy",
       data: table([f("night", "Night", "int"), ...paths.map((_, i) => f(`p${i}`, `Season ${i + 1}`, "x"))], rows),
       mark: "step",

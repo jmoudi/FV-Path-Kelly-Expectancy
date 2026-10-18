@@ -49,6 +49,15 @@ export function policyDetail(id: PolicyId, p: Params): string {
   return `${names}, ${Math.round(p.riskPerNight * 100)}% a night`;
 }
 
+/** The same parameters in the fewest words, for a narrow column: "3 names, 50%" (the share of the tranche at risk a night). */
+export function policyDetailShort(id: PolicyId, p: Params): string {
+  const k = Math.max(1, Math.round(p.names));
+  const names = `${k} name${k === 1 ? "" : "s"}`;
+  if (id === "coin") return "1 name, 100%";
+  if (id === "spread") return `${names}, 100%`;
+  return `${names}, ${Math.round(p.riskPerNight * 100)}%`;
+}
+
 export function policyLabel(id: PolicyId, p: Params): string {
   return `${POLICY_META[id].name} (${policyDetail(id, p)})`;
 }

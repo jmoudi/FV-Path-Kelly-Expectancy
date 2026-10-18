@@ -7,7 +7,7 @@ import { linspace } from "@kit/math/stats";
 import { fairRealizedRatio, movePdf, payoutFraction, ratioForLossRate, wingRates, type WingParams } from "@app/model/wing";
 import { partialShareOfBadSeasons, wingSeasonDistribution } from "@app/model/wingSeason";
 import { fig } from "./discussion";
-import { methodLabel, type Derived } from "./derived";
+import type { Derived } from "./derived";
 import { movesDeck, near } from "@kit/charts/scenario";
 import { pct, pct1, pct2, ratio, sigma, signedPct, signedPp, smallPct, x2 } from "@kit/charts/numbers";
 import type { Action, ScenarioView } from "./types";
@@ -73,7 +73,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
   const density: ChartSpec = {
     id: "wing-density",
     title: "The realized move against the short wing",
-    subtitle: `x move toward the short strike, priced sigmas · y density (log) · ${dist} realized at ${ratio(p.realizedRatio)} the priced sigma${empiricalWanted && !haveMoves ? " · no moves imported yet, showing the Normal" : ""}`,
+    subtitle: `x move toward the short strike, priced sigmas · y density (log) · ${dist}${empiricalWanted && !haveMoves ? " · no moves imported yet, showing the Normal" : ""}`,
     kind: "xy",
     data: table([f("x", "Move toward the short strike, priced sigmas", "x2"), f("density", "Density", "num"), f("payout", "Payout per unit width", "pct")], densRows),
     mark: "area",
@@ -96,7 +96,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
   const payout: ChartSpec = {
     id: "wing-payout",
     title: "Payout per unit width",
-    subtitle: "x move toward the short strike, priced sigmas · y payout per unit width · 100% = the full loss the binary model assumes",
+    subtitle: "x move toward the short strike, priced sigmas · y payout per unit width · 100% = full loss",
     kind: "xy",
     data: table([f("x", "Move toward the short strike, priced sigmas", "x2"), f("payout", "Payout per unit width", "pct")], rampRows),
     mark: "line",
@@ -244,7 +244,8 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
   const wingSeason: ChartSpec = {
     id: "wing-season",
     title: "Where a season ends when the wing pays out in part",
-    subtitle: `x season end, tranche units · y share of seasons ending at or below · whole tranche on each of ${p.nights} events · realized ÷ priced solved per width so every wing has the deck's effective rate ${pct2(q)} · ${methodLabel(yoursW.dist.method)}`,
+    subtitle: "x season end, tranche units · y share of seasons ending at or below",
+    caption: `Each width's realized ÷ priced is solved to give the deck's effective rate ${pct2(q)}.`,
     kind: "xy",
     data: table([f("end", "Season end, tranche units", "x"), ...seasonByWidth.map((s, i) => f(`w${i}`, `${sigma(s.width)} wide`, "pct1"))], seasonRows),
     mark: "step",

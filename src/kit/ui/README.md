@@ -9,17 +9,17 @@ and never imports the app's types.
 | Section skeleton | `SectionFrame.tsx` | eyebrow, chips (`LinkItem[]`), title, lede, claim, answers (`FigureItem[]`), actions, inputs (nodes), primary and secondary charts (nodes), panels (`PanelTab[]`) |
 | Answer strip, figure | `AnswerStrip.tsx` | `FigureItem[]`; the first is the hero, the rest open with "+N more figures" |
 | Footer line and tabbed panel | `TabbedPanel.tsx` | `PanelTab[]` (id, label, count, render); fixed height, scrolls inside |
-| View page | `ViewFrame.tsx` | eyebrow, title, prev/next (`LinkItem`), main and aside nodes |
-| Comparison grid | `DeskGrid.tsx` | `GridColumn[]` (a `tone` is the dot before the name), `GridGroup[]` of `GridRow`s with cells by column id; one hero row per group; the highlighted column in ink, the rest in ink-2 |
+| View page | `ViewFrame.tsx` | eyebrow, title, prev/next (`LinkItem`), main and aside nodes; the aside sticks beside the charts only while it fits the window, and is never a scroll box |
+| Comparison grid | `DeskGrid.tsx` | `GridColumn[]` (a `tone` is the dot before the name, inline so a wrapped name keeps it; `subShort` replaces `sub` on a narrow screen), `GridGroup[]` of `GridRow`s with cells by column id; one hero row per group; the highlighted column in ink, the rest in ink-2; each cell from its decimal point on sits in a fixed slot, so a column's decimal points stack |
 | Menus | `Menu.tsx` | `MenuButton` (portal panel, closes on Escape, outside click, hashchange), `LinkGroups`, `MenuItems` |
 | Settings | `Settings.tsx` | `SettingsLayout`, `SettingsGroup`, `SettingRow`, `KeyLegend` (`KeyBinding[]`), `Segmented` |
 | Chart frame | `../charts/ChartFrame.tsx` | title, subtitle, tools, tag, stories, story note, a plot box of fixed height, overlay, footer |
 | Section | `Section.tsx` | one `ScenarioView`, through `SectionFrame` and the adapters in `scenarioProps.tsx` |
 | View page | `ViewPage.tsx` | the `ScenarioView`s and a view id; `notFound` (a node) for an unknown id |
-| Chart host | `ChartHost.tsx`, `Authoring.tsx`, `TableView.tsx` | one `ChartSpec`: the backend, the editor in ⚙, the ⊞ table, stories (the badge from `copy.storyMoved`) |
+| Chart host | `ChartHost.tsx`, `Authoring.tsx`, `TableView.tsx` | one `ChartSpec`: the backend, the editor in ⚙, the ⊞ table, stories (the badge from `copy.storyMoved`; the answer shown whole); `legendPeer` (set by `Section` for two charts side by side) keeps the neighbour's legend rows free above the plot |
 | Full and quick settings | `SettingsBody.tsx` | `FullSettings` takes a `data` slot and lists the schema's advanced tier and, under Parameters, every numeric parameter's settings (`kit/inputs/ParamSettings.tsx`); `QuickSettings` holds the everyday settings and the resets |
 | Dialogs | `Dialogs.tsx` | `Modal`, import and export, the settings dialog (`guideHref` links a guide page) |
-| Guide page | `GuideFrame.tsx`, `guide.css` | `title`, `lede`, `sections: GuideSection[]` (blocks: paragraph, sub-heading, list, table, key rows; inline `code`, **term**, [label](#href)), `current` (the section in the address, scrolled to), `page` (links are `#<page>/<id>`). A rail of section links that highlights the one being read; a contents list above the text on narrow screens |
+| Guide page | `GuideFrame.tsx`, `guide.css` | `title`, `lede`, `sections: GuideSection[]` (blocks: paragraph, sub-heading, list, table, key rows; inline `code` (a quote with a space is set without the chip), **term**, [label](#href), `{icon:name}` for a drawn tool icon), `current` (the section in the address, scrolled to), `page` (links are `#<page>/<id>`). A rail of section links that highlights the one being read; a contents list above the text on narrow screens |
 | Routes | `route.ts` | a `RouteConfig` (`home`, `pages`, `aliases`, `sectionsPage`); `#view/<id>` and `#s-<id>` built in; `#<page>/<part>` puts the part in `route.section` |
 | Shell hooks | `Shell.tsx` | `useScrollSpy(ids, enabled, prefix = "s-")`, `useViewKeys` (`[` and `]` between views), `CrashScreen` |
 | Copy | `copy.ts` | `KitCopy`: every sentence a frame says on its own; neutral defaults, the app overrides them |

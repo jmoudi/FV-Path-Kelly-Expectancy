@@ -112,7 +112,8 @@ export function buildCorrelation(p: Params, d: Derived, _data: Datasets): Scenar
   const shareChart: ChartSpec = {
     id: "cor-shock-share",
     title: "Season ruin as more nights carry the shock",
-    subtitle: `x share of shocked nights · y P(ruin) per season, whole tranche · at ${ratio(p.volShock)} priced sigma, directions independent`,
+    subtitle: "x share of shocked nights · y P(ruin) per season, whole tranche",
+    caption: `At ${ratio(p.volShock)} the priced sigma, directions independent.`,
     kind: "xy",
     data: table([f("share", "Share of shocked nights", "pct"), f("ruin", "Ruin per season, whole tranche", "pct3")], shareRows),
     mark: "line",
