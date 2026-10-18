@@ -37,8 +37,9 @@ inputs), `Segmented` (a radio-group switch with an optional hint line per option
 
 ## Styles
 
-The frame's classes are `dkb-*`, `lv-*` and `seg-*`; they live in `src/ui/deck.css`
-for now (the restructure moves the sheet next to these files). Sizes come from the
+The frame's classes are `dkb-*`, `lv-*` and `seg-*`; they live in `deck.css` beside
+these files, imported by the module that mounts the deck (in this app
+`src/app/deck/DeckBar.tsx`). Sizes come from the
 theme's type tokens (`--fs-label`, `--fs-ui`, `--fs-body`, `--fs-h`, `--fs-kpi`) and
 colours from its colour tokens.
 

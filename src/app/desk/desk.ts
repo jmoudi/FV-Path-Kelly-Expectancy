@@ -1,7 +1,7 @@
 /**
  * The Desk: given my book, what happens? A policy comparison grid for one season
  * and N seasons, the sizing line, the calibration verdict and the market state.
- * Pure data; src/ui/DeskPage.tsx renders it.
+ * Pure data; src/app/desk/DeskPage.tsx renders it.
  */
 import { eventsToResolve } from "@app/model/calibration";
 import type { Params } from "@app/params/params";

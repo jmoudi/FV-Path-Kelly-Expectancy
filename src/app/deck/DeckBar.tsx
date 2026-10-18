@@ -5,7 +5,7 @@ import { useStore } from "@app/store";
 import type { DeckView } from "./deckView";
 import "@kit/ui/deck/deck.css";
 
-/** The deck sits on every page except Settings. Read from the hash the way src/ui/route.ts does. */
+/** The deck sits on every page except Settings. Read from the hash the way src/kit/ui/route.ts does. */
 function onSettingsPage(): boolean {
   return typeof location !== "undefined" && location.hash.replace(/^#/, "") === "settings";
 }

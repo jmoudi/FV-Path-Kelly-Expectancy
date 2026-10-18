@@ -2,7 +2,7 @@ import type { NumberFormat } from "./spec";
 
 /**
  * Number formatting for charts, tables and tick labels. It prints exactly what the
- * app's formatter prints (src/viewmodel/derived.ts): the same rounding per format,
+ * text helpers print (numbers.ts): the same rounding per format,
  * and the typographic minus U+2212, never the hyphen JavaScript emits.
  */
 export const MINUS = "−";

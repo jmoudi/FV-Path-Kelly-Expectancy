@@ -10,7 +10,17 @@ Off-thread build scaffolding, independent of what is built.
   request was made; `settledSince(t)` answers "has a build requested after t rendered?",
   which is what a frame-locked sweep waits on.
 
-What the app supplies: the `send` that posts to its worker (or runs inline), and the
-place that marks an answer rendered (after the commit, in the next animation frame).
-In this app: `src/ui/useBuild.ts`, which also sends `only` (the scenarios on screen)
-while a sweep runs.
+- `worker.ts`: `defineBuildWorker(build)` for the worker entry: it answers each
+  request `{ id, input, only }` with `build(input, { only })`, or with the error.
+- `useBuild.ts`: `useBuild(input, { createWorker, build, settled })` puts the two above
+  together for a page: one request in flight through the queue, `only` (the scenarios on
+  screen, `sweepScope`) while a sweep runs, partial answers merged into the last full
+  one (`mergeResult`, both in `scope.ts`), an inline fallback when the worker does not
+  answer in time, and each shown answer marked rendered after the commit.
+
+What the app supplies: a worker entry that calls `defineBuildWorker`, the same build
+function for the inline fallback, a `SettleTracker`, and `createWorker` written as
+`() => new Worker(new URL("./worker.ts", import.meta.url), { type: "module" })` with a
+relative literal (Vite bundles a worker only from that form). The build's output is
+`{ scenarios, partial? }` plus whatever else the app builds. In this app:
+`src/app/build.ts` and `src/app/worker.ts`.

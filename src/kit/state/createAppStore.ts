@@ -6,7 +6,7 @@
  * schema, the defaults, the presets and the sanitizers come in the config. The app
  * instantiates it once (src/app/store.ts).
  *
- * This file is src/state/store.ts with Params -> P, Datasets -> D and its module-level
+ * This file is the former src/state/store.ts with Params -> P, Datasets -> D and its module-level
  * constants moved into the config. Behaviour is unchanged.
  */
 import { create, type StoreApi, type UseBoundStore } from "zustand";
