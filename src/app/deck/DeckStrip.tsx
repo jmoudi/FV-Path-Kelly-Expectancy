@@ -1,4 +1,4 @@
-import { useStore } from "../../state/store";
+import { useStore } from "@app/store";
 import { SweepStrip } from "../../ui/SweepStrip";
 
 /**

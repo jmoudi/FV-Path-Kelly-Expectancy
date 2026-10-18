@@ -6,7 +6,7 @@ import { useMemo } from "react";
 import type { DeckProps, DrawerSection, InputGroup } from "@kit/ui/deck";
 import { PARAM_DEFS } from "@app/params/schema";
 import type { Params } from "@app/params/params";
-import { useStore } from "../../state/store";
+import { useStore } from "@app/store";
 import { Help } from "../../ui/Help";
 import { ParamInput } from "../../ui/ParamInput";
 import type { DeckView } from "./deckView";

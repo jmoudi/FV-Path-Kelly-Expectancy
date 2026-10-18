@@ -4,7 +4,7 @@ import { resolveAxes } from "@kit/charts/resolve";
 import { fieldFormat, numericFields, toCsv, type BackendId, type ChartSpec, type Emphasis, type MarkType, type NumberFormat, type ScaleType, type SpecOverride } from "@kit/charts/spec";
 import { roleColor } from "@kit/charts/theme";
 import type { Unit } from "@kit/inputs/schema";
-import { useStore } from "../state/store";
+import { useStore } from "@app/store";
 import { copyText, saveText } from "./download";
 import { Num } from "./Num";
 

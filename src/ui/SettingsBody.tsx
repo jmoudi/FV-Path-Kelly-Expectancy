@@ -3,7 +3,7 @@ import { BACKEND_INFO } from "@kit/charts/registry";
 import type { BackendId } from "@kit/charts/spec";
 import { KeyLegend, Segmented, SettingRow, SettingsGroup, SettingsLayout, type KeyBinding } from "@kit/ui/Settings";
 import { PARAM_DEFS } from "@app/params/schema";
-import { useStore } from "../state/store";
+import { useStore } from "@app/store";
 import { DataBody, ImportExportBody } from "./Dialogs";
 import { Num } from "./Num";
 import { ParamInput } from "./ParamInput";

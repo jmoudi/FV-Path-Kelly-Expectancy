@@ -1,7 +1,7 @@
 import { LinkedValue } from "@kit/ui/deck";
 import { lossRateFromPClean, pCleanFromLossRate } from "@app/model/binary";
 import { POLICY_META } from "@app/model/policies";
-import { useStore } from "../../state/store";
+import { useStore } from "@app/store";
 import { Help } from "../../ui/Help";
 import { pct } from "@kit/charts/numbers";
 

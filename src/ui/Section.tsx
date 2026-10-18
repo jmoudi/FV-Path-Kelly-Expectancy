@@ -2,7 +2,7 @@ import { useState } from "react";
 import { kpiItem, sectionNumber, viewChips } from "@app/frames";
 import type { PanelTab } from "@kit/ui/TabbedPanel";
 import { SectionFrame } from "@kit/ui/SectionFrame";
-import { useStore } from "../state/store";
+import { useStore } from "@app/store";
 import type { ChartSpec } from "@kit/charts/spec";
 import type { Action, Note, ScenarioView } from "@app/scenarios/types";
 import { viewOfChart } from "@app/scenarios/types";

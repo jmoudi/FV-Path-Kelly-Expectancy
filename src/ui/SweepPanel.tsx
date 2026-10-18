@@ -3,7 +3,7 @@ import { perHundredPxOf } from "./NumberField";
 import { inputConfig, isSweepable } from "@kit/inputs/schema";
 import { PARAM_BY_KEY, PARAM_DEFS, type ParamDef } from "@app/params/schema";
 import type { Params } from "@app/params/params";
-import { useStore } from "../state/store";
+import { useStore } from "@app/store";
 import { BUILTIN_ANCHORS, clonePreset, isBuiltinAnchor, type AnchorRef, type BuiltinAnchor, type SweepKind, type SweepPreset, type SweepRange, type SweepRangeMode, type SweepSpot } from "@kit/sweeps/types";
 import { Num } from "./Num";
 import { describeFor } from "./useSweeps";

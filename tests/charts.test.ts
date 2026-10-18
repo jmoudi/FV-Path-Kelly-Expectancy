@@ -5,7 +5,7 @@ import { applyOverride, f, sanitizeOverride, table, type ChartSpec, type Story }
 import { breakEvenLossRate } from "@app/model/binary";
 import { DEFAULT_PARAMS } from "@app/params/params";
 import { EMPTY_DATASETS } from "@app/params/datasets";
-import { useStore } from "../src/state/store";
+import { useStore } from "@app/store";
 import { buildAll } from "@app/scenarios";
 import { fmtMs, pct1, signedPct1, signedPp, smallPct, x2 } from "@kit/charts/numbers";
 import { formatNumber, MINUS } from "@kit/charts/format";

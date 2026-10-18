@@ -1,14 +1,12 @@
 import { useEffect, useMemo } from "react";
-import { sweepContext, sweepFormat } from "@app/params/sweepAnchors";
 import type { TrackBand } from "@kit/inputs/SyntheticNumber";
 import { committed, due, RUNNER_DEFAULTS, skipped, startCursor, type Cursor } from "@kit/sweeps/runner";
-import { isSweepable } from "@kit/inputs/schema";
-import { PARAM_BY_KEY } from "@app/params/schema";
 import type { Params } from "@app/params/params";
-import { registerSweepPlanner, useStore } from "../state/store";
-import { describePreset, nextIndex, planSweep } from "@kit/sweeps/engine";
+import { useStore } from "@app/store";
+import { nextIndex } from "@kit/sweeps/engine";
+import { describeWith, planWith } from "@kit/sweeps/adapter";
+import { SWEEPS } from "@app/sweeps";
 import type { SweepPlan, SweepPreset } from "@kit/sweeps/types";
-import { buildSettled } from "./useBuild";
 
 const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 const mod = mac ? "⌘" : "Ctrl";
@@ -25,24 +23,13 @@ export const HOTKEY_HINTS = {
 
 /** Resolve a preset for one input now: its anchors read the parameters and the deck figures of the last build. */
 export function planFor(key: string, preset: SweepPreset, params: Params, at?: { origin: number; current: number }): SweepPlan | null {
-  const def = PARAM_BY_KEY[key];
-  if (!def || !isSweepable(def)) return null;
-  const value = params[key as keyof Params];
-  if (typeof value !== "number") return null;
-  const origin = at?.origin ?? value;
-  return planSweep(preset, sweepContext(def, { params, origin, current: at?.current ?? value, deck: buildSettled.latest?.deck ?? null }));
+  return planWith(SWEEPS, key, preset, params, at);
 }
 
 /** "loops from optimistic 2.52% to break-even 3.38%, step 0.05 pp every 400 ms (18 values)", for this input. */
 export function describeFor(key: string, preset: SweepPreset, params: Params): string {
-  const def = PARAM_BY_KEY[key];
-  const value = params[key as keyof Params];
-  if (!def || !isSweepable(def) || typeof value !== "number") return "";
-  return describePreset(preset, sweepContext(def, { params, origin: value, deck: buildSettled.latest?.deck ?? null }), sweepFormat(def));
+  return describeWith(SWEEPS, key, preset, params);
 }
-
-// Runs are planned when they start, by the store, through this.
-registerSweepPlanner((key, preset, at) => planFor(key, preset, useStore.getState().params, at));
 
 function holdOf(plan: SweepPlan, index: number): number {
   return plan.holds[Math.max(0, index)] ?? plan.holds[0] ?? 400;
@@ -60,7 +47,7 @@ const cursors = new Map<string, { cursor: Cursor; startedAt: number }>();
 export function useSweepEngine() {
   useEffect(() => {
     let raf = 0;
-    const settledSince = (t: number) => buildSettled.settledSince(t);
+    const settledSince = (t: number) => SWEEPS.settledSince(t);
     const tick = () => {
       raf = requestAnimationFrame(tick);
       const s = useStore.getState();

@@ -8,6 +8,11 @@ import "@kit/ui/kit.css";
 import { THEME } from "@kit/charts/theme";
 import { registerFigures } from "@kit/charts/figures/registry";
 import { FIGURES } from "@app/figures";
+import { KitProvider } from "@kit/state/context";
+import { KIT_COPY } from "@app/copy/kitCopy";
+import { SCHEMA } from "@app/params/schema";
+import { useStore } from "@app/store";
+import { SWEEPS } from "@app/sweeps";
 import { App } from "./ui/App";
 
 // The palette lives in one place (charts/theme.ts); the CSS reads it from these variables.
@@ -26,6 +31,8 @@ registerFigures(FIGURES);
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <KitProvider store={useStore} schema={SCHEMA} sweeps={SWEEPS} copy={KIT_COPY}>
+      <App />
+    </KitProvider>
   </React.StrictMode>,
 );

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { sectionNumber, viewMenu, viewOrder } from "@app/frames";
 import { LinkGroups, MenuButton, MenuItems } from "@kit/ui/Menu";
-import { useStore } from "../state/store";
+import { useStore } from "@app/store";
 import { DeckBar } from "./DeckBar";
 import { DeskPage } from "./DeskPage";
 import { DataDialog, ImportExportDialog, SettingsDialog } from "./Dialogs";
@@ -9,7 +9,8 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import { setViewOrder, stepView, useRoute, type Route } from "./route";
 import { Section } from "./Section";
 import { FullSettings } from "./SettingsBody";
-import { useBuild } from "./useBuild";
+import { useBuild } from "@kit/build/useBuild";
+import { BUILD } from "@app/build";
 import { isEditableTarget, useSweepEngine, useSweepHotkeys } from "./useSweeps";
 import { ViewPage } from "./ViewPage";
 import type { ScenarioView } from "@app/scenarios/types";
@@ -128,7 +129,8 @@ export function App() {
   const params = useStore((s) => s.params);
   const datasets = useStore((s) => s.datasets);
   const resetEverything = useStore((s) => s.resetEverything);
-  const { result, pending, error } = useBuild(params, datasets);
+  const input = useMemo(() => ({ params, datasets }), [params, datasets]);
+  const { result, pending, error } = useBuild(input, BUILD);
   const [dialog, setDialog] = useState<Dialog>(null);
   const route = useRoute();
   const scenarios = useMemo(() => result?.scenarios ?? [], [result]);

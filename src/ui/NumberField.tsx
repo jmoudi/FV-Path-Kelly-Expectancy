@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { SyntheticNumber } from "@kit/inputs/SyntheticNumber";
 import type { InputConfig, Unit } from "@kit/inputs/schema";
-import { useStore } from "../state/store";
+import { useStore } from "@app/store";
 import { useSweepTrack } from "./useSweeps";
 
 export interface NumberFieldProps {

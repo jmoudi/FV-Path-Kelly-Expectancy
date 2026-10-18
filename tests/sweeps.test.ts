@@ -295,7 +295,7 @@ describe("store: sweep runs", () => {
   it("a run starts from the current value; stop keeps the value; ↺ and undo put back the pre-sweep value; ticks are not saved", async () => {
     const storage = memoryStorage();
     vi.stubGlobal("localStorage", storage);
-    const { useStore } = await import("../src/state/store");
+    const { useStore } = await import("@app/store");
     await import("../src/ui/useSweeps"); // registers the planner
     const s = () => useStore.getState();
     s().setActiveInput("lossRate");
@@ -325,7 +325,7 @@ describe("store: sweep runs", () => {
   it("a reload in the middle of a run restores the pre-sweep value", async () => {
     const stored = { version: 4, params: { ...P, lossRate: 0.0322, gain: 0.04 }, runs: [{ key: "lossRate", presetId: "optimistic-to-break-even", origin: 0.0281 }] };
     vi.stubGlobal("localStorage", memoryStorage({ "tranche-replay:v1": JSON.stringify(stored) }));
-    const { useStore } = await import("../src/state/store");
+    const { useStore } = await import("@app/store");
     expect(useStore.getState().params.lossRate).toBe(0.0281);
     expect(useStore.getState().params.gain).toBe(0.04);
     expect(useStore.getState().runs).toEqual({});
@@ -333,7 +333,7 @@ describe("store: sweep runs", () => {
 
   it("a hand edit of the swept input stops its run", async () => {
     vi.stubGlobal("localStorage", memoryStorage());
-    const { useStore } = await import("../src/state/store");
+    const { useStore } = await import("@app/store");
     await import("../src/ui/useSweeps");
     const s = () => useStore.getState();
     s().startSweep("lossRate", "around-current");

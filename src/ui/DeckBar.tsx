@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useDeckProps } from "@app/deck/useDeckProps";
 import { Deck } from "@kit/ui/deck";
-import { useStore } from "../state/store";
+import { useStore } from "@app/store";
 import type { DeckView } from "@app/deck/deckView";
 import "./deck.css";
 

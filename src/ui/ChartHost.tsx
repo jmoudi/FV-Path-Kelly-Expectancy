@@ -5,7 +5,7 @@ import { FigureFrame } from "@kit/charts/figures/FigureFrame";
 import { loadBackend, BACKEND_INFO } from "@kit/charts/registry";
 import { applyOverride, toCsv, type BackendId, type ChartSpec, type SpecOverride, type Story } from "@kit/charts/spec";
 import { ChartFrame } from "@kit/charts/ChartFrame";
-import { useStore } from "../state/store";
+import { useStore } from "@app/store";
 import { movedBadge } from "@app/scenarios/derived";
 import { Authoring } from "./Authoring";
 import { saveText } from "./download";
