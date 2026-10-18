@@ -16,7 +16,8 @@ Off-thread build scaffolding, independent of what is built.
   together for a page: one request in flight through the queue, `only` (the scenarios on
   screen, `sweepScope`) while a sweep runs, partial answers merged into the last full
   one (`mergeResult`, both in `scope.ts`), an inline fallback when the worker does not
-  answer in time, and each shown answer marked rendered after the commit.
+  answer in time, and each shown answer marked rendered after the commit and announced
+  as `build:settled` on the event bus.
 
 What the app supplies: a worker entry that calls `defineBuildWorker`, the same build
 function for the inline fallback, a `SettleTracker`, and `createWorker` written as

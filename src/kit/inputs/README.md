@@ -54,4 +54,4 @@ these; the two share only the schema's range).
 
 What `SyntheticNumber` needs: value, bounds, unit, `onChange`, and optionally `active`,
 `onActivate`, `run`, `band`, `tick`, `dragScale`. What the app supplies for the rest:
-one `Schema<P>`, given to `<KitProvider schema>` (in this app `src/app/params/schema.ts`).
+one `Schema<P>`, given to `<KitProvider schema>` (in this app `src/app/data/schema.ts`).

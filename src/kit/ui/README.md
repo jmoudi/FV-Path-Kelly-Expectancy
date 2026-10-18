@@ -20,8 +20,9 @@ and never imports the app's types.
 | Full and quick settings | `SettingsBody.tsx` | `FullSettings` takes a `data` slot and lists the schema's advanced tier and, under Parameters, every numeric parameter's settings (`kit/inputs/ParamSettings.tsx`); `QuickSettings` holds the everyday settings and the resets |
 | Dialogs | `Dialogs.tsx` | `Modal`, import and export, the settings dialog (`guideHref` links a guide page) |
 | Guide page | `GuideFrame.tsx`, `guide.css` | `title`, `lede`, `sections: GuideSection[]` (blocks: paragraph, sub-heading, list, table, key rows; inline `code`, **term**, [label](#href)), `current` (the section in the address, scrolled to), `page` (links are `#<page>/<id>`). A rail of section links that highlights the one being read; a contents list above the text on narrow screens |
-| Routes | `route.ts` | a `RouteConfig` (`home`, `pages`, `aliases`, `sectionsPage`); `#view/<id>` and `#s-<id>` built in; `#<page>/<part>` puts the part in `route.section` |
-| Shell hooks | `Shell.tsx` | `useScrollSpy(ids, enabled, prefix = "s-")`, `useViewKeys` (`[` and `]` between views), `CrashScreen` |
+| Routes | `route.ts` | a `RouteConfig` (`home`, `pages`, `aliases`, `sectionsPage`); `#view/<id>` and `#s-<id>` built in; `#<page>/<part>` puts the part in `route.section`. `useRoute` (called once, by the shell) emits `route:changed` on the event bus |
+| Shell hooks | `Shell.tsx` | `useScrollSpy(ids, enabled, prefix = "s-")`, `useViewKeys(blocked, order)` (`[` and `]` between the views of `order`), `CrashScreen` |
+| Notices | `Notices.tsx`, `notices.css` | nothing: it shows every `notice` on the event bus bottom-right (6 s, click or Escape dismisses, hover holds, the same `id` replaces, opacity only); mount it once |
 | Copy | `copy.ts` | `KitCopy`: every sentence a frame says on its own; neutral defaults, the app overrides them |
 
 Styles live in `kit.css` and read only the theme's tokens: `--fs-title`, `--fs-view`,
@@ -47,4 +48,4 @@ order, so it waits for its own screenshot pass.
 
 To use them in another explainer: define the tokens (copy the `:root` block of
 `src/kit/ui/theme.css`), import `kit.css` after it, and write adapters that turn your
-view-model into these props (this app's are in `src/app/`).
+view-model into these props (this app's are in `src/app/view/`).
