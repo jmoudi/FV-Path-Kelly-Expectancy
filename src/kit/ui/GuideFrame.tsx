@@ -146,9 +146,26 @@ export function GuideFrame({ title, lede, sections, current, page = "guide" }: G
   const active = spied || current || ids[0];
   const href = (id: string) => `#${page}/${id}`;
 
-  // A section in the address: scroll to it (also on first load).
+  // A section in the address: scroll to it (also on first load). A section filled after
+  // the first paint (a document read at run time) can leave the page too short to land
+  // on, so land again as the page grows, until the reader moves or 10 s pass.
   useEffect(() => {
-    if (current) document.getElementById(`g-${current}`)?.scrollIntoView({ block: "start" });
+    const el = current ? document.getElementById(`g-${current}`) : null;
+    if (!el) return;
+    const land = () => el.scrollIntoView({ block: "start" });
+    land();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(land);
+    ro?.observe(el.closest(".k-guide") ?? el);
+    const moves = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+    let timer = 0;
+    const quit = () => {
+      ro?.disconnect();
+      window.clearTimeout(timer);
+      for (const t of moves) window.removeEventListener(t, quit, true);
+    };
+    for (const t of moves) window.addEventListener(t, quit, { capture: true, passive: true });
+    timer = window.setTimeout(quit, 10_000);
+    return quit;
   }, [current]);
 
   return (

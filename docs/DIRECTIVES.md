@@ -132,7 +132,7 @@ The owner's words, quoted exactly (… marks a cut; spelling as written), then �
 54. “if a replayer-setting specifies that the step is 0.25% … the replayer uses its own value”\
     → The replayer never reads parameter settings; a test holds it to that.
 55. “implement documentation about how the GUI works in a convenient locations.”\
-    → The [Guide](#guide), written in `src/app/copy/guide.ts`.
+    → The [Guide](#guide), written in `src/app/data/copy/guide.ts`.
 56. “I mean some internal small docs view.”\
     → A page in the top bar, not tooltips.
 57. “No math/finance concepts in that except where very pertinent to app concerns.”\
@@ -190,7 +190,7 @@ What the words imply without saying it; every later change should pass these.
 
 ### Words and type
 
-- **Vocabulary and policy names.** Coin, Spread, Spread + reserve, named in one file, `src/app/model/policies.ts`; Expected value per season, Premium over fair per event, Log growth of surviving paths beside P(ruin), Median growth per season; one number formatter.\
+- **Vocabulary and policy names.** Coin, Spread, Spread + reserve, named in one file, `src/app/data/policies.ts`; Expected value per season, Premium over fair per event, Log growth of surviving paths beside P(ruin), Median growth per season; one number formatter.\
   *Why:* A/B/C meant nothing; “edge per season” contradicted the thesis. *Not taken:* lettered policies with a legend.
 - **The type scale.** Nine tokens: 36 · 30 · 20 · 17 · 15 · 13 · 11.5, a hero figure at 28, other figures at 20; weights 400/500/600.\
   *Why:* nearly all text sat between 10.5 and 14 px. *Not taken:* sizes per component.

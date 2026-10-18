@@ -124,6 +124,11 @@ swapped without touching the others.
   (`#guide/keys` is every shortcut in one table). A rail of section links marks the one
   being read. Linked from the top bar, the quick-settings dialog and the Settings page.
   Its text is `src/app/data/copy/guide.ts`; change it with the GUI.
+- **Directives.** An eleventh Guide section, `#guide/directives`, renders
+  `docs/DIRECTIVES.md` (the owner's directives, the design they imply, the decisions
+  taken, the open questions), which `scripts/directives.mjs` copies to
+  `public/directives.md` on every build and dev start; the page fetches it once per
+  load (Reload reads it again) and never bundles its text.
 - **Deck.** Anchored under the top bar on every page except Settings and the Guide, two rows when
   reduced. Row 1: eight fields in three groups set apart by 40px and a hairline (Per
   event: loss rate q, gain b, optimistic loss rate · Per season: nights n, names a

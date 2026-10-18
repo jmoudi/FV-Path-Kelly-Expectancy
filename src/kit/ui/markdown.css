@@ -67,8 +67,9 @@
 .k-md ol {
   padding-left: 2.4em;
 }
+/* Numbers in the page are the text face with tabular figures, as the Guide's own. */
 .k-md ol > li::marker {
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--fs-label);
   color: var(--muted);
 }
