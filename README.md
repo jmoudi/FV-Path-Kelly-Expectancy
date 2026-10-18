@@ -42,7 +42,9 @@ be swapped without touching the others.
 | Figures | `src/charts/figures/` | Charts of kind `figure` (the railroad schematic, the season calendar) are drawn by a React SVG component from the registry in `index.ts`, sized to the width the host gives them, in the theme's colours. They are not backend-switchable: ⊞ shows their data table and ⚙ offers only the height. |
 | Authoring | `src/ui/Authoring.tsx`, stories in each spec | A story is a trader's question ("Half my nights have one name", "The chain is right: q = break-even") with a one-line answer; when it moves the deck it carries a badge ("moves deck: q 2.94% → 2.52%"). Display choices (axis scales, backends, zooms) are not stories; they live in ⚙, which edits the spec by hand (backend, mark, axis scale and domain in the axis's own units, x field, series visibility, mark and emphasis, extra columns, legend, height) and stores only the diff, keyed by chart id. |
 | State | `src/state/store.ts` | Parameters, imported data, chart edits, default backend, and the snapshot of parameters a story moved. Only one deck-moving story is active at a time: applying one turns the other off and restores its parameters. Validated on load, persisted locally, exported and imported as one JSON file (version 4). `#reset` in the address clears it. |
-| UI | `src/ui/` | Control deck, section layout, chart host, tables, dialogs. One dark theme, graphite, with three policy hues and two status colours. |
+| Kit frames | `src/kit/ui/`, `src/kit/charts/` | Generic layout pieces that know nothing about tranches and take what they show through props: the section skeleton (`SectionFrame`), the answer strip, the footer line and its tabbed panel, the view page (`ViewFrame`), the comparison grid (`DeskGrid`), portal menus, settings groups and the hotkey legend, and the chart frame (`ChartFrame`: borderless, fixed plot box). Their CSS is `src/kit/ui/kit.css`; it reads only the theme's tokens. See `src/kit/ui/README.md`. |
+| App adapters | `src/app/` | Turn this app's view-model into the kit's props: KPIs into figures, sections into chips and the Views menu, the DeskView into the grid (`src/app/desk/grid.ts`), a story's snapshot into its "moves deck" badge. |
+| UI | `src/ui/` | The pages (Desk, Explain, view, Settings), the chart host, tables, dialogs, the deck. One dark theme, graphite (`theme.css`: colour tokens and a token-only type scale), with three policy hues and two status colours. |
 
 ## Using the app
 
@@ -52,14 +54,23 @@ be swapped without touching the others.
   for the active input, and the toggle. The full deck (Full deck ▾) is two columns:
   inputs as titled sections with help and the sweep presets on the left, the figures
   as a table and the definitions on the right.
-- **Tour** is the guided single page: each section has a functional title, a one-line
-  lede, the claim it defends in a boxed aside, an inputs bar, two headline figures, the
-  primary chart, secondary charts, and expanders for tables, notes and the
-  quoted-versus-recomputed figures.
-- **Views** are the same charts split into 19 responsibilities (season outcomes,
-  sizing grid, confidence band, candidate rates, a season by the calendar, refilling
-  from NAV, …), each on its own page with the context beside it. Open them from the Views menu, the chips next to a section title,
-  the ↗ on any chart, or Alt+← / Alt+→.
+- **Desk** (`#desk`, the landing page) answers "given my book, what happens?": the
+  three policies side by side for one season and for N seasons (mean, median, 10th
+  percentile, P(below threshold), ruin; each row links to the view that explains it),
+  the sizing heatmap with your cell outlined beside the robust risk, the one-line
+  calibration verdict, and the market switch.
+- **Explain** (`#explain`; `#tour` and `#s-<section>` still work) is the guided single
+  page. Each section, without boxes: an eyebrow with its number and its views, the
+  title, the question it answers with the claim as a narrow aside beside it, two or
+  three numbers inline, the section's own inputs as an open row above the chart they
+  drive, the primary chart, the secondary charts in two columns, and one footer line
+  ("Table · Derivations · Quoted vs recomputed (5)") that opens a fixed-height tabbed
+  panel in place.
+- **Views** are the same charts split into 19 responsibilities, each titled with the
+  trader's question it answers ("How long until my record proves q", "How much to risk
+  a night", …), on its own page with the context beside it. Open them from the Views
+  menu, the links next to a section's number, or the ↗ on any chart; `[` and `]` step
+  through them outside a text field.
 - **Inputs** are synthetic number fields: type, use the wheel (Shift ×10, Alt ×0.1),
   arrow keys, or drag the slider underneath. Dragging is relative and its feel is a
   per-parameter distance in pixels (`input.sensitivityPx` in the schema), scaled by a
@@ -73,21 +84,32 @@ be swapped without touching the others.
   pauses everything. Inputs that make no sense to sweep (seed, engine caps) are marked.
 - **Undo.** Ctrl+Z / Ctrl+Shift+Z step through parameter changes, including the state
   before a sweep started.
-- **Story chips** under a chart title ask a trader's question in one click ("What if
-  q is really 3.2%?", "I widen the wing to 1σ") and answer it in one line. Clicking an
-  active chip undoes it, including the deck parameters it moved.
+- **Stories** under a chart title ask a trader's question in one click ("What if
+  q is really 3.2%?", "I widen the wing to 1σ") and answer it in one line; when one
+  moves the deck the line says so ("moves deck: q 2.94% → 2.52% · undo"). Clicking an
+  active story, or undo, turns it off and puts back the deck parameters it moved.
 - **Market.** "Fair market" sets q = b/(1+b) (zero premium; the growth-optimal risk is
   then 0 and sizing only changes the median, P(below threshold) and ruin). "Discussion
   case" sets q so that a clean coin season has probability 55%. Typing q makes it
   custom.
-- **⚙ on any chart** opens the chart definition as a popover that leaves the layout
-  alone and closes when the pointer moves away; **⊞** shows the numbers behind it.
+- **Charts** are borderless; their tools (↗ ⊞ ⚙) show on hover or keyboard focus.
+  The plot box has the spec's height whatever it shows: **⊞** puts the numbers in the
+  same box (sticky header, scrolling inside), and errors render there too. **⚙** opens
+  the chart definition (display first: linear or log axes, mark, legend, reference
+  lines; then ranges, series, backend, height) as a popover beside the chart on the
+  side with more room, or above or below the plot when neither side has room, never
+  over the plot; at 900px and below it is a bottom sheet. It leaves the layout alone
+  and closes when the pointer moves away. The backend shows as a tag only when it is
+  not the default or the chart is edited.
 - **Data** imports a trade log (0/1 losses or P&L per unit of max loss) and realized
   moves in priced sigmas. The record feeds calibration and the robust sizing curve;
   the moves can replace the Normal in the effective-loss-rate section.
-- **Settings** exist as a quick dialog (⚙ in the top bar) and as a full page: default
-  backend, sweep presets, engine, resets. **Import / export** moves the whole state as
-  JSON.
+- **Settings.** The quick dialog (⚙ in the top bar) holds exactly the default
+  backend, drag sensitivity, sweep rate and the resets. The full page (`#settings`)
+  adds the sweep presets, the engine (engine, enumeration cap, Monte Carlo paths, seed,
+  fan paths, as plain number boxes), your data, import and export, and the hotkey
+  legend. **Import / export** moves the whole state as JSON. At 700px and below the
+  top bar's Data, Import / export and ⚙ fold into one "⋯" menu.
 
 ## Conventions worth knowing
 

@@ -3,7 +3,7 @@ import { parseNumberList, recordStats } from "../model/calibration";
 import { useStore } from "../state/store";
 import { pct2 } from "../viewmodel/derived";
 import { copyText, saveText } from "./download";
-import { SettingsBody } from "./SettingsBody";
+import { QuickSettings } from "./SettingsBody";
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -22,9 +22,9 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
   return (
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`dialog${wide ? " wide" : ""}`} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
-        <div className="row" style={{ justifyContent: "space-between" }}>
+        <div className="dialog-head">
           <h3>{title}</h3>
-          <button type="button" className="btn quiet" onClick={onClose}>
+          <button type="button" className="btn quiet small" onClick={onClose}>
             Close
           </button>
         </div>
@@ -34,7 +34,8 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
   );
 }
 
-export function ImportExportDialog({ onClose }: { onClose: () => void }) {
+/** Save, copy or load the whole state as one JSON file. Shared by the dialog and the settings page. */
+export function ImportExportBody() {
   const exportState = useStore((s) => s.exportState);
   const importState = useStore((s) => s.importState);
   const [text, setText] = useState("");
@@ -42,7 +43,7 @@ export function ImportExportDialog({ onClose }: { onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const json = () => JSON.stringify(exportState(), null, 2);
   return (
-    <Modal title="Import and export" onClose={onClose}>
+    <div className="io">
       <p>The whole state travels as one JSON file: every parameter, chart edit, sweep preset and link, the imported data and the default backend.</p>
       <div className="row">
         <button type="button" className="btn primary" onClick={() => void saveText(`tranche-replay-${new Date().toISOString().slice(0, 10)}.json`, json()).then((how) => setMsg({ ok: how !== "none", text: how === "download" ? "Saved." : how === "clipboard" ? "Downloads are blocked here, so it was copied to the clipboard." : "Could not save." }))}>
@@ -56,7 +57,7 @@ export function ImportExportDialog({ onClose }: { onClose: () => void }) {
         </button>
       </div>
       <h4>Import</h4>
-      <textarea id="import-text" value={text} onChange={(e) => setText(e.target.value)} placeholder='{"params": { ... }, "overrides": { ... }}' aria-label="State JSON" />
+      <textarea className="json" id="import-text" value={text} onChange={(e) => setText(e.target.value)} placeholder='{"params": { ... }, "overrides": { ... }}' aria-label="State JSON" />
       <div className="row">
         <button
           type="button"
@@ -90,6 +91,14 @@ export function ImportExportDialog({ onClose }: { onClose: () => void }) {
         />
         {msg && <span className={msg.ok ? "ok" : "err"}>{msg.text}</span>}
       </div>
+    </div>
+  );
+}
+
+export function ImportExportDialog({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal title="Import and export" onClose={onClose}>
+      <ImportExportBody />
     </Modal>
   );
 }
@@ -156,10 +165,10 @@ function DatasetEditor({ kind, title, blurb, placeholder }: { kind: "record" | "
   );
 }
 
-export function DataDialog({ onClose }: { onClose: () => void }) {
+/** The trade log and the realized moves. Shared by the dialog and the settings page. */
+export function DataBody() {
   return (
-    <Modal title="Your data" onClose={onClose}>
-      <p>Two imports feed the model. Both are one number per line (a CSV's last column is used). They are saved with the state and travel with the export.</p>
+    <div className="datasets">
       <DatasetEditor
         kind="record"
         title="Trade log"
@@ -172,17 +181,31 @@ export function DataDialog({ onClose }: { onClose: () => void }) {
         blurb="Realized earnings moves in priced sigmas, positive toward the short strike (one wing). The effective-loss-rate section can use them as the empirical move distribution: pick “Imported moves” among its inputs."
         placeholder={"0.4\n-1.2\n2.7\n…"}
       />
+    </div>
+  );
+}
+
+export function DataDialog({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal title="Your data" onClose={onClose} wide>
+      <p>Two imports feed the model. Both are one number per line (a CSV's last column is used). They are saved with the state and travel with the export.</p>
+      <DataBody />
     </Modal>
   );
 }
 
+/** The reduced settings: default backend, drag sensitivity, sweep rate, reset. */
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   return (
-    <Modal title="Settings" onClose={onClose} wide>
+    <Modal title="Settings" onClose={onClose}>
+      <QuickSettings />
       <p className="caption">
-        Reduced view. <a href="#settings" onClick={onClose}>Open the full settings page</a> for more room.
+        Presets, the engine, your data, import and export and the hotkeys are on the{" "}
+        <a href="#settings" onClick={onClose}>
+          full settings page
+        </a>
+        .
       </p>
-      <SettingsBody full={false} />
     </Modal>
   );
 }

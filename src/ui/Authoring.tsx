@@ -80,74 +80,83 @@ export function Authoring({ base, spec, override, onClose }: Props) {
     );
   };
 
+  const scaleSeg = (axis: "x" | "y") => (
+    <div className="seg" role="radiogroup" aria-label={`${axis.toUpperCase()} axis scale`}>
+      {(["linear", "log"] as ScaleType[]).map((s) => (
+        <button key={s} type="button" role="radio" aria-checked={(spec[axis].scale ?? "linear") === s} className={(spec[axis].scale ?? "linear") === s ? "on" : undefined} onClick={() => patch({ [axis]: { ...(override?.[axis] ?? {}), scale: s } })}>
+          {s}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <div className="authoring" role="group" aria-label={`Chart definition: ${base.title}`} ref={rootRef}>
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <h5>Chart definition</h5>
+        <h4 className="group-h">Chart definition</h4>
         <button type="button" className="btn small quiet" onClick={onClose}>
           Close
         </button>
       </div>
 
-      <div>
-        <h5>Backend</h5>
-        <div className="seg" style={{ marginTop: 6 }}>
-          {BACKENDS.filter((b) => base.kind !== "table" || b === "table").map((b) => (
-            <button key={b} type="button" className={activeBackend === b ? "on" : undefined} onClick={() => patch({ backend: b })} title={BACKEND_INFO[b].blurb}>
-              {BACKEND_INFO[b].label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {base.kind === "xy" && (
         <div>
-          <h5>Mark</h5>
-          <div className="seg" style={{ marginTop: 6 }}>
-            {MARKS.map((m) => (
-              <button key={m} type="button" className={spec.mark === m ? "on" : undefined} onClick={() => patch({ mark: m })}>
-                {m}
-              </button>
-            ))}
+          <h5>Display</h5>
+          <div className="grid2" style={{ marginTop: 6 }}>
+            <span>x axis</span>
+            {scaleSeg("x")}
+            <span>y axis</span>
+            {scaleSeg("y")}
+            <span>mark</span>
+            <div className="seg" role="radiogroup" aria-label="Mark">
+              {MARKS.map((m) => (
+                <button key={m} type="button" role="radio" aria-checked={spec.mark === m} className={spec.mark === m ? "on" : undefined} onClick={() => patch({ mark: m })}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="row" style={{ marginTop: 8 }}>
+            <label>
+              <input type="checkbox" checked={!override?.hideAnnotations} onChange={(e) => patch({ hideAnnotations: !e.target.checked })} /> reference lines and labels
+            </label>
+            <label>
+              <input type="checkbox" checked={spec.legend !== false} onChange={(e) => patch({ legend: e.target.checked })} /> legend
+            </label>
           </div>
         </div>
       )}
 
-      {base.kind === "xy" &&
-        (["x", "y"] as const).map((axis) => (
-          <div key={axis}>
-            <h5>{axis.toUpperCase()} axis</h5>
-            <div className="row" style={{ marginTop: 6, alignItems: "flex-end" }}>
-              <div className="seg">
-                {(["linear", "log"] as ScaleType[]).map((s) => (
-                  <button key={s} type="button" className={(spec[axis].scale ?? "linear") === s ? "on" : undefined} onClick={() => patch({ [axis]: { ...(override?.[axis] ?? {}), scale: s } })}>
-                    {s}
-                  </button>
-                ))}
-              </div>
+      {base.kind === "xy" && (
+        <div>
+          <h5>Axis ranges</h5>
+          {(["x", "y"] as const).map((axis) => (
+            <div key={axis} className="row" style={{ marginTop: 6, alignItems: "flex-end" }}>
+              <span style={{ minWidth: 48, color: "var(--ink-2)" }}>{axis} axis</span>
               {domainInput(axis, 0)}
               {domainInput(axis, 1)}
             </div>
-            {axis === "x" && !base.x.categorical && fields.length > 1 && (
-              <div className="row" style={{ marginTop: 6 }}>
-                <label htmlFor={`${base.id}-xfield`}>field</label>
-                <select id={`${base.id}-xfield`} value={spec.x.field} onChange={(e) => patch({ x: { ...(override?.x ?? {}), field: e.target.value } })}>
-                  {fields.map((f) => (
-                    <option key={f.name} value={f.name}>
-                      {f.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-        ))}
+          ))}
+          {!base.x.categorical && fields.length > 1 && (
+            <div className="row" style={{ marginTop: 6 }}>
+              <label htmlFor={`${base.id}-xfield`}>x field</label>
+              <select id={`${base.id}-xfield`} value={spec.x.field} onChange={(e) => patch({ x: { ...(override?.x ?? {}), field: e.target.value } })}>
+                {fields.map((f) => (
+                  <option key={f.name} value={f.name}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
 
       {base.kind === "xy" && (
         <div>
           <h5>Series</h5>
           {manySeries ? (
-            <p style={{ margin: "6px 0 0", color: "var(--muted)" }}>{base.series.length} sampled paths. Change the count under Settings → Paths in fan charts.</p>
+            <p className="muted" style={{ marginTop: 6 }}>{base.series.length} sampled paths. Change the count under Settings → Paths in fan charts.</p>
           ) : (
             <div className="series-list" style={{ marginTop: 6 }}>
               {base.series.map((s) => {
@@ -224,16 +233,19 @@ export function Authoring({ base, spec, override, onClose }: Props) {
               )}
             </div>
           )}
-          <div className="row" style={{ marginTop: 8 }}>
-            <label>
-              <input type="checkbox" checked={!override?.hideAnnotations} onChange={(e) => patch({ hideAnnotations: !e.target.checked })} /> reference lines and labels
-            </label>
-            <label>
-              <input type="checkbox" checked={spec.legend !== false} onChange={(e) => patch({ legend: e.target.checked })} /> legend
-            </label>
-          </div>
         </div>
       )}
+
+      <div>
+        <h5>Backend</h5>
+        <div className="seg" style={{ marginTop: 6 }} role="radiogroup" aria-label="Backend">
+          {BACKENDS.filter((b) => base.kind !== "table" || b === "table").map((b) => (
+            <button key={b} type="button" role="radio" aria-checked={activeBackend === b} className={activeBackend === b ? "on" : undefined} onClick={() => patch({ backend: b })} title={BACKEND_INFO[b].blurb}>
+              {BACKEND_INFO[b].label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div>
         <h5>Size</h5>
@@ -260,7 +272,7 @@ export function Authoring({ base, spec, override, onClose }: Props) {
         >
           Reset chart
         </button>
-        {flash && <span style={{ color: "var(--good)", alignSelf: "center" }}>{flash}</span>}
+        {flash && <span className="flash">{flash}</span>}
       </div>
     </div>
   );

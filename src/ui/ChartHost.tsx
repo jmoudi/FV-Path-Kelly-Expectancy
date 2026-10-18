@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { RenderHandle } from "../charts/backends/types";
 import { FIGURE_DEFAULT_HEIGHT, FigureFrame, figureFor } from "../charts/figures";
 import { loadBackend, BACKEND_INFO } from "../charts/registry";
-import { applyOverride, toCsv, type BackendId, type ChartSpec, type SpecOverride } from "../charts/spec";
+import { applyOverride, toCsv, type BackendId, type ChartSpec, type SpecOverride, type Story } from "../charts/spec";
+import { movedBadge } from "../app/figures";
+import { ChartFrame } from "../kit/charts/ChartFrame";
 import { useStore } from "../state/store";
 import { Authoring } from "./Authoring";
 import { saveText } from "./download";
@@ -11,24 +13,40 @@ import { Num } from "./Num";
 import { Popover } from "./Popover";
 import { TableView } from "./TableView";
 
+/** The plot box's height: fixed by the spec, the same whatever the box shows. */
+export function boxHeightOf(spec: ChartSpec): number {
+  if (spec.kind === "figure") return spec.height ?? FIGURE_DEFAULT_HEIGHT;
+  if (spec.kind === "table") return spec.height ?? 320;
+  // The backends get the spec's plot height plus a band for axes and legend.
+  return (spec.height ?? 300) + (spec.kind === "heatmap" ? 90 : 70);
+}
+
+/** The last version of every story seen, by chart and story id. */
+const STORY_CACHE = new Map<string, Story>();
+
+/** Pixels at the top of the viewport covered by the sticky top bar and deck. */
+function stickyInset(): number {
+  let bottom = 0;
+  for (const sel of [".topbar", "#deck"]) {
+    const el = document.querySelector(sel);
+    if (el) bottom = Math.max(bottom, el.getBoundingClientRect().bottom);
+  }
+  return Math.max(0, bottom);
+}
+
 /**
- * Renders one chart spec through the switchboard. Mounts lazily when scrolled
- * near the viewport, swaps backends on demand, and hosts the stories and the
- * chart-definition popover.
+ * Renders one chart spec through the switchboard inside the kit's chart frame. Mounts
+ * lazily when scrolled near the viewport, swaps backends on demand, shows the numbers
+ * (⊞) inside the same plot box, and hosts the stories and the chart-definition popover.
  */
 export function ChartHost({ spec: base, viewId }: { spec: ChartSpec; viewId?: string }) {
   const clearOverride = useStore((s) => s.clearOverride);
   return (
     <ErrorBoundary
       fallback={(err, retry) => (
-        <div className="chart-card" id={`chart-${base.id}`}>
-          <div className="chart-head">
-            <div className="t">
-              <div className="chart-title">{base.title}</div>
-              <div className="chart-sub">This chart could not render: {err.message}</div>
-            </div>
-          </div>
-          <div className="actions">
+        <ChartFrame id={`chart-${base.id}`} title={base.title} subtitle={base.subtitle} boxHeight={boxHeightOf(base)}>
+          <div className="k-chart-error" role="alert">
+            <span>This chart could not render: {err.message}</span>
             <button
               type="button"
               className="btn small"
@@ -40,7 +58,7 @@ export function ChartHost({ spec: base, viewId }: { spec: ChartSpec; viewId?: st
               Reset this chart
             </button>
           </div>
-        </div>
+        </ChartFrame>
       )}
     >
       <ChartCard base={base} viewId={viewId} />
@@ -55,15 +73,20 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
   const authoringOpen = useStore((s) => s.authoringOpen);
   const setAuthoringOpen = useStore((s) => s.setAuthoringOpen);
   const applyStory = useStore((s) => s.applyStory);
+  // Only the chart whose story moved the deck follows the parameters here.
+  const before = useStore((s) => s.storyPrev[base.id]);
+  const paramsNow = useStore((s) => (s.storyPrev[base.id] ? s.params : null));
   const spec = useMemo(() => applyOverride(base, override), [base, override]);
   // A figure is drawn by the figure registry, never by a backend; ⊞ still shows its data.
   const isFigure = base.kind === "figure";
-  const backendId: BackendId = spec.backend ?? (base.kind === "table" ? "table" : defaultBackend);
+  const isTable = base.kind === "table";
+  const backendId: BackendId = spec.backend ?? (isTable ? "table" : defaultBackend);
   const [tableView, setTableView] = useState(false);
   const effective: BackendId = tableView ? "table" : backendId;
   const mountsBackend = !isFigure && effective !== "table";
 
-  const cardRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<HTMLDivElement>(null);
   const gearRef = useRef<HTMLButtonElement>(null);
   const handleRef = useRef<RenderHandle | null>(null);
@@ -72,6 +95,7 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState<BackendId | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [inset, setInset] = useState(0);
 
   useEffect(() => {
     const el = cardRef.current;
@@ -102,7 +126,7 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
     }
     let cancelled = false;
     setError(null);
-    loadBackend(effective)
+    loadBackend(effective as Exclude<BackendId, "table">)
       .then((b) => {
         if (cancelled || !plotRef.current) return;
         handleRef.current?.dispose();
@@ -143,89 +167,122 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
   }, [effective, mounted, mountsBackend]);
 
   const open = authoringOpen === base.id;
-  // A figure draws its own axes inside its height; a backend gets an axis band on top.
-  const height = isFigure ? (spec.height ?? FIGURE_DEFAULT_HEIGHT) : (spec.height ?? 300) + (base.kind === "heatmap" ? 90 : 70);
+  useEffect(() => {
+    if (open) setInset(stickyInset());
+  }, [open]);
+  const height = boxHeightOf(spec);
   const edited = !!override && !override.story;
   const activeStory = override?.story;
-  const stories = base.stories ?? [];
-  const story = stories.find((s) => s.id === activeStory);
+  // A story the rebuilt spec no longer offers (its condition stopped holding once it moved
+  // the deck) stays listed while it is active, so its link and the row do not vanish.
+  const offered = base.stories ?? [];
+  for (const st of offered) STORY_CACHE.set(`${base.id}:${st.id}`, st);
+  const story = offered.find((s) => s.id === activeStory) ?? (activeStory ? STORY_CACHE.get(`${base.id}:${activeStory}`) : undefined);
+  const stories = story && !offered.includes(story) ? [...offered, story] : offered;
+  // The backend tag shows only when it says something: another backend than the default, or edits.
+  const offDefault = !isFigure && !isTable && backendId !== defaultBackend;
+  const tag = edited || offDefault ? `${isFigure ? "Figure" : BACKEND_INFO[backendId].label}${edited ? " · edited" : ""}` : null;
+
+  const tools = (
+    <>
+      {viewId && (
+        <a className="icon-btn" href={`#view/${viewId}`} title="Open this chart in its own view" aria-label="Open this chart in its own view">
+          ↗
+        </a>
+      )}
+      {!isTable && (
+        <button type="button" className={`icon-btn${tableView ? " on" : ""}`} title={tableView ? "Back to the chart" : "Show the numbers"} aria-label={tableView ? "Back to the chart" : "Show the numbers behind this chart"} aria-pressed={tableView} onClick={() => setTableView((v) => !v)}>
+          ⊞
+        </button>
+      )}
+      <button ref={gearRef} type="button" className={`icon-btn${open || edited ? " on" : ""}`} title="Chart definition: display, axes, marks, backend" aria-label="Open the chart definition" aria-expanded={open} aria-controls={`authoring-${base.id}`} onClick={() => setAuthoringOpen(open ? null : base.id)}>
+        ⚙
+      </button>
+    </>
+  );
+
+  const storyRow =
+    stories.length > 0 ? (
+      <div className="k-stories" role="group" aria-label="Questions this chart answers">
+        {stories.map((st) => (
+          <button key={st.id} type="button" className={`k-story${activeStory === st.id ? " on" : ""}`} aria-pressed={activeStory === st.id} onClick={() => applyStory(base.id, st)} title={(activeStory === st.id ? st.narrative : [st.narrative, st.badge].filter(Boolean).join(" · ")) || undefined}>
+            {st.label}
+          </button>
+        ))}
+      </div>
+    ) : undefined;
+  // The active story's answer and what it moved; "undo" turns it off and restores the deck.
+  // A story the rebuilt chart no longer offers (its condition no longer holds) can still be undone.
+  const badge = paramsNow ? movedBadge(before, paramsNow) : null;
+  const storyNote = activeStory ? (
+    <>
+      <span className="k-note-text" title={story?.narrative}>
+        {story?.narrative ?? (story ? "" : "A question on this chart has set the deck.")}
+      </span>
+      {badge && <span className="k-chart-badge">{badge}</span>}
+      <button type="button" className="k-textlink" onClick={() => applyStory(base.id, story ?? { id: activeStory, label: "" })}>
+        undo
+      </button>
+    </>
+  ) : undefined;
+
+  let body;
+  if (effective === "table") body = <TableView spec={spec} />;
+  else if (isFigure)
+    body = (
+      <div className="k-plot">
+        <FigureFrame spec={spec} Figure={figureFor(base)} height={height} />
+      </div>
+    );
+  else body = <div ref={plotRef} className={`k-plot${mounted ? "" : " loading"}`} data-loading={error ? "" : `Loading ${BACKEND_INFO[effective].label}…`} role="img" aria-label={spec.title} />;
+
+  const overlay = error ? (
+    <div className="k-chart-error" role="alert">
+      <span>Could not render: {error}</span>
+      {override && (
+        <button type="button" className="btn small" onClick={() => clearOverride(base.id)}>
+          Reset this chart
+        </button>
+      )}
+    </div>
+  ) : undefined;
+
+  const footer = spec.caption ? <span className="k-chart-caption">{spec.caption}</span> : undefined;
 
   return (
-    <div ref={cardRef} className={`chart-card${edited ? " edited" : ""}`} id={`chart-${base.id}`}>
-      <div className="chart-head">
-        <div className="t">
-          <div className="chart-title">{spec.title}</div>
-          {spec.subtitle && <div className="chart-sub">{spec.subtitle}</div>}
-        </div>
-        <div className="chart-tools">
-          {viewId && (
-            <a className="icon-btn" href={`#view/${viewId}`} title="Open this chart in its own view" aria-label="Open this chart in its own view">
-              ↗
-            </a>
-          )}
-          {base.kind !== "table" && (
-            <button type="button" className={`icon-btn${tableView ? " on" : ""}`} title={tableView ? "Back to the chart" : "Show the numbers"} aria-label={tableView ? "Back to the chart" : "Show the numbers behind this chart"} aria-pressed={tableView} onClick={() => setTableView((v) => !v)}>
-              ⊞
-            </button>
-          )}
-          <button ref={gearRef} type="button" className={`icon-btn${open || edited ? " on" : ""}`} title="Chart definition: backend, axes, marks" aria-label="Open the chart definition" aria-expanded={open} aria-controls={`authoring-${base.id}`} onClick={() => setAuthoringOpen(open ? null : base.id)}>
-            ⚙
-          </button>
-        </div>
-      </div>
-      {stories.length > 0 && (
-        <div className="stories" role="group" aria-label="Stories">
-          {stories.map((st) => (
-            <button key={st.id} type="button" className={`chip${activeStory === st.id ? " on" : ""}`} onClick={() => applyStory(base.id, st)} title={st.narrative}>
-              {st.label}
-            </button>
-          ))}
-          {story?.narrative && <span className="story-narrative">{story.narrative}</span>}
-        </div>
-      )}
-      {effective === "table" ? (
-        <TableView spec={spec} />
-      ) : isFigure ? (
-        <div className="chart-plot" style={{ height }}>
-          <FigureFrame spec={spec} Figure={figureFor(base)} height={height} />
-        </div>
-      ) : (
-        <div
-          ref={plotRef}
-          className={`chart-plot${mounted ? "" : " loading"}`}
-          style={{ height }}
-          data-loading={error ? `Could not render: ${error}` : `Loading ${BACKEND_INFO[effective].label}…`}
-          role="img"
-          aria-label={spec.title}
-        />
-      )}
-      {error && mounted && (
-        <div className="chart-error" role="alert">
-          <span>Could not render: {error}</span>
-          {override && (
-            <button type="button" className="btn small" onClick={() => clearOverride(base.id)}>
-              Reset this chart
-            </button>
-          )}
-        </div>
-      )}
-      {(spec.caption || edited || (!isFigure && effective !== defaultBackend)) && (
-        <div className="caption" style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
-          {spec.caption && <span>{spec.caption}</span>}
-          {(edited || !isFigure) && (
-            <span className="backend-tag" style={{ marginLeft: "auto" }}>
-              {isFigure ? "Figure" : BACKEND_INFO[effective].label}
-              {edited ? " · edited" : ""}
-            </span>
-          )}
-        </div>
-      )}
+    <ChartFrame
+      ref={cardRef}
+      id={`chart-${base.id}`}
+      className={edited ? "edited" : undefined}
+      title={spec.title}
+      subtitle={spec.subtitle}
+      tools={tools}
+      tag={tag}
+      toolsPinned={open || tableView}
+      stories={storyRow}
+      storyNote={storyNote}
+      boxHeight={height}
+      boxMode={isTable ? "max" : "fixed"}
+      boxRef={boxRef}
+      overlay={overlay}
+      footer={footer}
+    >
+      {body}
       {open && (
-        <Popover id={`authoring-${base.id}`} anchor={gearRef.current} onClose={() => setAuthoringOpen(null)} label={`Chart definition: ${base.title}`} width={isFigure ? 300 : 420}>
+        <Popover
+          id={`authoring-${base.id}`}
+          anchor={gearRef.current}
+          beside={cardRef.current}
+          avoid={boxRef.current}
+          insetTop={inset}
+          onClose={() => setAuthoringOpen(null)}
+          label={`Chart definition: ${base.title}`}
+          width={isFigure ? 320 : 400}
+        >
           {isFigure ? <FigureSettings base={base} spec={spec} override={override} onClose={() => setAuthoringOpen(null)} /> : <Authoring base={base} spec={spec} override={override} onClose={() => setAuthoringOpen(null)} />}
         </Popover>
       )}
-    </div>
+    </ChartFrame>
   );
 }
 
@@ -236,12 +293,12 @@ function FigureSettings({ base, spec, override, onClose }: { base: ChartSpec; sp
   return (
     <div className="authoring" role="group" aria-label={`Figure: ${base.title}`}>
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <h5>Figure</h5>
+        <h4 className="group-h">Figure</h4>
         <button type="button" className="btn small quiet" onClick={onClose}>
           Close
         </button>
       </div>
-      <p style={{ margin: 0, color: "var(--muted)" }}>Drawn by the app, not by a chart backend, so only its height is editable here. ⊞ shows the numbers behind it.</p>
+      <p className="muted">Drawn by the app, not by a chart backend, so only its height is editable here. ⊞ shows the numbers behind it.</p>
       <div>
         <h5>Size</h5>
         <div style={{ marginTop: 6, maxWidth: 220 }}>

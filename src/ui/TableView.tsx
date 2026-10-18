@@ -1,7 +1,11 @@
 import { formatNumber } from "../charts/format";
 import type { ChartSpec, Cell, ColumnSpec } from "../charts/spec";
 
-/** The HTML-table backend: the numbers behind any chart, or a table spec on its own. */
+/**
+ * The HTML-table backend: the numbers behind any chart, or a table spec on its own.
+ * It fills the box it is given and scrolls inside it with the header kept in view, so
+ * showing the numbers never changes the height of the chart it replaces.
+ */
 export function TableView({ spec }: { spec: ChartSpec }) {
   const cols: ColumnSpec[] = spec.columns?.length
     ? spec.columns
@@ -17,9 +21,9 @@ export function TableView({ spec }: { spec: ChartSpec }) {
   const rows = stride > 1 ? spec.data.rows.filter((_, i) => i % stride === 0 || i === spec.data.rows.length - 1) : spec.data.rows;
   const same = (a: Cell, b: Cell) => (typeof a === "number" && typeof b === "number" ? Math.abs(a - b) < 1e-9 : a === b);
   return (
-    <div className="table-wrap">
-      {stride > 1 && <div className="caption">Every {stride}th row of {spec.data.rows.length}. The CSV export carries all of them.</div>}
+    <div className="table-wrap sticky" tabIndex={0} role="region" aria-label={`Numbers: ${spec.title}`}>
       <table className="table">
+        {stride > 1 && <caption className="caption table-note">Every {stride}th row of {spec.data.rows.length}. The CSV export carries all of them.</caption>}
         <thead>
           <tr>
             {cols.map((c) => (

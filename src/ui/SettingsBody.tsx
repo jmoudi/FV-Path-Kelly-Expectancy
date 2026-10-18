@@ -1,122 +1,171 @@
 import { useState } from "react";
 import { BACKEND_INFO } from "../charts/registry";
 import type { BackendId } from "../charts/spec";
-import { PARAM_DEFS } from "../model/params";
+import { KeyLegend, Segmented, SettingRow, SettingsGroup, SettingsLayout, type KeyBinding } from "../kit/ui/Settings";
+import { DEFAULT_PARAMS, inputConfig, PARAM_BY_KEY, PARAM_DEFS, type Params } from "../model/params";
 import { useStore } from "../state/store";
+import { DataBody, ImportExportBody } from "./Dialogs";
+import { Help } from "./Help";
+import { Num } from "./Num";
+import { NumberField } from "./NumberField";
 import { ParamInput } from "./ParamInput";
 import { SweepPanel } from "./SweepPanel";
+import { HOTKEY_HINTS } from "./useSweeps";
 
-/** The settings content, shared by the dialog (reduced) and the full page. */
-export function SettingsBody({ full }: { full: boolean }) {
+const BACKENDS: BackendId[] = ["echarts", "plotly", "vega"];
+
+/** A schema parameter as a plain number box: no slider (seeds, caps, counts). */
+function PlainParam({ k }: { k: keyof Params }) {
+  const def = PARAM_BY_KEY[k];
+  const value = useStore((s) => s.params[k]);
+  const setParam = useStore((s) => s.setParam);
+  if (def.unit === "choice") return <ParamInput k={k} compact />;
+  return (
+    <div className="plain-param">
+      <NumberField
+        id={`param-${k}`}
+        inputKey={k}
+        label={def.label}
+        value={typeof value === "number" ? value : def.min}
+        min={def.min}
+        max={def.max}
+        step={def.step}
+        unit={def.unit}
+        config={{ ...inputConfig(def), slider: false }}
+        onChange={(v) => setParam(k, v as Params[typeof k])}
+        defaultValue={typeof DEFAULT_PARAMS[k] === "number" ? (DEFAULT_PARAMS[k] as number) : undefined}
+        compact
+        extra={<Help text={def.help} />}
+        ariaLabel={def.label}
+      />
+    </div>
+  );
+}
+
+/** A reset with a confirm step. */
+function ResetButton({ label, confirmLabel, keepLabel, onConfirm, disabled }: { label: string; confirmLabel: string; keepLabel: string; onConfirm: () => void; disabled?: boolean }) {
+  const [confirm, setConfirm] = useState(false);
+  if (!confirm)
+    return (
+      <button type="button" className="btn small" disabled={disabled} onClick={() => setConfirm(true)}>
+        {label}
+      </button>
+    );
+  return (
+    <span className="row">
+      <button
+        type="button"
+        className="btn small primary"
+        onClick={() => {
+          onConfirm();
+          setConfirm(false);
+        }}
+      >
+        {confirmLabel}
+      </button>
+      <button type="button" className="btn small quiet" onClick={() => setConfirm(false)}>
+        {keepLabel}
+      </button>
+    </span>
+  );
+}
+
+/** Default backend, and the feel of inputs and sweeps: shared by both views. */
+function EverydayGroups({ compact }: { compact?: boolean }) {
   const defaultBackend = useStore((s) => s.defaultBackend);
   const setDefaultBackend = useStore((s) => s.setDefaultBackend);
+  const ui = useStore((s) => s.ui);
+  const setUi = useStore((s) => s.setUi);
+  return (
+    <>
+      <SettingsGroup id="set-backend" title="Default backend" blurb={compact ? undefined : "Every chart is a renderer-agnostic definition routed through one of these. ⚙ on a chart overrides it for that chart."}>
+        <Segmented<BackendId> ariaLabel="Default backend" options={BACKENDS.map((b) => ({ value: b, label: BACKEND_INFO[b].label, title: BACKEND_INFO[b].blurb }))} value={defaultBackend === "table" ? "echarts" : defaultBackend} onChange={setDefaultBackend} />
+        <p className="caption">{BACKEND_INFO[defaultBackend].blurb}</p>
+      </SettingsGroup>
+      <SettingsGroup id="set-feel" title="Inputs and sweeps">
+        <SettingRow label="Drag sensitivity" hint="× the distance each input needs">
+          <Num id="ui-drag" value={ui.dragSensitivity} min={0.25} max={4} step={0.25} decimals={2} slider={false} onChange={(v) => v != null && setUi({ dragSensitivity: v })} />
+        </SettingRow>
+        <SettingRow label="Sweep rate" hint="values a second while a sweep runs">
+          <Num id="ui-sweephz" value={ui.sweepHz} min={1} max={30} step={1} unit="int" slider={false} onChange={(v) => v != null && setUi({ sweepHz: v })} />
+        </SettingRow>
+      </SettingsGroup>
+    </>
+  );
+}
+
+/** The resets, each with a confirm step: shared by both views. */
+function ResetGroup({ compact }: { compact?: boolean }) {
   const clearAllOverrides = useStore((s) => s.clearAllOverrides);
   const resetParams = useStore((s) => s.resetParams);
   const resetEverything = useStore((s) => s.resetEverything);
-  const overrides = useStore((s) => s.overrides);
-  const edited = Object.keys(overrides).length;
-  const [confirm, setConfirm] = useState<"charts" | "params" | "all" | null>(null);
-  const advanced = PARAM_DEFS.filter((d) => d.tier === "advanced");
+  const edited = useStore((s) => Object.keys(s.overrides).length);
   return (
-    <div className={`settings${full ? " full" : ""}`}>
-      <section>
-        <h4>Chart backends</h4>
-        <p>Every chart is a renderer-agnostic definition routed through one of these. Pick the default here; override it per chart with ⚙ on any card.</p>
-        <div className="backend-cards">
-          {(["echarts", "plotly", "vega"] as BackendId[]).map((b) => (
-            <button key={b} type="button" className={`backend-card${defaultBackend === b ? " on" : ""}`} onClick={() => setDefaultBackend(b)}>
-              <b>{BACKEND_INFO[b].label}</b>
-              <span>{BACKEND_INFO[b].blurb}</span>
-            </button>
-          ))}
+    <>
+      <SettingsGroup id="set-reset" title="Reset">
+        <div className="reset-list">
+          <ResetButton label="Reset every parameter to the discussion's inputs" confirmLabel="Yes, back to the discussion's inputs" keepLabel="Keep mine" onConfirm={resetParams} />
+          <ResetButton label={edited ? `Reset chart edits (${edited})` : "No chart edits to reset"} confirmLabel="Yes, reset every chart" keepLabel="Keep them" onConfirm={clearAllOverrides} disabled={!edited} />
+          <ResetButton label="Forget everything saved" confirmLabel="Yes, forget parameters, edits, presets and data" keepLabel="Keep it" onConfirm={resetEverything} />
         </div>
-        <div className="row" style={{ marginTop: 8 }}>
-          <span className="caption">{edited === 0 ? "No chart has been edited." : `${edited} chart${edited === 1 ? "" : "s"} carry edits or stories.`}</span>
-          {confirm === "charts" ? (
-            <>
-              <button
-                type="button"
-                className="btn small primary"
-                onClick={() => {
-                  clearAllOverrides();
-                  setConfirm(null);
-                }}
-              >
-                Yes, reset every chart
-              </button>
-              <button type="button" className="btn small quiet" onClick={() => setConfirm(null)}>
-                Keep them
-              </button>
-            </>
-          ) : (
-            <button type="button" className="btn small" disabled={edited === 0} onClick={() => setConfirm("charts")}>
-              Reset all chart edits
-            </button>
-          )}
-        </div>
-      </section>
-
-      <section>
-        <SweepPanel />
-      </section>
-
-      <section>
-        <h4>Engine</h4>
-        <div className="params-compact" style={{ padding: 0 }}>
-          {advanced.map((d) => (
-            <ParamInput key={d.key} k={d.key} compact />
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h4>Parameters and saved state</h4>
-        <div className="row">
-          {confirm === "params" ? (
-            <>
-              <button
-                type="button"
-                className="btn small primary"
-                onClick={() => {
-                  resetParams();
-                  setConfirm(null);
-                }}
-              >
-                Yes, back to the discussion's inputs
-              </button>
-              <button type="button" className="btn small quiet" onClick={() => setConfirm(null)}>
-                Keep mine
-              </button>
-            </>
-          ) : (
-            <button type="button" className="btn small" onClick={() => setConfirm("params")}>
-              Reset every parameter to the discussion's inputs
-            </button>
-          )}
-          {confirm === "all" ? (
-            <>
-              <button
-                type="button"
-                className="btn small primary"
-                onClick={() => {
-                  resetEverything();
-                  setConfirm(null);
-                }}
-              >
-                Yes, forget everything
-              </button>
-              <button type="button" className="btn small quiet" onClick={() => setConfirm(null)}>
-                Keep it
-              </button>
-            </>
-          ) : (
-            <button type="button" className="btn small quiet" onClick={() => setConfirm("all")}>
-              Forget parameters, chart edits, presets and imported data
-            </button>
-          )}
-        </div>
-        <p className="caption">Opening the app with #reset in the address does the same.</p>
-      </section>
-    </div>
+        {!compact && <p className="caption">Opening the app with #reset in the address forgets everything too.</p>}
+      </SettingsGroup>
+    </>
   );
+}
+
+/** The reduced settings in the ⚙ dialog: exactly the four everyday settings. */
+export function QuickSettings() {
+  return (
+    <SettingsLayout compact>
+      <EverydayGroups compact />
+      <ResetGroup compact />
+    </SettingsLayout>
+  );
+}
+
+const KEYS: KeyBinding[] = [
+  { keys: ["[", "]"], action: "Previous or next view", scope: "outside a text field" },
+  { keys: [HOTKEY_HINTS.undo], action: "Undo a parameter change", scope: "outside a text field" },
+  { keys: [HOTKEY_HINTS.redo], action: "Redo", scope: "outside a text field" },
+  { keys: [HOTKEY_HINTS.toggle], action: "Run or pause the linked sweep", scope: "on the active input" },
+  { keys: [HOTKEY_HINTS.stop], action: "Stop the sweep", scope: "on the active input" },
+  { keys: [HOTKEY_HINTS.prev, HOTKEY_HINTS.next], action: "Previous or next preset", scope: "on the active input" },
+  { keys: [HOTKEY_HINTS.all], action: "Pause or resume every sweep" },
+  { keys: ["Esc"], action: "Close a popover, a menu, a dialog or the full deck" },
+];
+
+/** The full settings page: the four everyday settings plus presets, engine, data, state, hotkeys. */
+export function FullSettings() {
+  const engine = PARAM_DEFS.filter((d) => d.tier === "advanced");
+  return (
+    <SettingsLayout>
+      <EverydayGroups />
+      <SettingsGroup id="set-engine" title="Engine" blurb="How season distributions are computed and how many samples the sampled charts draw.">
+        <div className="plain-params">
+          {engine.map((d) => (
+            <PlainParam key={d.key} k={d.key} />
+          ))}
+        </div>
+      </SettingsGroup>
+      <SettingsGroup id="set-keys" title="Hotkeys">
+        <KeyLegend bindings={KEYS} />
+      </SettingsGroup>
+      <SettingsGroup id="set-presets" title="Sweep presets" blurb="A preset drives the active input on its own. Link one to an input, then run it from the deck's strip or with the hotkeys above." wide>
+        <SweepPanel compact />
+      </SettingsGroup>
+      <SettingsGroup id="set-data" title="Your data" blurb="Two imports feed the model, one number per line (a CSV's last column is used). They are saved with the state and travel with the export." wide>
+        <DataBody />
+      </SettingsGroup>
+      <SettingsGroup id="set-io" title="Import and export">
+        <ImportExportBody />
+      </SettingsGroup>
+      <ResetGroup />
+    </SettingsLayout>
+  );
+}
+
+/** Kept for callers that pick the view with a flag. */
+export function SettingsBody({ full }: { full: boolean }) {
+  return full ? <FullSettings /> : <QuickSettings />;
 }
