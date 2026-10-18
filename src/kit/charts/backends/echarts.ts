@@ -28,7 +28,8 @@ echarts.use([
 
 type EOption = Record<string, unknown>;
 
-const LABEL_BG = withAlpha(THEME.surface, 0.82);
+/** Read per build, so configureTheme() reaches it. */
+const labelBg = () => withAlpha(THEME.surface, 0.82);
 /** The grid's insets in px; the plot box is what remains of the container. */
 const GRID = { left: 66, right: 22, top: 18, legendTop: 14, bottom: 46 };
 const ANNOTATIONS_ID = "__annotations";
@@ -248,7 +249,7 @@ function labelGraphics(rc: ResolvedChart, grid: { left: number; top: number; wid
         font: `${LABEL_FONT_PX}px ${THEME.fontUi}`,
         align: l.align,
         verticalAlign: l.baseline,
-        backgroundColor: a.kind === "xband" ? undefined : LABEL_BG,
+        backgroundColor: a.kind === "xband" ? undefined : labelBg(),
         padding: [2, 4],
         borderRadius: 3,
       },

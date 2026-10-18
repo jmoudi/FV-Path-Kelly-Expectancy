@@ -8,13 +8,17 @@ import type { Cell, NumberFormat } from "../spec";
 import { THEME } from "../theme";
 
 export const FIGURE_FONT = {
-  family: THEME.fontUi,
-  mono: THEME.fontMono,
+  get family() {
+    return THEME.fontUi;
+  },
+  get mono() {
+    return THEME.fontMono;
+  },
   /** Axis labels, captions, station numbers. */
   label: "var(--fs-label, 11.5px)",
   /** Legends and in-figure annotations. */
   ui: "var(--fs-ui, 13px)",
-} as const;
+};
 
 export interface Tokens {
   ink: string;
@@ -25,13 +29,26 @@ export interface Tokens {
   surface: string;
 }
 
+/** Read at draw time, so configureTheme() before the first render reaches the figures. */
 export const TOKENS: Tokens = {
-  ink: THEME.ink,
-  ink2: THEME.ink2,
-  muted: THEME.muted,
-  hairline: THEME.hairline,
-  grid: THEME.grid,
-  surface: THEME.surface,
+  get ink() {
+    return THEME.ink;
+  },
+  get ink2() {
+    return THEME.ink2;
+  },
+  get muted() {
+    return THEME.muted;
+  },
+  get hairline() {
+    return THEME.hairline;
+  },
+  get grid() {
+    return THEME.grid;
+  },
+  get surface() {
+    return THEME.surface;
+  },
 };
 
 /** Format a number for a figure label; the minus sign is always U+2212. */

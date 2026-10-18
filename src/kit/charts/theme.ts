@@ -1,7 +1,7 @@
 import type { ColorRole, Emphasis } from "./spec";
 
 /**
- * Graphite: the one theme. Three policy hues (amber, cyan, violet), a loss red and a
+ * Graphite: the one theme. Three categorical accents (amber, cyan, violet), a loss red and a
  * gain green reserved for status, and a cyan ramp for ordered scenarios of one
  * parameter. Validated for colour-vision separation on the chart surface.
  */
@@ -37,6 +37,22 @@ export const THEME = {
   /** Two-state cells: won (calm) and lost (loss red). */
   binary: ["#1f4a5a", "#D64566"],
 };
+
+export type Theme = typeof THEME;
+type ThemePatch = { [K in keyof Theme]?: Theme[K] extends readonly string[] ? Theme[K] : Theme[K] extends object ? Partial<Theme[K]> : Theme[K] };
+
+/**
+ * Another explainer's palette: replaces values in place, so every module that reads THEME
+ * sees them. Call it before the first render (first thing in main.tsx), then applyThemeVars().
+ */
+export function configureTheme(patch: ThemePatch): void {
+  const t = THEME as Record<string, unknown>;
+  for (const [k, v] of Object.entries(patch)) {
+    const cur = t[k];
+    if (v && typeof v === "object" && !Array.isArray(v) && cur && typeof cur === "object") Object.assign(cur, v);
+    else if (v !== undefined) t[k] = v;
+  }
+}
 
 export function heatPalette(kind: "diverging" | "sequential" | "binary"): string[] {
   return kind === "diverging" ? THEME.diverging : kind === "binary" ? THEME.binary : THEME.sequential;

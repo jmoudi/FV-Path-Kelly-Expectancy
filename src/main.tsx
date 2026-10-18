@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 // both, so they win where they style the same class.
 import "@kit/ui/theme.css";
 import "@kit/ui/kit.css";
-import { THEME } from "@kit/charts/theme";
+import { applyThemeVars } from "@kit/ui/applyTheme";
 import { registerFigures } from "@kit/charts/figures/registry";
 import { FIGURES } from "@app/figures";
 import { KitProvider } from "@kit/state/context";
@@ -15,17 +15,8 @@ import { useStore } from "@app/store";
 import { SWEEPS } from "@app/sweeps";
 import { App } from "@app/App";
 
-// The palette lives in one place (charts/theme.ts); the CSS reads it from these variables.
-const root = document.documentElement;
-root.style.setProperty("--bg", THEME.page);
-root.style.setProperty("--surface", THEME.surface);
-root.style.setProperty("--raised", THEME.raised);
-root.style.setProperty("--hairline", THEME.hairline);
-root.style.setProperty("--grid", THEME.grid);
-root.style.setProperty("--ink", THEME.ink);
-root.style.setProperty("--ink-2", THEME.ink2);
-root.style.setProperty("--muted", THEME.muted);
-for (const [role, hex] of Object.entries(THEME.roles)) root.style.setProperty(`--${role}`, hex);
+// The palette lives in one place (src/kit/charts/theme.ts); the CSS reads it from these variables.
+applyThemeVars();
 
 registerFigures(FIGURES);
 
