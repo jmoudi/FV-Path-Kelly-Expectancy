@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { useDeckProps } from "@app/deck/useDeckProps";
+import { useDeckProps } from "./useDeckProps";
 import { Deck } from "@kit/ui/deck";
 import { useStore } from "@app/store";
-import type { DeckView } from "@app/deck/deckView";
-import "./deck.css";
+import type { DeckView } from "./deckView";
+import "@kit/ui/deck/deck.css";
 
 /** The deck sits on every page except Settings. Read from the hash the way src/ui/route.ts does. */
 function onSettingsPage(): boolean {

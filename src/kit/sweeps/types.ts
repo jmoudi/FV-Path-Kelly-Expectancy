@@ -33,6 +33,8 @@ export interface AnchorDef {
   id: string;
   label: string;
   help?: string;
+  /** The built-in a reference to this anchor falls back to on inputs that lack it; default: the one at the same end. */
+  fallback?: BuiltinAnchor;
 }
 
 /** A reference to an anchor, with the built-in anchor used on inputs that do not declare it. */

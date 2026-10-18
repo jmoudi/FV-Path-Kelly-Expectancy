@@ -470,7 +470,7 @@ import { formatNumber as chartFormat, tickMultiple as tickX, tickPercent as tick
 import { legendLayout, resolveChart } from "@kit/charts/resolve";
 import { THEME } from "@kit/charts/theme";
 import { formatNumber as appFormat } from "@kit/charts/format";
-import { TableView } from "../src/ui/TableView";
+import { TableView } from "@kit/ui/TableView";
 
 describe("chart rendering", () => {
   const { scenarios } = buildAll(DEFAULT_PARAMS, EMPTY_DATASETS);

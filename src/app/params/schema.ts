@@ -38,7 +38,7 @@ export const PARAM_DEFS: ParamDef[] = [
     input: { sensitivityPx: 320, wheelStep: 0.0005, perHundredPx: 0.0025 },
     anchors: [
       { id: "optimistic", label: "optimistic", help: "The optimistic loss rate (section 03)." },
-      { id: "deck", label: "deck", help: "The deck's q when the sweep started." },
+      { id: "deck", label: "deck", help: "The deck's q when the sweep started.", fallback: "current" },
       { id: "break-even", label: "break-even", help: "b ÷ (1 + b): the fair rate, zero premium." },
     ],
   },
@@ -75,7 +75,7 @@ export const PARAM_DEFS: ParamDef[] = [
     anchors: [
       { id: "robust", label: "robust", help: "The risk a night that maximises growth averaged over the loss rates you cannot rule out." },
       { id: "kelly", label: "Kelly", help: "The growth-optimal risk a night at the deck's loss rate." },
-      { id: "deck", label: "deck", help: "The deck's risk a night when the sweep started." },
+      { id: "deck", label: "deck", help: "The deck's risk a night when the sweep started.", fallback: "current" },
     ],
   },
   { key: "seasons", label: "Seasons chained", short: "N", unit: "int", min: 1, max: 12, step: 1, tier: "primary", group: "sizing", help: "Seasons played back to back without refilling the tranche.", definition: "N: seasons replayed without refilling. The median after N seasons is the number the middle path shows.", input: { sensitivityPx: 160, perHundredPx: 1, noun: { one: "season", many: "seasons" } } },

@@ -2,7 +2,7 @@ import { LinkedValue } from "@kit/ui/deck";
 import { lossRateFromPClean, pCleanFromLossRate } from "@app/model/binary";
 import { POLICY_META } from "@app/model/policies";
 import { useStore } from "@app/store";
-import { Help } from "../../ui/Help";
+import { Help } from "@kit/ui/Help";
 import { pct } from "@kit/charts/numbers";
 
 const COIN = POLICY_META.coin.name;

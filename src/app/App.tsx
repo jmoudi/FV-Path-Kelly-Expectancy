@@ -1,58 +1,23 @@
+import { CrashScreen, useScrollSpy, useViewKeys } from "@kit/ui/Shell";
 import { useEffect, useMemo, useState } from "react";
-import { sectionNumber, viewMenu, viewOrder } from "@app/frames";
+import { sectionNumber, viewMenu, viewOrder } from "@kit/ui/scenarioProps";
 import { LinkGroups, MenuButton, MenuItems } from "@kit/ui/Menu";
 import { useStore } from "@app/store";
-import { DeckBar } from "./DeckBar";
-import { DeskPage } from "./DeskPage";
-import { DataDialog, ImportExportDialog, SettingsDialog } from "./Dialogs";
-import { ErrorBoundary } from "./ErrorBoundary";
-import { setViewOrder, stepView, useRoute, type Route } from "./route";
-import { Section } from "./Section";
-import { FullSettings } from "./SettingsBody";
+import { DeckBar } from "@app/deck/DeckBar";
+import { DeskPage } from "@app/desk/DeskPage";
+import { DataDialog, DataSettings } from "@app/DataDialog";
+import { ImportExportDialog, SettingsDialog } from "@kit/ui/Dialogs";
+import { ErrorBoundary } from "@kit/ui/ErrorBoundary";
+import { setViewOrder, useRoute, type Route, type RouteConfig } from "@kit/ui/route";
+import { Section } from "@kit/ui/Section";
+import { FullSettings } from "@kit/ui/SettingsBody";
 import { useBuild } from "@kit/build/useBuild";
 import { BUILD } from "@app/build";
-import { isEditableTarget, useSweepEngine, useSweepHotkeys } from "./useSweeps";
-import { ViewPage } from "./ViewPage";
+import { useSweepEngine, useSweepHotkeys } from "@kit/sweeps/useSweeps";
+import { ViewPage } from "@kit/ui/ViewPage";
 import type { ScenarioView } from "@app/scenarios/types";
 
-function useScrollSpy(ids: string[], enabled: boolean): string {
-  const [active, setActive] = useState("");
-  useEffect(() => {
-    if (!enabled || !("IntersectionObserver" in window)) return;
-    const els = ids.map((id) => document.getElementById(`s-${id}`)).filter((x): x is HTMLElement => !!x);
-    const io = new IntersectionObserver(
-      (entries) => {
-        const hit = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (hit) setActive(hit.target.id.replace(/^s-/, ""));
-      },
-      { rootMargin: "-25% 0px -60% 0px" },
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, [ids, enabled]);
-  return active;
-}
-
 type Dialog = "io" | "settings" | "data" | null;
-
-/**
- * Plain [ and ] step to the previous or next view, in reading order, from any page.
- * Not while focus is in an editable field or a select (typing wins there), not with
- * Ctrl or ⌘ (those cycle sweep presets), and not while a dialog is open.
- */
-function useViewKeys(blocked: boolean) {
-  useEffect(() => {
-    if (blocked) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.ctrlKey || e.metaKey || (e.key !== "[" && e.key !== "]")) return;
-      const el = document.activeElement;
-      if (isEditableTarget(el) || el?.tagName === "SELECT") return;
-      if (stepView(e.key === "]" ? 1 : -1)) e.preventDefault();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [blocked]);
-}
 
 /** The brand mark: the favicon's three bars, for the phone top bar. */
 function BrandMark() {
@@ -125,14 +90,16 @@ function TopBar({ route, scenarios, onDialog }: { route: Route; scenarios: Scena
   );
 }
 
+/** This explainer's pages; #view/<id> and #s-<id> are built in. */
+const ROUTES: RouteConfig = { home: "desk", pages: ["desk", "explain", "settings"], aliases: { tour: "explain" }, sectionsPage: "explain" };
+
 export function App() {
   const params = useStore((s) => s.params);
   const datasets = useStore((s) => s.datasets);
-  const resetEverything = useStore((s) => s.resetEverything);
   const input = useMemo(() => ({ params, datasets }), [params, datasets]);
   const { result, pending, error } = useBuild(input, BUILD);
   const [dialog, setDialog] = useState<Dialog>(null);
-  const route = useRoute();
+  const route = useRoute(ROUTES);
   const scenarios = useMemo(() => result?.scenarios ?? [], [result]);
   const ids = useMemo(() => scenarios.map((s) => s.id), [scenarios]);
   const active = useScrollSpy(ids, route.page === "explain");
@@ -156,29 +123,7 @@ export function App() {
 
   return (
     <ErrorBoundary
-      fallback={(err, retry) => (
-        <div className="page">
-          <div className="dialog" style={{ margin: "40px auto" }}>
-            <h3>Something broke</h3>
-            <p>{err.message}</p>
-            <div className="row">
-              <button type="button" className="btn primary" onClick={retry}>
-                Try again
-              </button>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  resetEverything();
-                  retry();
-                }}
-              >
-                Reset the app's saved state
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      fallback={(err, retry) => <CrashScreen error={err} retry={retry} />}
     >
       <TopBar route={route} scenarios={scenarios} onDialog={setDialog} />
       <DeckBar deck={result?.deck ?? null} pending={pending} />
@@ -187,10 +132,10 @@ export function App() {
       {route.page === "settings" ? (
         <div className="page">
           <h1 className="page-title">Settings</h1>
-          <FullSettings />
+          <FullSettings data={<DataSettings />} />
         </div>
       ) : route.page === "view" ? (
-        <div className="page">{result ? <ViewPage scenarios={scenarios} viewId={route.id} /> : <p className="status-line">Computing…</p>}</div>
+        <div className="page">{result ? <ViewPage scenarios={scenarios} viewId={route.id ?? ""} notFound={<>Pick one from the Views menu, or go back to the <a href="#desk">Desk</a>.</>} /> : <p className="status-line">Computing…</p>}</div>
       ) : route.page === "desk" ? (
         <div className="page">{result ? <DeskPage desk={result.desk} scenarios={scenarios} pending={pending} /> : <p className="status-line">Computing the desk…</p>}</div>
       ) : (

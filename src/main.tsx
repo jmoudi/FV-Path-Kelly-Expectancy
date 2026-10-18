@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 // Stylesheets first, in cascade order: the theme's tokens and controls, then the kit's
 // frames. Component stylesheets imported by their own modules (the deck's) come after
 // both, so they win where they style the same class.
-import "./ui/theme.css";
+import "@kit/ui/theme.css";
 import "@kit/ui/kit.css";
 import { THEME } from "@kit/charts/theme";
 import { registerFigures } from "@kit/charts/figures/registry";
@@ -13,7 +13,7 @@ import { KIT_COPY } from "@app/copy/kitCopy";
 import { SCHEMA } from "@app/params/schema";
 import { useStore } from "@app/store";
 import { SWEEPS } from "@app/sweeps";
-import { App } from "./ui/App";
+import { App } from "@app/App";
 
 // The palette lives in one place (charts/theme.ts); the CSS reads it from these variables.
 const root = document.documentElement;

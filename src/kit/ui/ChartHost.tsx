@@ -5,12 +5,12 @@ import { FigureFrame } from "@kit/charts/figures/FigureFrame";
 import { loadBackend, BACKEND_INFO } from "@kit/charts/registry";
 import { applyOverride, toCsv, type BackendId, type ChartSpec, type SpecOverride, type Story } from "@kit/charts/spec";
 import { ChartFrame } from "@kit/charts/ChartFrame";
-import { useStore } from "@app/store";
-import { movedBadge } from "@app/scenarios/derived";
+import { useKit, useKitCopy } from "@kit/state/context";
+import { viewHref } from "./route";
 import { Authoring } from "./Authoring";
 import { saveText } from "./download";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { Num } from "./Num";
+import { Num } from "@kit/inputs/Num";
 import { Popover } from "./Popover";
 import { TableView } from "./TableView";
 
@@ -41,7 +41,7 @@ function stickyInset(): number {
  * (⊞) inside the same plot box, and hosts the stories and the chart-definition popover.
  */
 export function ChartHost({ spec: base, viewId }: { spec: ChartSpec; viewId?: string }) {
-  const clearOverride = useStore((s) => s.clearOverride);
+  const clearOverride = useKit((s) => s.clearOverride);
   return (
     <ErrorBoundary
       fallback={(err, retry) => (
@@ -68,15 +68,16 @@ export function ChartHost({ spec: base, viewId }: { spec: ChartSpec; viewId?: st
 }
 
 function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
-  const override = useStore((s) => s.overrides[base.id]);
-  const clearOverride = useStore((s) => s.clearOverride);
-  const defaultBackend = useStore((s) => s.defaultBackend);
-  const authoringOpen = useStore((s) => s.authoringOpen);
-  const setAuthoringOpen = useStore((s) => s.setAuthoringOpen);
-  const applyStory = useStore((s) => s.applyStory);
+  const copy = useKitCopy();
+  const override = useKit((s) => s.overrides[base.id]);
+  const clearOverride = useKit((s) => s.clearOverride);
+  const defaultBackend = useKit((s) => s.defaultBackend);
+  const authoringOpen = useKit((s) => s.authoringOpen);
+  const setAuthoringOpen = useKit((s) => s.setAuthoringOpen);
+  const applyStory = useKit((s) => s.applyStory);
   // Only the chart whose story moved the deck follows the parameters here.
-  const before = useStore((s) => s.storyPrev[base.id]);
-  const paramsNow = useStore((s) => (s.storyPrev[base.id] ? s.params : null));
+  const before = useKit((s) => s.storyPrev[base.id]);
+  const paramsNow = useKit((s) => (s.storyPrev[base.id] ? s.params : null));
   const spec = useMemo(() => applyOverride(base, override), [base, override]);
   // A figure is drawn by the figure registry, never by a backend; ⊞ still shows its data.
   const isFigure = base.kind === "figure";
@@ -187,7 +188,7 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
   const tools = (
     <>
       {viewId && (
-        <a className="icon-btn" href={`#view/${viewId}`} title="Open this chart in its own view" aria-label="Open this chart in its own view">
+        <a className="icon-btn" href={viewHref(viewId)} title="Open this chart in its own view" aria-label="Open this chart in its own view">
           ↗
         </a>
       )}
@@ -214,7 +215,7 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
     ) : undefined;
   // The active story's answer and what it moved; "undo" turns it off and restores the deck.
   // A story the rebuilt chart no longer offers (its condition no longer holds) can still be undone.
-  const badge = paramsNow ? movedBadge(before, paramsNow) : null;
+  const badge = paramsNow ? copy.storyMoved(before, paramsNow) : null;
   const storyNote = activeStory ? (
     <>
       <span className="k-note-text" title={story?.narrative}>
@@ -290,8 +291,8 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
 
 /** The chart definition of a figure: not backend-switchable, so only its height and its data. */
 function FigureSettings({ base, spec, override, onClose }: { base: ChartSpec; spec: ChartSpec; override: SpecOverride | undefined; onClose: () => void }) {
-  const setOverride = useStore((s) => s.setOverride);
-  const clearOverride = useStore((s) => s.clearOverride);
+  const setOverride = useKit((s) => s.setOverride);
+  const clearOverride = useKit((s) => s.clearOverride);
   return (
     <div className="authoring" role="group" aria-label={`Figure: ${base.title}`}>
       <div className="row" style={{ justifyContent: "space-between" }}>

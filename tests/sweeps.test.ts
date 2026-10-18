@@ -296,7 +296,7 @@ describe("store: sweep runs", () => {
     const storage = memoryStorage();
     vi.stubGlobal("localStorage", storage);
     const { useStore } = await import("@app/store");
-    await import("../src/ui/useSweeps"); // registers the planner
+    await import("@kit/sweeps/useSweeps"); // registers the planner
     const s = () => useStore.getState();
     s().setActiveInput("lossRate");
     s().startSweep("lossRate", "optimistic-to-break-even");
@@ -334,7 +334,7 @@ describe("store: sweep runs", () => {
   it("a hand edit of the swept input stops its run", async () => {
     vi.stubGlobal("localStorage", memoryStorage());
     const { useStore } = await import("@app/store");
-    await import("../src/ui/useSweeps");
+    await import("@kit/sweeps/useSweeps");
     const s = () => useStore.getState();
     s().startSweep("lossRate", "around-current");
     s().setParam("lossRate", 0.03);

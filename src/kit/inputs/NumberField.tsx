@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { SyntheticNumber } from "@kit/inputs/SyntheticNumber";
-import type { InputConfig, Unit } from "@kit/inputs/schema";
-import { useStore } from "@app/store";
-import { useSweepTrack } from "./useSweeps";
+import { SyntheticNumber } from "./SyntheticNumber";
+import type { InputConfig, Unit } from "./schema";
+import { useKit, useKitApi } from "@kit/state/context";
+import { useSweepTrack } from "@kit/sweeps/useSweeps";
 
 export interface NumberFieldProps {
   id: string;
@@ -42,12 +42,13 @@ export function perHundredPxOf(config: InputConfig, min: number, max: number): n
  * The field itself is the kit's SyntheticNumber.
  */
 export function NumberField(p: NumberFieldProps) {
-  const dragSensitivity = useStore((s) => s.ui.dragSensitivity);
-  const isActive = useStore((s) => !!p.inputKey && s.activeInput === p.inputKey);
-  const setActiveInput = useStore((s) => s.setActiveInput);
+  const api = useKitApi();
+  const dragSensitivity = useKit((s) => s.ui.dragSensitivity);
+  const isActive = useKit((s) => !!p.inputKey && s.activeInput === p.inputKey);
+  const setActiveInput = useKit((s) => s.setActiveInput);
   const track = useSweepTrack(p.inputKey, isActive);
   const activate = () => {
-    if (p.inputKey && useStore.getState().activeInput !== p.inputKey) setActiveInput(p.inputKey);
+    if (p.inputKey && api.getState().activeInput !== p.inputKey) setActiveInput(p.inputKey);
   };
   return (
     <SyntheticNumber

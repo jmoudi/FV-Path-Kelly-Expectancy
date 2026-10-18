@@ -1,35 +1,34 @@
 import { useState } from "react";
-import { perHundredPxOf } from "./NumberField";
-import { inputConfig, isSweepable } from "@kit/inputs/schema";
-import { PARAM_BY_KEY, PARAM_DEFS, type ParamDef } from "@app/params/schema";
-import type { Params } from "@app/params/params";
-import { useStore } from "@app/store";
-import { BUILTIN_ANCHORS, clonePreset, isBuiltinAnchor, type AnchorRef, type BuiltinAnchor, type SweepKind, type SweepPreset, type SweepRange, type SweepRangeMode, type SweepSpot } from "@kit/sweeps/types";
-import { Num } from "./Num";
-import { describeFor } from "./useSweeps";
+import { perHundredPxOf } from "@kit/inputs/NumberField";
+import { inputConfig, isSweepable, type ParamDef, type Schema } from "@kit/inputs/schema";
+import { useKit, useKitSweeps, useSchema } from "@kit/state/context";
+import { describeWith } from "./adapter";
+import { BUILTIN_ANCHORS, clonePreset, isBuiltinAnchor, type AnchorRef, type BuiltinAnchor, type SweepKind, type SweepPreset, type SweepRange, type SweepRangeMode, type SweepSpot } from "./types";
+import { Num } from "@kit/inputs/Num";
 
 function newId(): string {
   return `p-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** The input a description speaks for: the active one, or the deck's loss rate. */
-function subjectOf(activeInput: string | null): ParamDef {
-  const d = activeInput ? PARAM_BY_KEY[activeInput] : undefined;
-  return d && isSweepable(d) ? d : PARAM_BY_KEY.lossRate;
+/** The input a description speaks for: the active one, or the schema's first sweepable input. */
+function subjectOf(schema: Schema, activeInput: string | null): ParamDef {
+  const d = activeInput ? schema.byKey[activeInput] : undefined;
+  return d && isSweepable(d) ? d : schema.defs.find(isSweepable)!;
 }
 
 /** Every anchor a preset can name: the subject's own first, then the rest of the schema's, then the built-ins. */
-function anchorChoices(subject: ParamDef): { id: string; label: string; own: boolean }[] {
+function anchorChoices(schema: Schema, subject: ParamDef): { id: string; label: string; own: boolean }[] {
   const own = (subject.anchors ?? []).map((a) => ({ id: a.id, label: a.label, own: true }));
   const others: { id: string; label: string; own: boolean }[] = [];
-  for (const d of PARAM_DEFS) for (const a of d.anchors ?? []) if (!own.some((o) => o.id === a.id) && !others.some((o) => o.id === a.id)) others.push({ id: a.id, label: `${a.label} (${d.shortLabel ?? d.label})`, own: false });
+  for (const d of schema.defs) for (const a of d.anchors ?? []) if (!own.some((o) => o.id === a.id) && !others.some((o) => o.id === a.id)) others.push({ id: a.id, label: `${a.label} (${d.shortLabel ?? d.label})`, own: false });
   return [...own, ...BUILTIN_ANCHORS.map((b) => ({ id: b.id, label: b.label, own: true })), ...others];
 }
 
-/** A named anchor falls back to the built-in at the same end; "deck" to the current value. */
-function refFor(id: string, end: "lo" | "hi" | "spot"): AnchorRef {
+/** A named anchor falls back to the built-in its schema entry names, else to the one at the same end. */
+function refFor(schema: Schema, id: string, end: "lo" | "hi" | "spot"): AnchorRef {
   if (isBuiltinAnchor(id)) return { id, fallback: id };
-  const fallback: BuiltinAnchor = id === "deck" ? "current" : end === "lo" ? "min" : end === "hi" ? "max" : "current";
+  const declared = schema.defs.flatMap((d) => d.anchors ?? []).find((a) => a.id === id)?.fallback;
+  const fallback: BuiltinAnchor = declared ?? (end === "lo" ? "min" : end === "hi" ? "max" : "current");
   return { id, fallback };
 }
 
@@ -41,11 +40,11 @@ const RANGE_MODES: { mode: SweepRangeMode; label: string }[] = [
   { mode: "full", label: "the whole range" },
 ];
 
-function rangeFor(mode: SweepRangeMode, subject: ParamDef, value: number): SweepRange {
+function rangeFor(schema: Schema, mode: SweepRangeMode, subject: ParamDef, value: number): SweepRange {
   switch (mode) {
     case "anchors": {
       const own = subject.anchors ?? [];
-      return { mode, lo: refFor(own[0]?.id ?? "min", "lo"), hi: refFor(own[own.length - 1]?.id ?? "max", "hi") };
+      return { mode, lo: refFor(schema, own[0]?.id ?? "min", "lo"), hi: refFor(schema, own[own.length - 1]?.id ?? "max", "hi") };
     }
     case "around":
       return { mode, half: 0.2, unit: "share" };
@@ -67,20 +66,22 @@ function rangeFor(mode: SweepRangeMode, subject: ParamDef, value: number): Sweep
  * way it will run.
  */
 export function SweepPanel() {
-  const presets = useStore((s) => s.presets);
-  const links = useStore((s) => s.links);
-  const runs = useStore((s) => s.runs);
-  const params = useStore((s) => s.params);
-  const activeInput = useStore((s) => s.activeInput);
-  const upsertPreset = useStore((s) => s.upsertPreset);
-  const deletePreset = useStore((s) => s.deletePreset);
-  const linkPreset = useStore((s) => s.linkPreset);
-  const toggleSweep = useStore((s) => s.toggleSweep);
-  const stopSweep = useStore((s) => s.stopSweep);
+  const schema = useSchema();
+  const sweeps = useKitSweeps();
+  const presets = useKit((s) => s.presets);
+  const links = useKit((s) => s.links);
+  const runs = useKit((s) => s.runs);
+  const params = useKit((s) => s.params);
+  const activeInput = useKit((s) => s.activeInput);
+  const upsertPreset = useKit((s) => s.upsertPreset);
+  const deletePreset = useKit((s) => s.deletePreset);
+  const linkPreset = useKit((s) => s.linkPreset);
+  const toggleSweep = useKit((s) => s.toggleSweep);
+  const stopSweep = useKit((s) => s.stopSweep);
   const [editing, setEditing] = useState<SweepPreset | null>(null);
-  const activeDef = activeInput ? PARAM_BY_KEY[activeInput] : undefined;
+  const activeDef = activeInput ? schema.byKey[activeInput] : undefined;
   const sweepable = !!activeDef && isSweepable(activeDef);
-  const subject = subjectOf(activeInput);
+  const subject = subjectOf(schema, activeInput);
 
   const startEdit = (p?: SweepPreset) =>
     setEditing(p ? clonePreset(p) : { id: newId(), name: "New sweep", kind: "loop", range: { mode: "around", half: 0.1, unit: "share" }, step: { size: subject.step, unit: "units" }, intervalMs: 400, scenarios: [] });
@@ -104,14 +105,14 @@ export function SweepPanel() {
         {presets.map((p) => {
           const linkedKeys = Object.entries(links)
             .filter(([, v]) => v === p.id)
-            .map(([k]) => PARAM_BY_KEY[k]?.shortLabel ?? PARAM_BY_KEY[k]?.label ?? k);
+            .map(([k]) => schema.byKey[k]?.shortLabel ?? schema.byKey[k]?.label ?? k);
           const isLinked = !!activeInput && links[activeInput] === p.id;
           const run = activeInput ? runs[activeInput] : undefined;
           return (
             <div key={p.id} className={`preset${isLinked ? " on" : ""}`}>
               <div className="preset-main">
                 <b>{p.name}</b>
-                <span className="caption preset-desc">{describeFor(subject.key, p, params)}</span>
+                <span className="caption preset-desc">{describeWith(sweeps, subject.key, p, params)}</span>
                 {linkedKeys.length > 0 && <span className="caption">linked to {linkedKeys.join(", ")}</span>}
               </div>
               <div className="row" style={{ gap: 4 }}>
@@ -164,11 +165,13 @@ export function SweepPanel() {
   );
 }
 
-function PresetEditor({ preset, subject, params, onChange, onSave, onDelete, onCancel, isNew }: { preset: SweepPreset; subject: ParamDef; params: Params; onChange: (p: SweepPreset) => void; onSave: () => void; onDelete: () => void; onCancel: () => void; isNew: boolean }) {
+function PresetEditor({ preset, subject, params, onChange, onSave, onDelete, onCancel, isNew }: { preset: SweepPreset; subject: ParamDef; params: Record<string, any>; onChange: (p: SweepPreset) => void; onSave: () => void; onDelete: () => void; onCancel: () => void; isNew: boolean }) {
+  const schema = useSchema();
+  const sweeps = useKitSweeps();
   const set = (patch: Partial<SweepPreset>) => onChange({ ...preset, ...patch });
   const r = preset.range;
   const value = params[subject.key] as number;
-  const anchors = anchorChoices(subject);
+  const anchors = anchorChoices(schema, subject);
   const unitDrag = perHundredPxOf(inputConfig(subject), subject.min, subject.max);
   const inUnits = (id: string, label: string, v: number, onV: (v: number) => void, delta = false) => (
     <Num id={id} label={label} value={v} min={delta ? 0 : subject.min} max={delta ? subject.max - subject.min : subject.max} step={subject.step / (subject.unit === "int" ? 1 : 5)} unit={subject.unit} perHundredPx={unitDrag} onChange={(x) => x != null && onV(x)} />
@@ -176,7 +179,7 @@ function PresetEditor({ preset, subject, params, onChange, onSave, onDelete, onC
   const anchorSelect = (label: string, ref: AnchorRef, end: "lo" | "hi" | "spot", onRef: (a: AnchorRef) => void) => (
     <label className="mini-field">
       <span>{label}</span>
-      <select value={ref.id} onChange={(e) => onRef(refFor(e.target.value, end))}>
+      <select value={ref.id} onChange={(e) => onRef(refFor(schema, e.target.value, end))}>
         {!anchors.some((a) => a.id === ref.id) && <option value={ref.id}>{ref.id}</option>}
         {anchors.map((a) => (
           <option key={a.id} value={a.id}>
@@ -205,7 +208,7 @@ function PresetEditor({ preset, subject, params, onChange, onSave, onDelete, onC
         {preset.kind !== "scenarios" && (
           <label className="mini-field">
             <span>range</span>
-            <select value={r.mode} onChange={(e) => set({ range: rangeFor(e.target.value as SweepRangeMode, subject, value) })}>
+            <select value={r.mode} onChange={(e) => set({ range: rangeFor(schema, e.target.value as SweepRangeMode, subject, value) })}>
               {RANGE_MODES.map((m) => (
                 <option key={m.mode} value={m.mode}>
                   {m.label}
@@ -290,7 +293,7 @@ function PresetEditor({ preset, subject, params, onChange, onSave, onDelete, onC
                         const { anchor: _drop, ...rest } = sc;
                         void _drop;
                         set({ range: { mode: "absolute", lo: subject.min, hi: subject.max }, scenarios: preset.scenarios.map((x, j) => (j === i ? { ...rest, at: value } : x)) });
-                      } else update({ anchor: refFor(e.target.value, "spot") });
+                      } else update({ anchor: refFor(schema, e.target.value, "spot") });
                     }}
                   >
                     {anchors.map((a) => (
@@ -319,13 +322,13 @@ function PresetEditor({ preset, subject, params, onChange, onSave, onDelete, onC
               </div>
             );
           })}
-          <button type="button" className="btn small" onClick={() => set({ scenarios: [...preset.scenarios, { anchor: refFor("current", "spot"), at: 0.5, holdMs: 2000 }] })}>
+          <button type="button" className="btn small" onClick={() => set({ scenarios: [...preset.scenarios, { anchor: refFor(schema, "current", "spot"), at: 0.5, holdMs: 2000 }] })}>
             add a spot
           </button>
         </div>
       )}
       <p className="caption preset-desc" style={{ margin: 0 }}>
-        On {subject.label}: {describeFor(subject.key, preset, params)}. A named anchor an input lacks falls back to its min, current value or max.
+        On {subject.label}: {describeWith(sweeps, subject.key, preset, params)}. A named anchor an input lacks falls back to its min, current value or max.
       </p>
       <div className="row" style={{ gap: 6 }}>
         <button type="button" className="btn small primary" onClick={onSave}>

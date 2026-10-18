@@ -1,15 +1,17 @@
-import { kpiItem, sectionNumber } from "@app/frames";
-import { AnswerStrip } from "@kit/ui/AnswerStrip";
-import { TabbedPanel, type PanelTab } from "@kit/ui/TabbedPanel";
-import { ViewFrame } from "@kit/ui/ViewFrame";
-import type { ScenarioView } from "@app/scenarios/types";
-import { allCharts } from "@app/scenarios/types";
+import type { ReactNode } from "react";
+import { kpiItem, sectionNumber } from "./scenarioProps";
+import { AnswerStrip } from "./AnswerStrip";
+import { TabbedPanel, type PanelTab } from "./TabbedPanel";
+import { ViewFrame } from "./ViewFrame";
+import { sectionHref, viewHref } from "./route";
+import type { ScenarioView } from "@kit/charts/scenario";
+import { allCharts } from "@kit/charts/scenario";
 import { ChartHost } from "./ChartHost";
-import { ParamInput } from "./ParamInput";
+import { ParamInput } from "@kit/inputs/ParamInput";
 import { ActionButton, Notes, SourceFigures } from "./Section";
 
 /** One responsibility on its own page: the charts large, the context beside them. */
-export function ViewPage({ scenarios, viewId }: { scenarios: ScenarioView[]; viewId: string }) {
+export function ViewPage({ scenarios, viewId, notFound }: { scenarios: ScenarioView[]; viewId: string; notFound?: ReactNode }) {
   const flat = scenarios.flatMap((s) => s.views.map((v) => ({ scenario: s, view: v })));
   const idx = flat.findIndex((x) => x.view.id === viewId);
   if (idx < 0)
@@ -17,7 +19,7 @@ export function ViewPage({ scenarios, viewId }: { scenarios: ScenarioView[]; vie
       <div className="k-view">
         <h1 className="k-view-title">No such view</h1>
         <p className="page-lede">
-          Pick one from the Views menu, or go back to the <a href="#desk">Desk</a>.
+          {notFound ?? "Pick one from the Views menu."}
         </p>
       </div>
     );
@@ -69,13 +71,13 @@ export function ViewPage({ scenarios, viewId }: { scenarios: ScenarioView[]; vie
   return (
     <ViewFrame
       eyebrow={
-        <a href={`#s-${scenario.id}`} className="k-crumb">
+        <a href={sectionHref(scenario.id)} className="k-crumb">
           Section {sectionNumber(scenario)} · {scenario.title}
         </a>
       }
       title={view.title}
-      prev={{ href: `#view/${prev.view.id}`, label: prev.view.title, title: `${prev.scenario.title} › ${prev.view.title}` }}
-      next={{ href: `#view/${next.view.id}`, label: next.view.title, title: `${next.scenario.title} › ${next.view.title}` }}
+      prev={{ href: viewHref(prev.view.id), label: prev.view.title, title: `${prev.scenario.title} › ${prev.view.title}` }}
+      next={{ href: viewHref(next.view.id), label: next.view.title, title: `${next.scenario.title} › ${next.view.title}` }}
       main={main}
       aside={aside}
     />

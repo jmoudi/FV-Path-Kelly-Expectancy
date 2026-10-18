@@ -4,9 +4,9 @@ import { resolveAxes } from "@kit/charts/resolve";
 import { fieldFormat, numericFields, toCsv, type BackendId, type ChartSpec, type Emphasis, type MarkType, type NumberFormat, type ScaleType, type SpecOverride } from "@kit/charts/spec";
 import { roleColor } from "@kit/charts/theme";
 import type { Unit } from "@kit/inputs/schema";
-import { useStore } from "@app/store";
+import { useKit, useKitCopy } from "@kit/state/context";
 import { copyText, saveText } from "./download";
-import { Num } from "./Num";
+import { Num } from "@kit/inputs/Num";
 
 const MARKS: MarkType[] = ["line", "step", "area", "bar", "scatter"];
 const EMPH: Emphasis[] = ["strong", "normal", "muted"];
@@ -32,9 +32,10 @@ function unitOf(fmt?: NumberFormat): Unit {
  * spec (axes, marks, series, backend) and stores only the diff.
  */
 export function Authoring({ base, spec, override, onClose }: Props) {
-  const setOverride = useStore((s) => s.setOverride);
-  const clearOverride = useStore((s) => s.clearOverride);
-  const defaultBackend = useStore((s) => s.defaultBackend);
+  const setOverride = useKit((s) => s.setOverride);
+  const clearOverride = useKit((s) => s.clearOverride);
+  const defaultBackend = useKit((s) => s.defaultBackend);
+  const copy = useKitCopy();
   const [flash, setFlash] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -156,7 +157,7 @@ export function Authoring({ base, spec, override, onClose }: Props) {
         <div>
           <h5>Series</h5>
           {manySeries ? (
-            <p className="muted" style={{ marginTop: 6 }}>{base.series.length} sampled paths. Change the count under Settings → Paths in fan charts.</p>
+            <p className="muted" style={{ marginTop: 6 }}>{copy.manySeriesNote(base.series.length)}</p>
           ) : (
             <div className="series-list" style={{ marginTop: 6 }}>
               {base.series.map((s) => {

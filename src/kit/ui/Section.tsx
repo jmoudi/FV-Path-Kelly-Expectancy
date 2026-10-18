@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { kpiItem, sectionNumber, viewChips } from "@app/frames";
-import type { PanelTab } from "@kit/ui/TabbedPanel";
-import { SectionFrame } from "@kit/ui/SectionFrame";
-import { useStore } from "@app/store";
+import { kpiItem, sectionNumber, viewChips } from "./scenarioProps";
+import type { PanelTab } from "./TabbedPanel";
+import { SectionFrame } from "./SectionFrame";
+import { useKit } from "@kit/state/context";
 import type { ChartSpec } from "@kit/charts/spec";
-import type { Action, Note, ScenarioView } from "@app/scenarios/types";
-import { viewOfChart } from "@app/scenarios/types";
+import type { Action, Note, ScenarioView } from "@kit/charts/scenario";
+import { viewOfChart } from "@kit/charts/scenario";
 import { ChartHost } from "./ChartHost";
-import { ParamInput } from "./ParamInput";
+import { ParamInput } from "@kit/inputs/ParamInput";
+import { useKitCopy } from "@kit/state/context";
+import { viewHref } from "./route";
 import { TableView } from "./TableView";
 
 function NoteBody({ body }: { body: string }) {
@@ -47,7 +49,7 @@ export function Notes({ notes }: { notes: Note[] }) {
 
 /** An action that moves the deck, phrased as a sentence; a warning asks first. */
 export function ActionButton({ a }: { a: Action }) {
-  const setParams = useStore((s) => s.setParams);
+  const setParams = useKit((s) => s.setParams);
   const [confirm, setConfirm] = useState(false);
   if (a.warning && confirm) {
     return (
@@ -81,6 +83,7 @@ export function ActionButton({ a }: { a: Action }) {
 
 /** Every figure the discussion quotes for the section, next to what the app computes. */
 export function SourceFigures({ view }: { view: ScenarioView }) {
+  const copy = useKitCopy();
   if (!view.sourceFigures?.length) return null;
   return (
     <div className="source-figures">
@@ -113,7 +116,7 @@ export function SourceFigures({ view }: { view: ScenarioView }) {
           ))}
         </tbody>
       </table>
-      <p className="caption">Recomputed from the current deck, except where the label fixes an input at the discussion's number.</p>
+      <p className="caption">{copy.sourceFiguresCaption}</p>
     </div>
   );
 }
@@ -129,7 +132,7 @@ function Tables({ view, tables }: { view: ScenarioView; tables: ChartSpec[] }) {
             <div className="panel-table-head">
               <span className="panel-table-title">{t.title}</span>
               {v && (
-                <a className="k-textlink" href={`#view/${v.id}`}>
+                <a className="k-textlink" href={viewHref(v.id)}>
                   {v.title} ↗
                 </a>
               )}

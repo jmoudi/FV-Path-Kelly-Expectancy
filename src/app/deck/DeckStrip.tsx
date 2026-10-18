@@ -1,5 +1,5 @@
 import { useStore } from "@app/store";
-import { SweepStrip } from "../../ui/SweepStrip";
+import { SweepStrip } from "@kit/sweeps/SweepStrip";
 
 /**
  * The deck's reserved strip slot: the sweep strip of the active input, alone. The

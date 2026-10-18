@@ -1,14 +1,13 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { BACKEND_INFO } from "@kit/charts/registry";
 import type { BackendId } from "@kit/charts/spec";
-import { KeyLegend, Segmented, SettingRow, SettingsGroup, SettingsLayout, type KeyBinding } from "@kit/ui/Settings";
-import { PARAM_DEFS } from "@app/params/schema";
-import { useStore } from "@app/store";
-import { DataBody, ImportExportBody } from "./Dialogs";
-import { Num } from "./Num";
-import { ParamInput } from "./ParamInput";
-import { SweepPanel } from "./SweepPanel";
-import { HOTKEY_HINTS } from "./useSweeps";
+import { KeyLegend, Segmented, SettingRow, SettingsGroup, SettingsLayout, type KeyBinding } from "./Settings";
+import { useKit, useKitCopy, useSchema } from "@kit/state/context";
+import { ImportExportBody } from "./Dialogs";
+import { Num } from "@kit/inputs/Num";
+import { ParamInput } from "@kit/inputs/ParamInput";
+import { SweepPanel } from "@kit/sweeps/SweepPanel";
+import { HOTKEY_HINTS } from "@kit/sweeps/useSweeps";
 
 const BACKENDS: BackendId[] = ["echarts", "plotly", "vega"];
 
@@ -42,10 +41,10 @@ function ResetButton({ label, confirmLabel, keepLabel, onConfirm, disabled }: { 
 
 /** Default backend, and the feel of inputs and sweeps: shared by both views. */
 function EverydayGroups({ compact }: { compact?: boolean }) {
-  const defaultBackend = useStore((s) => s.defaultBackend);
-  const setDefaultBackend = useStore((s) => s.setDefaultBackend);
-  const ui = useStore((s) => s.ui);
-  const setUi = useStore((s) => s.setUi);
+  const defaultBackend = useKit((s) => s.defaultBackend);
+  const setDefaultBackend = useKit((s) => s.setDefaultBackend);
+  const ui = useKit((s) => s.ui);
+  const setUi = useKit((s) => s.setUi);
   return (
     <>
       <SettingsGroup id="set-backend" title="Default backend" blurb={compact ? undefined : "Every chart is a renderer-agnostic definition routed through one of these. ⚙ on a chart overrides it for that chart."}>
@@ -71,15 +70,16 @@ function EverydayGroups({ compact }: { compact?: boolean }) {
 
 /** The resets, each with a confirm step: shared by both views. */
 function ResetGroup({ compact }: { compact?: boolean }) {
-  const clearAllOverrides = useStore((s) => s.clearAllOverrides);
-  const resetParams = useStore((s) => s.resetParams);
-  const resetEverything = useStore((s) => s.resetEverything);
-  const edited = useStore((s) => Object.keys(s.overrides).length);
+  const clearAllOverrides = useKit((s) => s.clearAllOverrides);
+  const resetParams = useKit((s) => s.resetParams);
+  const resetEverything = useKit((s) => s.resetEverything);
+  const edited = useKit((s) => Object.keys(s.overrides).length);
+  const copy = useKitCopy();
   return (
     <>
       <SettingsGroup id="set-reset" title="Reset">
         <div className="reset-list">
-          <ResetButton label="Reset every parameter to the discussion's inputs" confirmLabel="Yes, back to the discussion's inputs" keepLabel="Keep mine" onConfirm={resetParams} />
+          <ResetButton label={copy.resetParamsButton} confirmLabel={copy.resetParamsConfirm} keepLabel="Keep mine" onConfirm={resetParams} />
           <ResetButton label={edited ? `Reset chart edits (${edited})` : "No chart edits to reset"} confirmLabel="Yes, reset every chart" keepLabel="Keep them" onConfirm={clearAllOverrides} disabled={!edited} />
           <ResetButton label="Forget everything saved" confirmLabel="Yes, forget parameters, edits, presets and data" keepLabel="Keep it" onConfirm={resetEverything} />
         </div>
@@ -111,12 +111,14 @@ const KEYS: KeyBinding[] = [
 ];
 
 /** The full settings page: the four everyday settings plus presets, engine, data, state, hotkeys. */
-export function FullSettings() {
-  const engine = PARAM_DEFS.filter((d) => d.tier === "advanced");
+export function FullSettings({ data }: { data?: ReactNode } = {}) {
+  const schema = useSchema();
+  const copy = useKitCopy();
+  const engine = schema.defs.filter((d) => d.tier === "advanced");
   return (
     <SettingsLayout>
       <EverydayGroups />
-      <SettingsGroup id="set-engine" title="Engine" blurb="How season distributions are computed and how many samples the sampled charts draw.">
+      <SettingsGroup id="set-engine" title="Engine" blurb={copy.engineSettingsBlurb}>
         <div className="plain-params">
           {engine.map((d) => (
             <ParamInput key={d.key} k={d.key} compact />
@@ -129,9 +131,7 @@ export function FullSettings() {
       <SettingsGroup id="set-presets" title="Sweep presets" blurb="A preset drives the active input on its own, in the input's own units. Link one to an input, then run it from the deck's strip or with the hotkeys above." wide>
         <SweepPanel />
       </SettingsGroup>
-      <SettingsGroup id="set-data" title="Your data" blurb="Two imports feed the model, one number per line (a CSV's last column is used). They are saved with the state and travel with the export." wide>
-        <DataBody />
-      </SettingsGroup>
+      {data}
       <SettingsGroup id="set-io" title="Import and export">
         <ImportExportBody />
       </SettingsGroup>

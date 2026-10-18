@@ -1,9 +1,7 @@
-import { valueText } from "@app/params/sweepAnchors";
-import { DEFAULT_PARAMS, type Params } from "@app/params/params";
 import { isSweepable } from "@kit/inputs/schema";
-import { PARAM_BY_KEY } from "@app/params/schema";
-import { useStore } from "@app/store";
-import { describeFor, HOTKEY_HINTS } from "./useSweeps";
+import { useKit, useKitCopy, useKitSweeps, useSchema } from "@kit/state/context";
+import { describeWith } from "./adapter";
+import { HOTKEY_HINTS } from "./useSweeps";
 
 /**
  * The sweep strip: one line, in the deck's reserved slot (compact) or under a field.
@@ -21,23 +19,26 @@ import { describeFor, HOTKEY_HINTS } from "./useSweeps";
  * copied or read aloud.
  */
 export function SweepStrip({ inputKey, compact }: { inputKey: string | null; compact?: boolean }) {
-  const runs = useStore((s) => s.runs);
-  const params = useStore((s) => s.params);
-  const presets = useStore((s) => s.presets);
-  const links = useStore((s) => s.links);
-  const origins = useStore((s) => s.sweepOrigins);
-  const linkPreset = useStore((s) => s.linkPreset);
-  const cyclePreset = useStore((s) => s.cyclePreset);
-  const toggleSweep = useStore((s) => s.toggleSweep);
-  const stopSweep = useStore((s) => s.stopSweep);
-  const restoreSweep = useStore((s) => s.restoreSweep);
-  const setParam = useStore((s) => s.setParam);
+  const schema = useSchema();
+  const sweeps = useKitSweeps();
+  const copy = useKitCopy();
+  const runs = useKit((s) => s.runs);
+  const params = useKit((s) => s.params);
+  const presets = useKit((s) => s.presets);
+  const links = useKit((s) => s.links);
+  const origins = useKit((s) => s.sweepOrigins);
+  const linkPreset = useKit((s) => s.linkPreset);
+  const cyclePreset = useKit((s) => s.cyclePreset);
+  const toggleSweep = useKit((s) => s.toggleSweep);
+  const stopSweep = useKit((s) => s.stopSweep);
+  const restoreSweep = useKit((s) => s.restoreSweep);
+  const setParam = useKit((s) => s.setParam);
 
   const cls = `sweep-strip sw${compact ? " compact" : ""}`;
   const runningKey = Object.values(runs).find((r) => r.startedAt != null)?.key;
   // A running sweep owns the strip; otherwise the active input does.
   const key = inputKey && runs[inputKey] ? inputKey : (runningKey ?? inputKey);
-  const def = key ? PARAM_BY_KEY[key] : undefined;
+  const def = key ? schema.byKey[key] : undefined;
   if (!key || !def || def.unit === "choice") {
     return (
       <div className={cls} role="status">
@@ -45,10 +46,11 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
       </div>
     );
   }
-  const value = params[key as keyof Params] as number;
+  const value = params[key] as number;
+  const fmt = (v: number) => sweeps.format(key).value(v);
   const run = runs[key];
   const origin = run?.origin ?? origins[key];
-  const dflt = DEFAULT_PARAMS[key as keyof Params];
+  const dflt = schema.defaults[key];
   const name = (
     <span className="sw-name" title={def.label}>
       <span className="sw-wide">{def.label}</span>
@@ -61,7 +63,7 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
       <div className={`${cls} named`} role="group" aria-label={`${def.label}: not swept`}>
         {name} <span className="sw-label">not swept</span>{" "}
         {value !== dflt && (
-          <button type="button" className="chip tiny" onClick={() => setParam(key as keyof Params, dflt)} title="Back to the discussion's value">
+          <button type="button" className="chip tiny" onClick={() => setParam(key, dflt)} title={copy.resetToDefaultTitle}>
             ↺ default
           </button>
         )}
@@ -85,14 +87,14 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
         <button type="button" className="sw-icon" onClick={() => toggleSweep(key)} title={`Pause (${HOTKEY_HINTS.toggle})`} aria-label="Pause the sweep">
           ❚❚
         </button>{" "}
-        <span className="sw-label sw-wide">sweeping</span> {name} <span className="sw-value">{valueText(def, value)}</span>{" "}
+        <span className="sw-label sw-wide">sweeping</span> {name} <span className="sw-value">{fmt(value)}</span>{" "}
         {position && (
           <>
             <span className="sw-sep">·</span> {position}{" "}
           </>
         )}
         <span className="sw-sep">·</span>{" "}
-        <button type="button" className="sw-link" onClick={() => stopSweep(key)} title={`Stop and keep ${valueText(def, value)}; ${HOTKEY_HINTS.undo} puts back ${valueText(def, run.origin)}`}>
+        <button type="button" className="sw-link" onClick={() => stopSweep(key)} title={`Stop and keep ${fmt(value)}; ${HOTKEY_HINTS.undo} puts back ${fmt(run.origin)}`}>
           <span className="sw-wide">{HOTKEY_HINTS.stop} </span>stop
         </button>
       </div>
@@ -119,14 +121,14 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
           type="button"
           className={`chip tiny sw-preset${linked ? " on" : ""}`}
           onClick={() => (linked ? cyclePreset(key, 1) : presets[0] && linkPreset(key, presets[0].id))}
-          title={linked ? `${describeFor(key, linked, params)}. Click for the next preset (${HOTKEY_HINTS.next}).` : "Link a preset to this input"}
+          title={linked ? `${describeWith(sweeps, key, linked, params)}. Click for the next preset (${HOTKEY_HINTS.next}).` : "Link a preset to this input"}
           disabled={!presets.length}
         >
           {linked ? `${linked.name} ▸` : "link a preset"}
         </button>
       ) : (
         presets.map((p) => (
-          <button key={p.id} type="button" className={`chip tiny${linkedId === p.id ? " on" : ""}`} onClick={() => linkPreset(key, linkedId === p.id ? null : p.id)} title={describeFor(key, p, params)}>
+          <button key={p.id} type="button" className={`chip tiny${linkedId === p.id ? " on" : ""}`} onClick={() => linkPreset(key, linkedId === p.id ? null : p.id)} title={describeWith(sweeps, key, p, params)}>
             {p.name}
           </button>
         ))
@@ -143,7 +145,7 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
         </>
       )}
       {showRestore && (
-        <button type="button" className="chip tiny" onClick={() => restoreSweep(key)} title={`Put back ${valueText(def, origin)}, the value before the sweep (${HOTKEY_HINTS.undo})`} aria-label="Back to the value before the sweep">
+        <button type="button" className="chip tiny" onClick={() => restoreSweep(key)} title={`Put back ${fmt(origin)}, the value before the sweep (${HOTKEY_HINTS.undo})`} aria-label="Back to the value before the sweep">
           ↺<span className="sw-wide"> before sweep</span>
         </button>
       )}

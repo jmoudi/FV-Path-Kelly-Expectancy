@@ -17,6 +17,10 @@ export interface KitCopy {
   affectsAllTitle: string;
   /** Authoring popover, charts with more than 8 series. */
   manySeriesNote: (count: number) => string;
+  /** What a chart's active story moved, from the parameters before it and now ("moves deck: q 2.94% → 2.52%"); null for none. */
+  storyMoved: (before: Record<string, unknown> | undefined, now: Record<string, unknown>) => string | null;
+  /** Settings page: the blurb of the engine group (the schema's advanced inputs). */
+  engineSettingsBlurb: string;
 }
 
 export const DEFAULT_COPY: KitCopy = {
@@ -28,4 +32,6 @@ export const DEFAULT_COPY: KitCopy = {
   affectsAllBadge: "all sections",
   affectsAllTitle: "This input moves every section.",
   manySeriesNote: (n) => `${n} series.`,
+  storyMoved: () => null,
+  engineSettingsBlurb: "How the model is computed and how many samples the sampled charts draw.",
 };
