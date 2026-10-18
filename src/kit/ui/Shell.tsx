@@ -14,10 +14,17 @@ export function useScrollSpy(ids: string[], enabled: boolean, prefix = "s-"): st
   useEffect(() => {
     if (!enabled || !("IntersectionObserver" in window)) return;
     const els = ids.map((id) => document.getElementById(`${prefix}${id}`)).filter((x): x is HTMLElement => !!x);
+    // Every element in the band now, not only those whose crossing this batch reports: a long
+    // section already in the band when its neighbour leaves must still win.
+    const inBand = new Set<Element>();
     const io = new IntersectionObserver(
       (entries) => {
-        const hit = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (hit) setActive(hit.target.id.slice(prefix.length));
+        for (const e of entries) {
+          if (e.isIntersecting) inBand.add(e.target);
+          else inBand.delete(e.target);
+        }
+        const hit = [...inBand].sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0];
+        if (hit) setActive(hit.id.slice(prefix.length));
       },
       { rootMargin: "-25% 0px -60% 0px" },
     );

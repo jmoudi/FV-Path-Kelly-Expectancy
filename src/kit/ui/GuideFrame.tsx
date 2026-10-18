@@ -13,6 +13,7 @@
 import { Fragment, useEffect, useMemo, type ReactNode } from "react";
 import { Icon, type IconName } from "./Icon";
 import { KeyLegend, type KeyBinding } from "./Settings";
+import { RemoteMarkdown } from "./RemoteMarkdown";
 import { useScrollSpy } from "./Shell";
 import "./guide.css";
 
@@ -26,7 +27,13 @@ export type GuideBlock =
   /** A small table: a header row, then rows of cells. */
   | { kind: "table"; head: string[]; rows: string[][]; caption?: string }
   /** Key rows: keys rendered as <kbd>, what they do, where they apply. */
-  | { kind: "keys"; rows: KeyBinding[] };
+  | { kind: "keys"; rows: KeyBinding[] }
+  /**
+   * A Markdown file read at run time, once per page load, relative to the page (never
+   * bundled), in this page's prose styles under a "Loaded <time> · Reload" line;
+   * `failure` follows the plain line shown when it cannot be loaded.
+   */
+  | { kind: "markdown"; src: string; failure?: string; idPrefix?: string };
 
 export interface GuideSection {
   id: string;
@@ -128,6 +135,8 @@ function Block({ b }: { b: GuideBlock }) {
           <KeyLegend bindings={b.rows} />
         </div>
       );
+    case "markdown":
+      return <RemoteMarkdown src={b.src} failure={b.failure} idPrefix={b.idPrefix ?? "g-md-"} headingShift={1} classes={{ p: "k-guide-p", list: "k-guide-list" }} />;
   }
 }
 

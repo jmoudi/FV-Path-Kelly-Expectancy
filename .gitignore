@@ -1,4 +1,6 @@
 node_modules
 dist
+# copied from docs/DIRECTIVES.md by scripts/directives.mjs on every build and dev start
+public/directives.md
 *.log
 .DS_Store

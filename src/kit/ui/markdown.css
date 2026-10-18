@@ -1,0 +1,173 @@
+/*
+ * The Markdown renderer (Markdown.tsx) and the fetched document around it
+ * (RemoteMarkdown.tsx). Type from the theme's scale only; no boxes. A page can hand
+ * its own prose classes to the renderer (the Guide does), and these are the defaults.
+ */
+.k-md {
+  min-width: 0;
+}
+.k-md > :first-child {
+  margin-top: 0;
+}
+/* Headings have ids; a link to one lands below the sticky bars. */
+.k-md :is(h1, h2, h3, h4, h5, h6) {
+  scroll-margin-top: calc(var(--topbar-h) + var(--deck-h) + 24px);
+}
+.k-md-h1,
+.k-md-h2 {
+  margin: 40px 0 12px;
+  font-size: var(--fs-h);
+  font-weight: var(--fw-h);
+  line-height: 1.3;
+  color: var(--ink);
+}
+.k-md-h1 {
+  font-size: var(--fs-view);
+  font-weight: var(--fw-view);
+}
+.k-md-h3 {
+  margin: 40px 0 10px;
+  font-size: var(--fs-chart);
+  font-weight: var(--fw-chart);
+  line-height: 1.35;
+  color: var(--ink);
+}
+.k-md-h4 {
+  margin: 28px 0 8px;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.k-md-h5,
+.k-md-h6 {
+  margin: 20px 0 6px;
+  font-size: var(--fs-ui);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.k-md-p {
+  margin: 0 0 10px;
+  max-width: var(--prose-max);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.k-md-list {
+  margin: 0 0 12px;
+  padding-left: 1.3em;
+  max-width: var(--prose-max);
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: var(--ink-2);
+  display: grid;
+  gap: 4px;
+}
+.k-md ol {
+  padding-left: 2.4em;
+}
+.k-md ol > li::marker {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--muted);
+}
+.k-md li > ul,
+.k-md li > ol,
+.k-md li > p {
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+.k-md strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.k-md code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-ui);
+  color: var(--ink);
+  background: var(--surface);
+  border-radius: 4px;
+  padding: 0 4px;
+  overflow-wrap: anywhere;
+}
+.k-md-link {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--muted);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.k-md-link:hover,
+.k-md-link:focus-visible {
+  text-decoration-color: var(--accent);
+}
+.k-md-quote {
+  margin: 0 0 14px;
+  padding-left: 14px;
+  border-left: 2px solid var(--hairline);
+  max-width: var(--prose-max);
+}
+.k-md-quote > :last-child {
+  margin-bottom: 0;
+}
+.k-md-pre {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  max-width: 100%;
+  overflow-x: auto;
+  background: var(--surface);
+  border-radius: 4px;
+}
+.k-md-pre code {
+  background: none;
+  padding: 0;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.k-md-hr {
+  border: 0;
+  border-top: 1px solid var(--hairline);
+  margin: 28px 0;
+}
+
+/* The fetched document: one status line above it, or one plain line when it failed. */
+.k-md-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0 0 20px;
+  font-size: var(--fs-label);
+  color: var(--muted);
+}
+.k-md-fail {
+  margin: 0 0 20px;
+  padding-left: 12px;
+  border-left: 2px solid var(--loss);
+  max-width: var(--prose-max);
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: var(--ink);
+}
+.k-md-reload {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--ink-2);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--muted);
+  text-underline-offset: 3px;
+}
+.k-md-reload:hover,
+.k-md-reload:focus-visible {
+  color: var(--ink);
+  text-decoration-color: var(--accent);
+}
+.k-md-reload:disabled {
+  color: var(--muted);
+  cursor: default;
+}
