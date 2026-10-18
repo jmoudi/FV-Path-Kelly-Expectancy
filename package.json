@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "parity": "node scripts/parity.mjs"
   },
   "dependencies": {
     "echarts": "^5.5.1",

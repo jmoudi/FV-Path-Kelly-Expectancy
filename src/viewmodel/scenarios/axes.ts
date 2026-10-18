@@ -72,7 +72,7 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
   const kellyCurve: ChartSpec = {
     id: "axes-kelly",
     title: "The growth-optimal fraction per name",
-    subtitle: "x loss rate per name · y Kelly fraction per name, f* = p − q/b · black = deck · green = optimistic · red = break-even",
+    subtitle: "x loss rate per name · y Kelly fraction per name, f* = p − q/b · white = deck · green = optimistic · red = break-even",
     kind: "xy",
     data: table([f("q", "Loss rate per name", "pct2"), f("fstar", "Kelly fraction per name", "pct")], kellyRows),
     mark: "line",
@@ -103,7 +103,7 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
   const hump: ChartSpec = {
     id: "axes-hump",
     title: "Log growth per season against the fraction risked per name",
-    subtitle: `x fraction of the tranche per name · y log growth per season of surviving paths · ${k} name${k === 1 ? "" : "s"} a night, ${n} nights · green = optimistic q · black = deck q · red = break-even q · violet line = your per-name fraction · axis ends where ${k} names fill the tranche`,
+    subtitle: `x fraction of the tranche per name · y log growth per season of surviving paths · ${k} name${k === 1 ? "" : "s"} a night, ${n} nights · green = optimistic q · white = deck q · red = break-even q · violet line = your per-name fraction · axis ends where ${k} names fill the tranche`,
     kind: "xy",
     data: table([f("f", "Fraction of the tranche per name", "pct"), ...rates.map((qq, i) => f(`g${i}`, `q = ${pct2(qq)}`, "pct1"))], humpRows),
     mark: "line",
@@ -142,7 +142,7 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
   const breadthChart: ChartSpec = {
     id: "axes-breadth",
     title: "Growth per season by names per night",
-    subtitle: `x names a night · y log growth per season at the Kelly fraction per name, capped once k·f* passes 100% · black = deck q · green = optimistic q · the cap ${capDeck ? `binds from ${capDeck} names at the deck's rate` : "does not bind at the deck's rate"}${capOpt ? ` and from ${capOpt} at the optimistic rate` : ""}`,
+    subtitle: `x names a night · y log growth per season at the Kelly fraction per name, capped once k·f* passes 100% · white = deck q · green = optimistic q · the cap ${capDeck ? `binds from ${capDeck} names at the deck's rate` : "does not bind at the deck's rate"}${capOpt ? ` and from ${capOpt} at the optimistic rate` : ""}`,
     kind: "xy",
     data: table(
       [f("names", "Names per night", "int"), f("deck", `at the deck's q ${pct2(q)}`, "pct1"), f("opt", `at the optimistic q ${pct2(alt)}`, "pct1"), f("optUncapped", "optimistic, uncapped", "pct1")],

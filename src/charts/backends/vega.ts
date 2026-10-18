@@ -1,220 +1,157 @@
 import embed, { type Result } from "vega-embed";
+import { BarAccumulator, exposeProbe, inRange, type AxisProbe, type RenderProbe, type SeriesProbe } from "../../kit/charts/probe";
 import { formatNumber } from "../format";
-import { resolveAxes, type ResolvedAxis } from "../resolve";
-import { fieldFormat, fieldLabel, type ChartSpec, type Row, type SeriesSpec } from "../spec";
-import { THEME, emphasisOpacity, emphasisWidth, heatPalette, roleColor } from "../theme";
-import { categories, d3Format, numberOrNull, showLegend, type Backend, type RenderHandle } from "./types";
+import { resolveChart, type ResolvedAxis } from "../resolve";
+import { fieldFormat, type ChartSpec } from "../spec";
+import { markOf, type Backend, type RenderHandle } from "./types";
+import { buildVegaSpec } from "./vegaSpec";
 
-type VL = Record<string, unknown>;
-
-/** A Vega expression mapping tick values to the labels every backend shares. */
-function labelExpr(ticks: number[], labels: string[], fallbackFormat?: string): string {
-  const entries = ticks.map((t, i) => `${JSON.stringify(String(t))}: ${JSON.stringify(labels[i])}`).join(", ");
-  const fallback = fallbackFormat ? `format(datum.value, ${JSON.stringify(fallbackFormat)})` : "datum.label";
-  return `({${entries}})[toString(datum.value)] || ${fallback}`;
+interface VItem {
+  x?: number;
+  y?: number;
+  x2?: number;
+  y2?: number;
+  width?: number;
+  height?: number;
+  datum?: Record<string, unknown>;
+  items?: VMark[];
+}
+interface VMark {
+  marktype: string;
+  items: VItem[];
+}
+interface VScale {
+  type: string;
+  domain(): unknown[];
+  range(): unknown[];
+}
+interface VView {
+  width(): number;
+  height(): number;
+  scale(name: string): VScale | undefined;
+  scenegraph(): { root: VMark };
 }
 
-function axisEnc(ax: ResolvedAxis, field: string, cat: boolean): VL {
-  if (cat) return { field, type: "ordinal", title: ax.label, axis: { labelAngle: 0, grid: false } };
-  const fmt = d3Format(ax.format);
-  const enc: VL = {
-    field,
-    type: "quantitative",
-    title: ax.label,
-    scale: { type: ax.scale === "log" ? "log" : "linear", domain: [ax.min, ax.max], nice: false, zero: false, clamp: false },
-    axis: { grid: ax.grid, values: ax.ticks, labelExpr: labelExpr(ax.ticks, ax.labels, fmt), labelOverlap: true, labelFlush: false },
+/** Every mark in the scenegraph with its items, depth first. */
+function marks(root: VMark): VMark[] {
+  const out: VMark[] = [];
+  const visit = (m: VMark) => {
+    out.push(m);
+    if (m.marktype === "group") for (const it of m.items ?? []) for (const child of it.items ?? []) visit(child);
   };
-  return enc;
+  visit(root);
+  return out;
 }
 
-function seriesLayer(spec: ChartSpec, s: SeriesSpec, xAx: ResolvedAxis, yAx: ResolvedAxis, cat: boolean, domain: string[], range: string[]): VL {
-  const mark = s.mark ?? spec.mark;
-  const color = roleColor(s.color);
-  const op = emphasisOpacity(s.emphasis);
-  const width = s.width ?? emphasisWidth(s.emphasis, 2);
-  const name = s.label ?? fieldLabel(spec.data, s.field);
-  const xField = s.xField ?? spec.x.field;
-  const xfmt = d3Format(spec.x.format ?? fieldFormat(spec.data, xField));
-  const yfmt = d3Format(fieldFormat(spec.data, s.field));
-  let m: VL;
-  switch (mark) {
-    case "bar":
-      m = { type: "bar", color, opacity: op, cornerRadiusTopLeft: 2, cornerRadiusTopRight: 2, ...(spec.barWidthPx && !cat ? { width: spec.barWidthPx } : {}) };
-      break;
-    case "scatter":
-      m = { type: "point", filled: true, color, opacity: op, size: 70, stroke: THEME.surface, strokeWidth: 1.5 };
-      break;
-    case "area":
-      m = { type: "area", color, opacity: 0.16 * op, line: { color, strokeWidth: width, opacity: op, strokeDash: s.dash ? [6, 4] : undefined } };
-      break;
-    case "step":
-      m = { type: "line", color, opacity: op, strokeWidth: width, interpolate: "step-after", strokeDash: s.dash ? [6, 4] : undefined };
-      break;
-    default:
-      m = { type: "line", color, opacity: op, strokeWidth: width, strokeDash: s.dash ? [6, 4] : undefined };
+function axisProbe(scale: VScale | undefined, label: (c: unknown) => string): AxisProbe | undefined {
+  if (!scale) return undefined;
+  if (scale.type === "band" || scale.type === "point" || scale.type === "ordinal") {
+    // Show categories by their labels, as the other backends do, in screen order.
+    const labels = scale.domain().map(label);
+    const [r0, r1] = scale.range() as number[];
+    return { kind: "category", categories: r0 > r1 ? labels.reverse() : labels };
   }
-  const filters = [`isValid(datum["${s.field}"])`, `isValid(datum["${xField}"])`];
-  if (yAx.scale === "log") filters.push(`datum["${s.field}"] > 0`);
-  if (xAx.scale === "log") filters.push(`datum["${xField}"] > 0`);
-  // Keep values inside the resolved domain so a clipped y does not draw outside the frame.
-  if (!cat) filters.push(`datum["${xField}"] >= ${xAx.min} && datum["${xField}"] <= ${xAx.max}`);
-  // clip: a story or edit that narrows the domain must not draw outside the frame.
-  const layer: VL = {
-    mark: { ...m, clip: true },
-    transform: [{ filter: filters.join(" && ") }],
-    encoding: {
-      x: axisEnc(xAx, xField, cat),
-      y: axisEnc(yAx, s.field, false),
-      tooltip: [
-        { field: xField, type: cat ? "ordinal" : "quantitative", title: xAx.label, format: xfmt },
-        { field: s.field, type: "quantitative", title: name, format: yfmt },
-      ],
-    },
+  const [min, max] = scale.domain() as number[];
+  return { kind: scale.type === "log" ? "log" : "linear", min, max };
+}
+
+function probeView(view: VView, spec: ChartSpec, containerWidth: number): RenderProbe {
+  const all = marks(view.scenegraph().root);
+  if (spec.kind === "heatmap") {
+    let cells = 0;
+    const field = spec.heat?.valueField ?? "";
+    for (const m of all) if (m.marktype === "rect") for (const it of m.items) if (it.datum?.__cell && Number.isFinite(it.datum[field] as number)) cells++;
+    const heat = spec.heat;
+    const fmtOf = (f: string | undefined) => (c: unknown) => (typeof c === "number" ? formatNumber(c, (f && fieldFormat(spec.data, f)) || "auto") : String(c));
+    return { backend: "vega", kind: "heatmap", horizontal: false, height: spec.height, h: axisProbe(view.scale("x"), fmtOf(heat?.xField)), v: axisProbe(view.scale("y"), fmtOf(heat?.yField)), series: [], lines: 0, areas: 0, dots: 0, labels: 0, cells };
+  }
+  const rc = resolveChart(spec, containerWidth);
+  const W = view.width();
+  const H = view.height();
+  const catLabel = (ax: ResolvedAxis) => (c: unknown) => {
+    const i = ax.categories.findIndex((k) => String(k) === String(c));
+    return i >= 0 ? ax.labels[i] : String(c);
   };
-  if (s.colors && cat && mark === "bar") {
-    const cats = categories(spec.data.rows, xField);
-    (layer.encoding as VL).color = { field: xField, type: "nominal", scale: { domain: cats.map(String), range: cats.map((_, i) => roleColor(s.colors![i % s.colors!.length])) }, legend: null };
-    (layer.mark as VL).color = undefined;
-  } else if (s.legend !== false && domain.length >= 2) {
-    // The legend sits above the plot, as in the other backends, never over the data.
-    (layer.encoding as VL).color = { datum: name, scale: { domain, range }, legend: { title: null, orient: "top", direction: "horizontal", symbolType: "stroke", offset: 6 } };
-    (layer.mark as VL).color = undefined;
-  }
-  if (spec.stack && (mark === "bar" || mark === "area")) (layer.encoding as VL).y = { ...((layer.encoding as VL).y as VL), stack: "zero" };
-  return layer;
-}
-
-function annotationLayers(spec: ChartSpec, height: number): VL[] {
-  const layers: VL[] = [];
-  // Each annotation is one mark. Without its own single-row data source a layer
-  // inherits the chart's rows and draws the mark once per row.
-  const out = { push: (l: VL) => layers.push({ data: { values: [{}] }, ...l, mark: { ...(l.mark as VL), clip: true } }) };
-  for (const a of spec.annotations ?? []) {
-    const color = roleColor(a.color ?? "muted");
-    const dash = a.dash === false ? undefined : [4, 4];
-    if (a.kind === "vline" && a.x != null) {
-      out.push({ mark: { type: "rule", color, strokeDash: dash, strokeWidth: 1.2 }, encoding: { x: { datum: a.x } } });
-      if (a.text) out.push({ mark: { type: "text", color, align: "left", baseline: a.at === "start" ? "bottom" : "top", dx: 4, dy: a.at === "start" ? -4 : 4, fontSize: 10.5 }, encoding: { x: { datum: a.x }, y: { value: a.at === "start" ? height : 0 }, text: { value: a.text } } });
-    } else if (a.kind === "hline" && a.y != null) {
-      out.push({ mark: { type: "rule", color, strokeDash: dash, strokeWidth: 1.2 }, encoding: { y: { datum: a.y } } });
-      if (a.text) out.push({ mark: { type: "text", color, align: a.at === "start" ? "left" : "right", baseline: "bottom", dy: -3, fontSize: 10.5 }, encoding: { y: { datum: a.y }, x: { value: a.at === "start" ? 4 : "width" }, text: { value: a.text } } });
-    } else if ((a.kind === "point" || a.kind === "label") && a.x != null && a.y != null) {
-      if (a.kind === "point") out.push({ mark: { type: "point", filled: true, color, size: 90, stroke: THEME.surface, strokeWidth: 2 }, encoding: { x: { datum: a.x }, y: { datum: a.y } } });
-      if (a.text) out.push({ mark: { type: "text", color: roleColor(a.color ?? "ink"), dy: -12, fontSize: 10.5, align: a.at === "start" ? "right" : a.at === "end" ? "left" : "center", dx: a.at === "start" ? -8 : a.at === "end" ? 8 : 0 }, encoding: { x: { datum: a.x }, y: { datum: a.y }, text: { value: a.text } } });
-    } else if (a.kind === "xband" && a.x != null && a.x2 != null) {
-      out.push({ mark: { type: "rect", color, opacity: 0.1 }, encoding: { x: { datum: a.x }, x2: { datum: a.x2 } } });
-      if (a.text) out.push({ mark: { type: "text", color: THEME.muted, baseline: "top", dy: 4, fontSize: 10.5 }, encoding: { x: { datum: (a.x + a.x2) / 2 }, y: { value: 0 }, text: { value: a.text } } });
-    } else if (a.kind === "yband" && a.y != null && a.y2 != null) {
-      out.push({ mark: { type: "rect", color, opacity: 0.1 }, encoding: { y: { datum: a.y }, y2: { datum: a.y2 } } });
+  const h = axisProbe(view.scale("x"), catLabel(rc.h));
+  const v = axisProbe(view.scale("y"), catLabel(rc.v));
+  const posAxis = rc.horizontal ? v : h;
+  const posOk = (p: unknown) => posAxis?.kind === "category" || inRange(p, posAxis?.min ?? -Infinity, posAxis?.max ?? Infinity);
+  // One series may draw several marks (an area and its outline); count the primary one.
+  const primary: Record<string, string> = { bar: "rect", line: "line", step: "line", area: "area", scatter: "symbol", band: "area" };
+  const kindOf = (key: string) => (key.endsWith("~band") ? "band" : markOf(spec, spec.series.find((x) => x.field === key) ?? spec.series[0]));
+  // Items per series key, and per mark node: a fill drawn as one path is one piece.
+  const byKey = new Map<string, { marktype: string; items: VItem[]; pieces: VItem[][] }>();
+  const ann = { line: 0, area: 0, dot: 0, label: 0 };
+  for (const m of all) {
+    if (m.marktype === "group") continue;
+    const pieces = new Map<string, VItem[]>();
+    for (const it of m.items ?? []) {
+      const d = it.datum;
+      if (!d) continue;
+      if (typeof d.__ann === "string") ann[d.__ann as keyof typeof ann]++;
+      else if (typeof d.__key === "string" && primary[kindOf(d.__key)] === m.marktype) {
+        const e = byKey.get(d.__key) ?? { marktype: m.marktype, items: [], pieces: [] };
+        e.items.push(it);
+        byKey.set(d.__key, e);
+        const piece = pieces.get(d.__key) ?? [];
+        piece.push(it);
+        pieces.set(d.__key, piece);
+      }
     }
+    for (const [k, piece] of pieces) byKey.get(k)!.pieces.push(piece);
   }
-  return layers;
-}
-
-const CONFIG: VL = {
-  font: THEME.fontUi,
-  background: "transparent",
-  axis: {
-    labelColor: THEME.muted,
-    titleColor: THEME.muted,
-    gridColor: THEME.grid,
-    domainColor: THEME.hairline,
-    tickColor: THEME.hairline,
-    labelFontSize: 11,
-    titleFontSize: 11,
-    titleFontWeight: "normal",
-    labelFont: THEME.fontMono,
-    titlePadding: 8,
-  },
-  legend: { labelColor: THEME.ink2, titleColor: THEME.muted, labelFontSize: 11, symbolStrokeWidth: 3, symbolSize: 60 },
-  view: { stroke: null },
-  text: { font: THEME.fontUi },
-};
-
-function heatSpec(spec: ChartSpec, height: number): VL {
-  const h = spec.heat!;
-  const xFmt = fieldFormat(spec.data, h.xField);
-  const yFmt = fieldFormat(spec.data, h.yField);
-  const vf = h.format ?? fieldFormat(spec.data, h.valueField) ?? "auto";
-  const xs = categories(spec.data.rows, h.xField);
-  const ys = categories(spec.data.rows, h.yField);
-  const catExpr = (cats: (string | number)[], fmt?: typeof xFmt) =>
-    `({${cats.map((c) => `${JSON.stringify(String(c))}: ${JSON.stringify(typeof c === "number" ? formatNumber(c, fmt ?? "auto") : String(c))}`).join(", ")}})[toString(datum.value)] || datum.label`;
-  const rows: Row[] = spec.data.rows.map((r) => {
-    const v = numberOrNull(r[h.valueField]);
-    const custom = h.labelField ? r[h.labelField] : null;
-    return { ...r, __label: custom != null ? String(custom) : v == null ? "" : formatNumber(v, vf) };
-  });
-  const vals = rows.map((r) => numberOrNull(r[h.valueField])).filter((v): v is number => v != null);
-  const min = vals.length ? Math.min(...vals) : 0;
-  const max = vals.length ? Math.max(...vals) : 1;
-  const palette = heatPalette(h.palette);
-  let domain: number[];
-  if (h.palette === "diverging") {
-    const c = h.center ?? 0;
-    const span = Math.max(Math.abs(max - c), Math.abs(min - c));
-    domain = palette.map((_, i) => c - span + (2 * span * i) / (palette.length - 1));
-  } else if (h.palette === "binary") domain = [0, 1];
-  else domain = palette.map((_, i) => min + ((max - min) * i) / (palette.length - 1));
-  // Sort orders must carry the field's own value type; strings would not match numeric cells.
-  const xEnc = { field: h.xField, type: "ordinal", title: spec.x.label ?? fieldLabel(spec.data, h.xField), axis: { labelAngle: 0, labelExpr: catExpr(xs, xFmt) }, sort: [...xs] };
-  const yEnc = { field: h.yField, type: "ordinal", title: spec.y.label ?? fieldLabel(spec.data, h.yField), axis: { labelExpr: catExpr(ys, yFmt) }, sort: [...ys].reverse() };
-  const layers: VL[] = [
-    {
-      mark: { type: "rect", stroke: THEME.surface, strokeWidth: 2, cornerRadius: 3 },
-      encoding: {
-        x: xEnc,
-        y: yEnc,
-        color: {
-          field: h.valueField,
-          type: "quantitative",
-          scale: { domain, range: palette },
-          legend: h.palette === "binary" ? null : { title: null, format: d3Format(vf), orient: "bottom", direction: "horizontal", gradientLength: 140, gradientThickness: 8, labelFontSize: 10.5 },
-        },
-        tooltip: [
-          { field: h.xField, title: fieldLabel(spec.data, h.xField) },
-          { field: h.yField, title: fieldLabel(spec.data, h.yField) },
-          { field: "__label", title: fieldLabel(spec.data, h.valueField) },
-        ],
-      },
-    },
-  ];
-  if (h.cellLabels !== false) layers.push({ mark: { type: "text", color: THEME.ink, fontSize: 11, font: THEME.fontMono }, encoding: { x: xEnc, y: yEnc, text: { field: "__label" } } });
-  if (h.highlight) {
-    layers.push({
-      transform: [{ filter: `toString(datum["${h.xField}"]) === ${JSON.stringify(String(h.highlight.x))} && toString(datum["${h.yField}"]) === ${JSON.stringify(String(h.highlight.y))}` }],
-      mark: { type: "rect", fill: null, stroke: THEME.ink, strokeWidth: 2.5, cornerRadius: 3 },
-      encoding: { x: xEnc, y: yEnc },
-    });
-  }
-  return { $schema: "https://vega.github.io/schema/vega-lite/v5.json", width: "container", height, data: { values: rows }, config: CONFIG, layer: layers };
-}
-
-function build(spec: ChartSpec): VL {
-  const height = spec.height ?? 300;
-  if (spec.kind === "heatmap" && spec.heat) return heatSpec(spec, height);
-  const axes = resolveAxes(spec);
-  const cat = axes.x.categorical;
-  const legendOn = showLegend(spec);
-  const legendSeries = spec.series.filter((s) => s.legend !== false);
-  const domain = legendOn ? legendSeries.map((s) => s.label ?? fieldLabel(spec.data, s.field)) : [];
-  const range = legendOn ? legendSeries.map((s) => roleColor(s.color)) : [];
-  const layers = [...spec.series.map((s) => seriesLayer(spec, s, axes.x, axes.y, cat, domain, range)), ...annotationLayers(spec, height)];
-  if (cat) {
-    const cats = categories(spec.data.rows, spec.x.field).map(String);
-    for (const l of layers) {
-      const enc = (l as VL).encoding as VL | undefined;
-      if (enc?.x && (enc.x as VL).field) (enc.x as VL).sort = cats;
+  /** Summed bounding-box area of the fill pieces, as a share of the plot. */
+  const fillShare = (pieces: VItem[][]) => {
+    let sum = 0;
+    for (const piece of pieces) {
+      let x0 = Infinity;
+      let x1 = -Infinity;
+      let y0 = Infinity;
+      let y1 = -Infinity;
+      for (const it of piece) {
+        for (const x of [it.x, it.x2]) if (Number.isFinite(x)) (x0 = Math.min(x0, x!)), (x1 = Math.max(x1, x!));
+        for (const y of [it.y, it.y2]) if (Number.isFinite(y)) (y0 = Math.min(y0, y!)), (y1 = Math.max(y1, y!));
+      }
+      if (Number.isFinite(x0)) sum += Math.max(0, Math.min(x1, W) - Math.max(x0, 0)) * Math.max(0, Math.min(y1, H) - Math.max(y0, 0));
     }
-  }
-  return {
-    $schema: "https://vega.github.io/schema/vega-lite/v5.json",
-    width: "container",
-    height,
-    data: { values: spec.data.rows },
-    config: CONFIG,
-    layer: layers,
+    return sum / (W * H);
   };
+  const keys = [...spec.series.filter((s) => s.band).map((s) => `${s.field}~band`), ...spec.series.map((s) => s.field)];
+  const series: SeriesProbe[] = [];
+  for (const key of keys) {
+    const e = byKey.get(key);
+    if (key.endsWith("~band")) {
+      if (!e) continue;
+      const share = fillShare(e.pieces);
+      series.push({ key, kind: "band", count: share > 0 ? 1 : 0, extent: share });
+      continue;
+    }
+    const s = spec.series.find((x) => x.field === key)!;
+    const mark = markOf(spec, s);
+    const items = e?.items ?? [];
+    if (mark === "bar") {
+      const acc = new BarAccumulator(rc.horizontal ? W : H, rc.horizontal ? H : W);
+      let count = 0;
+      for (const it of items) {
+        const d = it.datum!;
+        if (Number.isFinite(d.value as number) && d.value !== 0 && posOk(d.pos)) count++;
+        if (rc.horizontal) acc.add(it.width ?? 0, H - ((it.y ?? 0) + (it.height ?? 0) / 2), it.height);
+        else acc.add(it.height ?? 0, (it.x ?? 0) + (it.width ?? 0) / 2, it.width);
+      }
+      series.push({ key, kind: "bar", count, extent: acc.extent(), center: acc.center(), thickness: acc.thickness() });
+      continue;
+    }
+    let count = 0;
+    for (const it of items) {
+      const d = it.datum!;
+      const val = rc.horizontal ? d.h : d.v;
+      const pos = rc.horizontal ? d.v : d.h;
+      if (typeof val === "number" && Number.isFinite(val) && posOk(pos)) count++;
+    }
+    if (mark === "area") series.push({ key, kind: "area", count, extent: fillShare(e?.pieces ?? []) });
+    else series.push({ key, kind: mark === "scatter" ? "point" : "line", count });
+  }
+  return { backend: "vega", kind: "xy", horizontal: rc.horizontal, height: spec.height, h, v, series, lines: ann.line, areas: ann.area, dots: ann.dot, labels: ann.label };
 }
 
 export const backend: Backend = {
@@ -223,28 +160,47 @@ export const backend: Backend = {
   mount(el, spec): RenderHandle {
     let result: Result | null = null;
     let disposed = false;
+    let current = spec;
+    let ready: Promise<unknown> = Promise.resolve();
+    let builtWidth = 0;
     const run = (s: ChartSpec) => {
       if (disposed) return;
+      current = s;
       result?.finalize();
       result = null;
-      void embed(el, build(s) as never, { actions: false, renderer: "svg", tooltip: { theme: "dark" } }).then((r) => {
+      builtWidth = el.clientWidth || 700;
+      const { vl } = buildVegaSpec(s, builtWidth);
+      ready = embed(el, vl as never, { actions: false, renderer: "svg", tooltip: { theme: "dark" } }).then((r) => {
         if (disposed) r.finalize();
         else result = r;
       });
     };
     run(spec);
-    return {
+    const handle: RenderHandle = {
       update(next) {
         run(next);
       },
       resize() {
-        result?.view.resize().runAsync();
+        // Bar offsets and label placements depend on the width, so rebuild when it changes.
+        if (Math.abs((el.clientWidth || 700) - builtWidth) > 1) run(current);
       },
       dispose() {
         disposed = true;
         result?.finalize();
         result = null;
       },
+      async probe() {
+        let seen: Promise<unknown>;
+        do {
+          seen = ready;
+          await seen;
+        } while (seen !== ready);
+        if (!result) throw new Error("Vega-Lite has not rendered");
+        await result.view.runAsync();
+        return probeView(result.view as unknown as VView, current, builtWidth);
+      },
     };
+    exposeProbe(el, () => handle.probe!());
+    return handle;
   },
 };

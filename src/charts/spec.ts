@@ -15,6 +15,8 @@ export type ColorRole =
   | "loss"
   | "good"
   | "ink"
+  /** The neutral accent: secondary ink, for asides and claims (never a policy hue). */
+  | "ink2"
   | "muted"
   | "ramp1"
   | "ramp2"
@@ -160,6 +162,11 @@ export interface ChartSpec {
    * the series values along the horizontal one; annotations placed on x follow it.
    */
   orientation?: "horizontal" | "vertical";
+  /**
+   * Where a step mark changes level: "after" each point (the default), or "middle",
+   * halfway to the next point, so each point owns a flat segment centred on it.
+   */
+  step?: "after" | "middle";
   legend?: boolean;
   /** Bar width hint for numeric-x bars, in px. */
   barWidthPx?: number;
@@ -197,7 +204,7 @@ export interface SpecOverride {
 const BACKENDS: BackendId[] = ["echarts", "plotly", "vega", "table"];
 const MARKS: MarkType[] = ["line", "step", "area", "bar", "scatter"];
 const EMPHASES: Emphasis[] = ["strong", "normal", "muted"];
-const ROLES: ColorRole[] = ["a", "b", "c", "loss", "good", "ink", "muted", "ramp1", "ramp2", "ramp3", "ramp4"];
+const ROLES: ColorRole[] = ["a", "b", "c", "loss", "good", "ink", "ink2", "muted", "ramp1", "ramp2", "ramp3", "ramp4"];
 
 function num(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;

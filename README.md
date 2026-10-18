@@ -25,7 +25,22 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # static site in dist/
 npm test           # model tests against the discussion's figures
+npm run parity     # every chart × backend draws the same marks (see below)
 ```
+
+### Backend parity
+
+`npm run parity` (`scripts/parity.mjs`) builds the app, serves `dist/` with its own
+`vite preview` on a free port in 4300–4399, and opens every view (`#view/<id>`, the
+ids come from the view-model) once with ECharts, once with Plotly and once with
+Vega-Lite as the default backend. Each backend exposes a probe on the element it drew
+into that reads back, from the library's own model or DOM, what it actually drew:
+bars (count, summed length, position, thickness), points and line vertices per
+series, band and area fills, reference lines, dots, labels, heatmap cells and the
+axis ranges. ECharts is the reference and is itself checked against the resolved
+spec; any disagreement fails the run. Options: `--no-build`, `--only=<chart ids>`,
+`--viewport=400x800`. It needs Playwright (resolved from the project,
+`$PLAYWRIGHT_PATH` or the global npm root) and a Chromium at `$PARITY_CHROME`.
 
 ## How it is put together
 
@@ -37,8 +52,9 @@ be swapped without touching the others.
 | Model | `src/model/` | Pure math. Season distributions (exact multinomial enumeration, a binned log-space engine, seeded Monte Carlo), the binary reduction, calibration and record statistics, wing rates (Normal, Student-t or an imported sample) with `ratioForLossRate`, correlation, Kelly sizing and the robust optimum averaged over a band of loss rates, the two growth figures (`growth.ts`). The discussion's remaining concepts each have a file: `nav.ts` (NAV log growth and the Kelly share of NAV when the tranche is refilled each season), `railroad.ts` (stations, tracks and track widths of the schematic), `calendar.ts` (names per night from a histogram, Kelly per name with the capital ceiling, the sampled and expected season), `wingSeason.ts` (the season-end distribution the wing's partial payout produces, and the share of bad seasons that are partial), `symmetric.ts` (the 60% symmetric-payoff system's season). `policies.ts` is the single source of the three policies' names and colours. No DOM, no chart library. |
 | Parameters | `src/model/params.ts` | One typed object plus a schema with tiers: primary (control deck), secondary (tuned under a section), advanced (settings dialog). Includes the market switch (`market`: fair, discussion, custom) with `marketOf` / `marketPatch`. The wing's default realized ÷ priced sigma is solved at load so the wing's effective loss rate equals the deck's q. Imported datasets sit beside it. |
 | View-model | `src/viewmodel/` | Turns model output into renderer-agnostic chart specs (`src/charts/spec.ts`): data table, mark, axes, series, annotations, stories. One file per section, plus `desk.ts` (the Desk's policy grid, sizing line, calibration verdict and market state) and `derived.ts` (shared derived state, the deck's figures, and the one number formatter: U+2212 minus everywhere, milliseconds under a second). Runs in a Web Worker (`worker.ts`) so sliders never block the page. |
-| Axis resolution | `src/charts/resolve.ts` | Computes concrete domains, tick positions and tick labels once, so every backend draws the same ranges and puts reference lines in the same place. |
-| Switchboard | `src/charts/registry.ts`, `src/charts/backends/` | Routes a spec to ECharts, Plotly, Vega-Lite, or an HTML table. Each backend is loaded on first use. |
+| Axis resolution | `src/charts/resolve.ts` | `resolveChart` computes, once per render, everything a backend needs: domains, ticks and tick labels (ECharts uses them too, not its own), which axis is drawn where (`orientation: "horizontal"` puts the x field up the side), the bar plan, where each annotation label goes, and how the legend wraps. Every backend draws the same ranges, lines, labels and bars. |
+| Chart kit | `src/kit/charts/` | Generic pieces with no domain knowledge: `bars.ts` (grouped when series share a position, overlaid when they never do, stacked on request; px thickness that never overruns its neighbours; axis ends widened so edge bars show whole; step vertices), `collide.ts` (greedy label placement), `probe.ts` and `parity.ts` (what a backend drew, and the comparison the parity script runs). |
+| Switchboard | `src/charts/registry.ts`, `src/charts/backends/` | Routes a spec to ECharts, Plotly, Vega-Lite, or an HTML table. Each backend is loaded on first use. All three draw from the same point lists (`backends/types.ts`); the Plotly figure and the Vega-Lite spec are built by pure modules (`plotlyFigure.ts`, `vegaSpec.ts`) that the tests inspect without a DOM. |
 | Figures | `src/charts/figures/` | Charts of kind `figure` (the railroad schematic, the season calendar) are drawn by a React SVG component from the registry in `index.ts`, sized to the width the host gives them, in the theme's colours. They are not backend-switchable: ⊞ shows their data table and ⚙ offers only the height. |
 | Authoring | `src/ui/Authoring.tsx`, stories in each spec | A story is a trader's question ("Half my nights have one name", "The chain is right: q = break-even") with a one-line answer; when it moves the deck it carries a badge ("moves deck: q 2.94% → 2.52%"). Display choices (axis scales, backends, zooms) are not stories; they live in ⚙, which edits the spec by hand (backend, mark, axis scale and domain in the axis's own units, x field, series visibility, mark and emphasis, extra columns, legend, height) and stores only the diff, keyed by chart id. |
 | State | `src/state/store.ts` | Parameters, imported data, chart edits, default backend, and the snapshot of parameters a story moved. Only one deck-moving story is active at a time: applying one turns the other off and restores its parameters. Validated on load, persisted locally, exported and imported as one JSON file (version 4). `#reset` in the address clears it. |
@@ -107,8 +123,16 @@ be swapped without touching the others.
 - The robust risk a night maximises growth averaged over loss rates drawn uniformly
   between the optimistic rate and break-even, or from a Beta posterior when a trade log
   is imported.
-- Rates palette: optimistic = green, deck = ink, break-even = red. Policy colours are
-  reserved for policies.
+- Rates palette: optimistic = green, deck = ink (near white on graphite), break-even =
+  red, wherever those rates are a series or an annotation; a test holds every chart to
+  it. Policy colours are reserved for policies; `ink2` is the neutral accent for asides.
+- Chart conventions: bars on a numeric axis are drawn at their exact positions with a
+  px thickness; annotation labels never overlap (vertical-line labels closer than 14px
+  alternate top and bottom, horizontal-line labels stack, point labels move aside);
+  legends wrap above the plot instead of printing over it; a step chart can change
+  level after each point or midway (`step: "middle"`, each point owns a centred step);
+  a series with `band` fills down to its lower edge. Chart numbers print through
+  `src/charts/format.ts`, which matches the app's formatter, U+2212 minus included.
 - **Refilling from NAV** makes a season a bet of a share f of NAV on the season-end
   multiple X; NAV grows at E[log(1 − f + f·X)] and the growth-optimal share is
   f* ≈ 2p − 1 for the coin (exactly p − (1 − p)/(X − 1) for a two-point season).

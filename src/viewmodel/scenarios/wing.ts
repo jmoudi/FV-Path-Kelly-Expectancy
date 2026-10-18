@@ -115,7 +115,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
   const sweep: ChartSpec = {
     id: "wing-sweep",
     title: "Three candidate rates against the short-strike distance",
-    subtitle: "x short strike distance, priced sigmas · y rate per event (log) · breach, effective, full gap · red = fair c ÷ W · black = deck q · line = your strike",
+    subtitle: "x short strike distance, priced sigmas · y rate per event (log) · breach, effective, full gap · red = fair c ÷ W · white = deck q · line = your strike",
     kind: "xy",
     data: table([f("d", "Short strike distance, priced sigmas", "x2"), f("breach", "Breach rate", "pct2"), f("effective", "Effective rate", "pct2"), f("fullGap", "Full-gap rate", "pct2")], sweepRows),
     mark: "line",
@@ -137,7 +137,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
   const bars: ChartSpec = {
     id: "wing-bars",
     title: "The three rates at your strikes",
-    subtitle: "x candidate rate · y rate per event · red = fair c ÷ W · black = deck q",
+    subtitle: "x candidate rate · y rate per event · red = fair c ÷ W · white = deck q",
     kind: "xy",
     data: table(
       [f("rate", "Rate"), f("value", "Rate per event", "pct2")],

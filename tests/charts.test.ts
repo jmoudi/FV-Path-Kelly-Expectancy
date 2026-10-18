@@ -442,3 +442,308 @@ describe("story rules in the store", () => {
     useStore.getState().resetEverything();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Chart rendering: orientation, bars, bands, label collisions, parity, palette.
+// ---------------------------------------------------------------------------
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { planBars, stepVertices } from "../src/kit/charts/bars";
+import { estimateTextWidth, overlaps, placeLabels } from "../src/kit/charts/collide";
+import { compareProbes } from "../src/kit/charts/parity";
+import { BarAccumulator, type RenderProbe } from "../src/kit/charts/probe";
+import { buildOption } from "../src/charts/backends/echarts";
+import { buildFigure } from "../src/charts/backends/plotlyFigure";
+import { bandPoints, barPoints, linePoints } from "../src/charts/backends/types";
+import { buildVegaSpec } from "../src/charts/backends/vegaSpec";
+import { formatNumber as chartFormat, tickMultiple as tickX, tickPercent as tickPct, tickPlain } from "../src/charts/format";
+import { legendLayout, resolveChart } from "../src/charts/resolve";
+import { THEME } from "../src/charts/theme";
+import { formatNumber as appFormat } from "../src/viewmodel/derived";
+import { TableView } from "../src/ui/TableView";
+
+describe("chart rendering", () => {
+  const { scenarios } = buildAll(DEFAULT_PARAMS, EMPTY_DATASETS);
+  const charts = scenarios.flatMap((s) => [...s.primary, ...s.secondary]);
+  const chart = (id: string) => charts.find((c) => c.id === id)!;
+  const xy = charts.filter((c) => c.kind === "xy");
+
+  it("formats chart numbers exactly like the app's one formatter, with U+2212", () => {
+    for (const v of [-0.042, -1234.5, -2.5e-7, 0.0294, 1.0947, -3, 0, -Infinity, 12.3456])
+      for (const fmt of ["pct", "pct1", "pct2", "pct3", "x", "x2", "int", "num", "sci", "auto"] as const) expect(chartFormat(v, fmt), `${v} ${fmt}`).toBe(appFormat(v, fmt));
+    expect(tickPct(-0.05)).toBe("−5%");
+    expect(tickPlain(-2.5)).toBe("−2.5");
+    expect(tickX(2)).toBe("2×");
+    for (const s of [chartFormat(-0.1, "pct1"), tickPct(-0.001), tickPlain(-1500)]) expect(s).not.toMatch(/-/);
+  });
+
+  it("draws the single-name outcomes as two horizontal bars with a mean line, 140px high", () => {
+    const spec = chart("binary-outcomes");
+    const rc = resolveChart(spec, 900);
+    expect(rc.horizontal).toBe(true);
+    // Probability runs along the bottom, the season end up the side.
+    expect(rc.h.field).toBe("clean");
+    expect([rc.h.min, rc.h.max]).toEqual([0, 1]);
+    expect(rc.v.field).toBe("end");
+    expect(rc.v.ticks).toEqual([0, 1, 2]);
+    // The two series never share a position, so they are overlaid at their own ends.
+    expect(rc.bars).toMatchObject({ mode: "overlay", thicknessPx: 22, offsetsPx: { ruin: 0, clean: 0 } });
+    expect(barPoints(spec, rc, spec.series[0]).map((b) => [b.shifted, b.value])).toEqual([[0, expect.closeTo(0.45, 2)]]);
+    expect(barPoints(spec, rc, spec.series[1]).map((b) => b.shifted)).toEqual([expect.closeTo(1.99, 2)]);
+    // The mean, placed on the season-end axis, becomes a horizontal line.
+    const mean = rc.annotations.find((a) => a.text?.startsWith("mean"))!;
+    expect(mean.kind).toBe("hline");
+    expect(mean.y).toBeCloseTo(1.0947, 3);
+    // ECharts: value axes both ways, bars drawn as placed rectangles, no legend.
+    const opt = buildOption(spec, 900, 210) as { xAxis: { type: string }; yAxis: { type: string; min: number }; series: { type: string; id: string }[]; legend: { show: boolean } };
+    expect(opt.xAxis.type).toBe("value");
+    expect(opt.yAxis).toMatchObject({ type: "value", min: -0.5 });
+    expect(opt.series.filter((s) => s.type === "custom").map((s) => s.id)).toEqual(["ruin", "clean"]);
+    expect(opt.legend.show).toBe(false);
+    // Plotly: horizontal bars, overlaid (not grouped), with an explicit width.
+    const fig = buildFigure(spec, 900);
+    expect(fig.layout.barmode).toBe("overlay");
+    const bars = fig.data.filter((t) => t.type === "bar");
+    expect(bars.map((t) => t.orientation)).toEqual(["h", "h"]);
+    for (const t of bars) expect(t.width as number).toBeGreaterThan(0);
+    expect((bars[1].y as number[])[0]).toBeCloseTo(1.99, 2);
+    // Vega-Lite: each bar layer carries its own rows, so it cannot draw nothing.
+    const vl = buildVegaSpec(spec, 900).vl as { layer: { mark: { type: string; orient?: string }; data: { values: unknown[] } }[]; height: number };
+    const barLayers = vl.layer.filter((l) => l.mark.type === "bar");
+    expect(barLayers).toHaveLength(2);
+    for (const l of barLayers) {
+      expect(l.mark.orient).toBe("horizontal");
+      expect(l.data.values).toHaveLength(1);
+    }
+    expect(vl.height).toBe(140);
+  });
+
+  it("groups bars that share positions and keeps edge bars whole", () => {
+    const pmf = chart("cal-pmf-year");
+    const rc = resolveChart(pmf, 900);
+    expect(rc.bars!.mode).toBe("group");
+    expect(rc.bars!.offsetsPx.opt).toBeLessThan(0);
+    expect(rc.bars!.offsetsPx.be).toBeGreaterThan(0);
+    // The zero-loss bar sits at the axis start: the axis widens so it shows in full.
+    expect(rc.axes.x.min).toBeLessThan(0);
+    expect(rc.axes.x.ticks[0]).toBe(0);
+    expect(buildFigure(pmf, 900).layout.barmode).toBe("overlay");
+    // Bars never overlap their neighbours, whatever the hint.
+    const plan = planBars(
+      [
+        { key: "a", positions: [0, 1, 2] },
+        { key: "b", positions: [0, 1, 2] },
+      ],
+      { axis: { min: 0, max: 2, scale: "linear", categorical: false }, axisPx: 40, thicknessPx: 30 },
+    );
+    expect(plan.thicknessPx! * 2 + 1).toBeLessThanOrEqual(20);
+    expect(
+      planBars(
+        [
+          { key: "a", positions: [0] },
+          { key: "b", positions: [1] },
+        ],
+        { axis: { min: 0, max: 1, scale: "linear", categorical: false }, axisPx: 400 },
+      ).mode,
+    ).toBe("overlay");
+    expect(
+      planBars(
+        [
+          { key: "a", positions: ["x", "y"] },
+          { key: "b", positions: ["x"] },
+        ],
+        { axis: { min: 0, max: 2, scale: "linear", categorical: true }, axisPx: 400 },
+      ),
+    ).toMatchObject({ mode: "group", thicknessPx: null });
+  });
+
+  it("draws the chained mean and median as centred steps with a 25–75% band", () => {
+    const spec = chart("chain-curve");
+    expect(spec.step).toBe("middle");
+    const rc = resolveChart(spec, 600);
+    const median = spec.series.find((s) => s.field === "medianReserve")!;
+    const pts = linePoints(spec, rc, median);
+    // Each season owns a flat step centred on it: two vertices per season.
+    expect(pts).toHaveLength(2 * spec.data.rows.length);
+    expect(pts[0][0]).toBeCloseTo(0.5, 9);
+    expect(pts[1][0]).toBeCloseTo(1.5, 9);
+    expect(pts[0][1]).toBe(pts[1][1]);
+    expect(
+      stepVertices(
+        [
+          [1, 2],
+          [2, 3],
+        ],
+        "after",
+      ),
+    ).toEqual([
+      [1, 2],
+      [2, 2],
+      [2, 3],
+    ]);
+    const band = spec.series.find((s) => s.band)!;
+    const polys = bandPoints(spec, rc, band);
+    expect(polys).toHaveLength(1);
+    expect(polys[0].length).toBe(4 * spec.data.rows.length);
+    // Every backend fills it.
+    const opt = buildOption(spec, 600) as { series: { id: string; type: string }[] };
+    expect(opt.series[0]).toMatchObject({ id: "p75Reserve~band", type: "custom" });
+    expect(buildFigure(spec, 600).data[0]).toMatchObject({ meta: "p75Reserve~band", fill: "toself" });
+    const vl = buildVegaSpec(spec, 600).vl as { layer: { mark: { type: string }; encoding: Record<string, unknown> }[] };
+    expect(vl.layer[0].mark.type).toBe("area");
+    expect(vl.layer[0].encoding.y2).toEqual({ field: "lo" });
+    // An area mark is one fill, not one per row (which an `order` channel would cause).
+    for (const c of xy)
+      for (const l of (buildVegaSpec(c, 600).vl as { layer: { mark: { type: string }; encoding?: Record<string, unknown> }[] }).layer) if (l.mark.type === "area") expect(l.encoding?.order, c.id).toBeUndefined();
+  });
+
+  it("keeps vertical-line labels closer than 14px at opposite ends and stacks horizontal ones", () => {
+    const base: ChartSpec = {
+      id: "t",
+      title: "t",
+      kind: "xy",
+      data: table(
+        [f("x", "x"), f("y", "y")],
+        [
+          { x: 0, y: 0 },
+          { x: 1, y: 1 },
+        ],
+      ),
+      mark: "line",
+      x: { field: "x", domain: [0, 1] },
+      y: { field: "y", domain: [0, 1] },
+      series: [{ field: "y", color: "a" }],
+      height: 300,
+      annotations: [
+        { kind: "vline", x: 0.5, text: "first line" },
+        { kind: "vline", x: 0.51, text: "second line" },
+        { kind: "vline", x: 0.52, text: "third line" },
+        { kind: "hline", y: 0.5, text: "upper level", at: "start" },
+        { kind: "hline", y: 0.49, text: "lower level", at: "start" },
+      ],
+    };
+    const rc = resolveChart(base, 900);
+    const [v1, v2, v3, h1, h2] = rc.annotations.map((a) => a.label!);
+    expect(v1.anchor).toBe("top");
+    expect(v2.anchor).toBe("bottom");
+    expect(v3.anchor).toBe("top");
+    expect(h1.anchor).toBe("left");
+    expect(h2.anchor).toBe("left");
+    const boxes = rc.annotations.map((a) => a.label!.box);
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) expect(overlaps(boxes[i], boxes[j], 0), `${i} ${j}`).toBe(false);
+    // The second horizontal label went above or below the first one's level, not onto it.
+    expect(Math.abs(h1.box.y0 - h2.box.y0)).toBeGreaterThanOrEqual(16);
+    // The placer itself.
+    const placed = placeLabels(
+      [
+        [{ box: { x0: 0, y0: 0, x1: 10, y1: 10 }, value: "a" }],
+        [
+          { box: { x0: 5, y0: 5, x1: 15, y1: 15 }, value: "b1" },
+          { box: { x0: 20, y0: 0, x1: 30, y1: 10 }, value: "b2" },
+        ],
+      ],
+      { x0: 0, y0: 0, x1: 100, y1: 100 },
+    );
+    expect(placed.map((p) => p.value)).toEqual(["a", "b2"]);
+    expect(estimateTextWidth("mmm")).toBeGreaterThan(estimateTextWidth("iii"));
+  });
+
+  it("places every annotation label of every chart without overlaps, at desktop and phone widths", () => {
+    for (const width of [900, 420])
+      for (const c of xy) {
+        const boxes = resolveChart(c, width)
+          .annotations.filter((a) => a.label)
+          .map((a) => ({ text: a.text, box: a.label!.box }));
+        for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) expect(overlaps(boxes[i].box, boxes[j].box, 0), `${c.id} @${width}: "${boxes[i].text}" / "${boxes[j].text}"`).toBe(false);
+      }
+  });
+
+  it("wraps legends into rows above the plot on narrow screens", () => {
+    const names = ["Spread + reserve, 25th to 75th percentile", "Spread, mean", "Spread, median", "Spread + reserve, mean", "Spread + reserve, median"];
+    expect(legendLayout(names, 1300)).toEqual({ flowRows: 1, columns: 5, gridRows: 1 });
+    const narrow = legendLayout(names, 300);
+    expect(narrow.flowRows).toBeGreaterThan(2);
+    expect(narrow.columns).toBe(1);
+    expect(narrow.gridRows).toBe(5);
+    expect(resolveChart(chart("chain-curve"), 400).legend!.flowRows).toBeGreaterThan(1);
+  });
+
+  it("builds every chart in every backend without losing a mark", () => {
+    for (const width of [900, 400])
+      for (const c of charts.filter((x) => x.kind === "xy" || x.kind === "heatmap")) {
+        const opt = buildOption(c, width) as { series: unknown[] };
+        expect(opt.series.length, c.id).toBeGreaterThan(0);
+        const fig = buildFigure(c, width);
+        const vl = buildVegaSpec(c, width).vl as { layer: { data?: { values: unknown[] } }[] };
+        if (c.kind === "heatmap") continue;
+        const rc = resolveChart(c, width);
+        for (const s of c.series) {
+          const n = (s.mark ?? c.mark) === "bar" ? barPoints(c, rc, s).length : linePoints(c, rc, s).length;
+          expect(
+            fig.data.find((t) => t.meta === s.field),
+            `${c.id}/${s.field} plotly`,
+          ).toBeTruthy();
+          const layer = vl.layer.find((l) => (l.data?.values as { __key?: string }[] | undefined)?.[0]?.__key === s.field);
+          if (n > 0) expect(layer?.data?.values.length, `${c.id}/${s.field} vega`).toBe(n);
+        }
+      }
+  });
+
+  it("uses the rates palette: optimistic green, deck ink, break-even red", () => {
+    // A gap between two rates ("optimistic vs break-even") is neither rate and stays neutral.
+    const role = (t: string) =>
+      / vs /.test(t) ? null : /^(optimistic|true rate .*\(optimistic\))/.test(t) ? "good" : /^(break-even|fair \/ break-even|fair c ÷ W|true rate .*\(break-even\))/.test(t) ? "loss" : /^deck q/.test(t) ? "ink" : null;
+    let checked = 0;
+    for (const c of xy) {
+      for (const s of c.series) {
+        const want = s.label ? role(s.label) : null;
+        if (!want) continue;
+        expect(s.color, `${c.id}: ${s.label}`).toBe(want);
+        checked++;
+      }
+      for (const a of c.annotations ?? []) {
+        const want = a.text ? role(a.text) : null;
+        if (!want) continue;
+        expect(a.color, `${c.id}: ${a.text}`).toBe(want);
+        checked++;
+      }
+      // Ink is not black on the graphite theme.
+      expect(c.subtitle ?? "", c.id).not.toMatch(/\bblack\b/);
+    }
+    expect(checked).toBeGreaterThanOrEqual(12);
+    // The neutral accent for claims and asides exists as a role and is not a policy hue.
+    expect(THEME.roles.ink2).toBe(THEME.ink2);
+    expect(THEME.roles.ink2).not.toBe(THEME.roles.c);
+  });
+
+  it("shows a horizontal bar chart's numbers in the table by position", () => {
+    const html = renderToStaticMarkup(createElement(TableView, { spec: chart("binary-outcomes") }));
+    const heads = [...html.matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]);
+    expect(heads).toEqual(["Season end, tranche units", "Ruin", "Clean season"]);
+    expect(html).toContain("1.99×");
+  });
+
+  it("compares render probes and names every disagreement", () => {
+    const ref: RenderProbe = {
+      backend: "echarts",
+      kind: "xy",
+      horizontal: true,
+      h: { kind: "linear", min: 0, max: 1 },
+      v: { kind: "category", categories: ["a", "b"] },
+      series: [{ key: "s", kind: "bar", count: 2, extent: 1, center: 0.5 }],
+      lines: 1,
+      areas: 0,
+      dots: 0,
+      labels: 2,
+    };
+    expect(compareProbes(ref, { ...ref, backend: "plotly" })).toEqual([]);
+    const bad = compareProbes(ref, { ...ref, horizontal: false, h: { kind: "linear", min: 0, max: 1.2 }, v: { kind: "category", categories: ["b", "a"] }, series: [{ key: "s", kind: "bar", count: 1, extent: 0.4, center: 0.8 }], labels: 1 });
+    expect(bad.map((d) => d.what)).toEqual(["bar orientation", "horizontal axis range", "vertical axis categories", "annotation labels", "series s bars", "series s bar length", "series s bar position"]);
+    // A bar the library clipped away does not count.
+    const acc = new BarAccumulator(100, 100);
+    acc.add(50, 50);
+    acc.add(50, 140);
+    expect(acc.extent()).toBe(0.5);
+    expect(acc.center()).toBe(0.5);
+  });
+});

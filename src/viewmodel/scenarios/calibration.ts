@@ -188,7 +188,7 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
   const symChart: ChartSpec = {
     id: "cal-symmetric",
     title: `The ${pct(symP)} symmetric system's season next to the ${coin.name}'s`,
-    subtitle: `x season end, units of the starting stake · y share of seasons ending at or below · ${p.nights} events each · amber = ${coin.label} · black = symmetric payoff, ${pct(symP)} win rate, ${pct1(symS)} staked a trade · red line = the start`,
+    subtitle: `x season end, units of the starting stake · y share of seasons ending at or below · ${p.nights} events each · amber = ${coin.label} · white = symmetric payoff, ${pct(symP)} win rate, ${pct1(symS)} staked a trade · red line = the start`,
     kind: "xy",
     data: table([f("end", "Season end", "x"), f("coin", coin.label, "pct1"), f("sym", symLabel, "pct1")], symRows),
     mark: "step",
