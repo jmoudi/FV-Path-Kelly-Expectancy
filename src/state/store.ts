@@ -4,7 +4,8 @@ import { DEFAULT_PARAMS, EMPTY_DATASETS, PARAM_BY_KEY, sanitizeDatasets, sanitiz
 import { DEFAULT_PRESETS, type SweepPreset, type SweepRange, type SweepRun } from "../sweeps/types";
 
 const STORAGE_KEY = "tranche-replay:v1";
-const EXPORT_VERSION = 3;
+/** 4: the snapshot of parameters a story moved (storyPrev) travels with the state. */
+const EXPORT_VERSION = 4;
 
 export interface UiSettings {
   /** How many times a second a running sweep commits a value. */
@@ -27,6 +28,8 @@ export interface ExportedState {
   presets: SweepPreset[];
   links: Record<string, string>;
   ui: UiSettings;
+  /** chart id -> the parameters a story moved, as they were before it. */
+  storyPrev: Record<string, Partial<Params>>;
 }
 
 interface AppState {
@@ -40,7 +43,11 @@ interface AppState {
   links: Record<string, string>;
   /** input key -> running sweep (transient) */
   runs: Record<string, SweepRun>;
-  /** chart id -> the parameters a story moved, as they were before it (transient). */
+  /**
+   * chart id -> the parameters a story moved, as they were before it. Persisted, so a
+   * reload still knows what "undo" restores. Only one deck-moving story is active at a
+   * time: applying one turns the other off and restores its parameters first.
+   */
   storyPrev: Record<string, Partial<Params>>;
   activeInput: string | null;
   ui: UiSettings;
@@ -91,7 +98,7 @@ function load(): Partial<ExportedState> {
   }
 }
 
-type Persisted = Pick<AppState, "params" | "overrides" | "defaultBackend" | "datasets" | "presets" | "links" | "ui">;
+type Persisted = Pick<AppState, "params" | "overrides" | "defaultBackend" | "datasets" | "presets" | "links" | "ui" | "storyPrev">;
 
 function save(state: Persisted) {
   try {
@@ -116,6 +123,32 @@ function sanitizeOverrides(input: unknown): Record<string, SpecOverride> {
 }
 
 const num = (v: unknown, lo: number, hi: number, dflt: number) => (typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : dflt);
+
+/** A snapshot is a partial Params: known keys only, each value of the right kind. */
+function sanitizeParamPatch(input: unknown): Partial<Params> | null {
+  if (!input || typeof input !== "object") return null;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+    const def = PARAM_BY_KEY[k];
+    if (!def) continue;
+    if (def.unit === "choice") {
+      if (typeof v === "string" && def.choices?.some((c) => c.value === v)) out[k] = v;
+    } else if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+  }
+  return Object.keys(out).length ? (out as Partial<Params>) : null;
+}
+
+/** chart id -> snapshot; only snapshots whose chart still carries a story override are kept. */
+function sanitizeStoryPrev(input: unknown, overrides: Record<string, SpecOverride>): Record<string, Partial<Params>> {
+  if (!input || typeof input !== "object") return {};
+  const out: Record<string, Partial<Params>> = {};
+  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+    if (!/^[\w-]{1,64}$/.test(k) || !overrides[k]?.story) continue;
+    const patch = sanitizeParamPatch(v);
+    if (patch) out[k] = patch;
+  }
+  return out;
+}
 
 export function sanitizePreset(input: unknown): SweepPreset | null {
   if (!input || typeof input !== "object") return null;
@@ -180,22 +213,23 @@ function pushHistory(past: Params[], prev: Params): Params[] {
 
 const initial = load();
 const initialPresets = sanitizePresets(initial.presets);
+const initialOverrides = sanitizeOverrides(initial.overrides);
 
 export const useStore = create<AppState>((set, get) => {
   const persist = (patch: Partial<Persisted>) => {
     const s = get();
-    save({ params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui, ...patch });
+    save({ params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui, storyPrev: s.storyPrev, ...patch });
   };
   return {
     params: sanitizeParams(initial.params ?? DEFAULT_PARAMS),
     datasets: sanitizeDatasets(initial.datasets ?? EMPTY_DATASETS),
-    overrides: sanitizeOverrides(initial.overrides),
+    overrides: initialOverrides,
     defaultBackend: VALID_BACKENDS.includes(initial.defaultBackend as BackendId) ? (initial.defaultBackend as BackendId) : "echarts",
     authoringOpen: null,
     presets: initialPresets,
     links: sanitizeLinks(initial.links, initialPresets),
     runs: {},
-    storyPrev: {},
+    storyPrev: sanitizeStoryPrev(initial.storyPrev, initialOverrides),
     activeInput: null,
     ui: sanitizeUi(initial.ui),
     past: [],
@@ -268,15 +302,26 @@ export const useStore = create<AppState>((set, get) => {
         if (back) params = sanitizeParams({ ...params, ...back });
         delete storyPrev[id];
       } else if (story.params) {
+        // Only one deck-moving story is active at a time: turn the others off first and
+        // restore what they moved, so the new snapshot is taken from clean parameters.
+        for (const otherId of Object.keys(storyPrev)) {
+          if (otherId === id) continue;
+          params = sanitizeParams({ ...params, ...storyPrev[otherId] });
+          delete storyPrev[otherId];
+          delete overrides[otherId];
+        }
         // Snapshot what it is about to move, unless an earlier story on this chart already did.
         const snap: Partial<Params> = storyPrev[id] ?? {};
-        for (const k of Object.keys(story.params) as (keyof Params)[]) if (!(k in snap)) (snap as Record<string, unknown>)[k] = prev[k];
+        for (const k of Object.keys(story.params) as (keyof Params)[]) if (!(k in snap)) (snap as Record<string, unknown>)[k] = params[k];
         storyPrev[id] = snap;
         params = sanitizeParams({ ...params, ...story.params });
       } else {
+        // A story that only re-defines the chart replaces a deck-moving one on the same chart.
+        const back = storyPrev[id];
+        if (back) params = sanitizeParams({ ...params, ...back });
         delete storyPrev[id];
       }
-      persist({ overrides, params });
+      persist({ overrides, params, storyPrev });
       set({ overrides, params, storyPrev, ...(params !== prev ? { past: pushHistory(get().past, prev), future: [] } : {}) });
     },
     clearOverride: (id) => {
@@ -287,7 +332,7 @@ export const useStore = create<AppState>((set, get) => {
       delete storyPrev[id];
       const prev = get().params;
       const params = back ? sanitizeParams({ ...prev, ...back }) : prev;
-      persist({ overrides, params });
+      persist({ overrides, params, storyPrev });
       set({ overrides, params, storyPrev, ...(params !== prev ? { past: pushHistory(get().past, prev), future: [] } : {}) });
     },
     clearAllOverrides: () => {
@@ -295,7 +340,7 @@ export const useStore = create<AppState>((set, get) => {
       let params = prev;
       for (const back of Object.values(get().storyPrev)) params = { ...params, ...back };
       params = params === prev ? prev : sanitizeParams(params);
-      persist({ overrides: {}, params });
+      persist({ overrides: {}, params, storyPrev: {} });
       set({ overrides: {}, params, storyPrev: {}, ...(params !== prev ? { past: pushHistory(get().past, prev), future: [] } : {}) });
     },
     setDefaultBackend: (defaultBackend) => {
@@ -375,7 +420,7 @@ export const useStore = create<AppState>((set, get) => {
     },
     exportState: () => {
       const s = get();
-      return { version: EXPORT_VERSION, exportedAt: new Date().toISOString(), params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui };
+      return { version: EXPORT_VERSION, exportedAt: new Date().toISOString(), params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui, storyPrev: s.storyPrev };
     },
     importState: (text) => {
       let parsed: unknown;
@@ -394,8 +439,9 @@ export const useStore = create<AppState>((set, get) => {
       const links = sanitizeLinks(obj.links ?? get().links, presets);
       const ui = sanitizeUi(obj.ui ?? get().ui);
       const defaultBackend = VALID_BACKENDS.includes(obj.defaultBackend as BackendId) ? (obj.defaultBackend as BackendId) : get().defaultBackend;
-      set({ params, overrides, defaultBackend, datasets, presets, links, ui, runs: {} });
-      save({ params, overrides, defaultBackend, datasets, presets, links, ui });
+      const storyPrev = sanitizeStoryPrev(obj.storyPrev, overrides);
+      set({ params, overrides, defaultBackend, datasets, presets, links, ui, storyPrev, runs: {} });
+      save({ params, overrides, defaultBackend, datasets, presets, links, ui, storyPrev });
       return { ok: true };
     },
     resetEverything: () => {
@@ -404,7 +450,7 @@ export const useStore = create<AppState>((set, get) => {
       } catch {
         /* ignore */
       }
-      set({ params: { ...DEFAULT_PARAMS }, overrides: {}, defaultBackend: "echarts", datasets: { record: [], moves: [] }, presets: DEFAULT_PRESETS.map((p) => ({ ...p })), links: {}, runs: {}, ui: { ...DEFAULT_UI } });
+      set({ params: { ...DEFAULT_PARAMS }, overrides: {}, defaultBackend: "echarts", datasets: { record: [], moves: [] }, presets: DEFAULT_PRESETS.map((p) => ({ ...p })), links: {}, runs: {}, storyPrev: {}, ui: { ...DEFAULT_UI } });
     },
   };
 });

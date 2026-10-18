@@ -1,5 +1,6 @@
 import type { Datasets, Params } from "../model/params";
 import { deckView, derive, type DeckView, type Derived } from "./derived";
+import { buildDesk, type DeskView } from "./desk";
 import { buildAxes } from "./scenarios/axes";
 import { buildBinary } from "./scenarios/binary";
 import { buildCalibration } from "./scenarios/calibration";
@@ -16,6 +17,8 @@ export const BUILDERS: Builder[] = [buildBinary, buildMeanMedian, buildCalibrati
 
 export interface BuildResult {
   deck: DeckView;
+  /** The Desk landing page: policy grid, sizing line, calibration verdict, market state. */
+  desk: DeskView;
   scenarios: ScenarioView[];
   /** Milliseconds the build took. */
   ms: number;
@@ -26,8 +29,8 @@ export function buildAll(p: Params, data: Datasets): BuildResult {
   const derived = derive(p, data);
   const scenarios = BUILDERS.map((b) => b(p, derived, data));
   const ms = typeof performance !== "undefined" ? performance.now() - t0 : 0;
-  return { deck: deckView(derived), scenarios, ms };
+  return { deck: deckView(derived, p), desk: buildDesk(p, derived), scenarios, ms };
 }
 
 export { derive };
-export type { DeckView, Derived, ScenarioView };
+export type { DeckView, DeskView, Derived, ScenarioView };

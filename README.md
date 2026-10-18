@@ -2,14 +2,19 @@
 
 An interactive explainer for one trading discussion: a tranche of capital replayed
 across earnings seasons, the reduction of a season to a coin flip, what the mean of
-that coin measures, why the edge is expensive to calibrate, which per-event loss rate
-belongs in the model, diversification within a night, shared causes, the two axes of
-time and breadth, and chaining seasons.
+that coin measures, why the premium over fair is expensive to calibrate, which
+per-event loss rate belongs in the model, diversification within a night, shared
+causes, the two axes of time and breadth, and chaining seasons.
+
+The thesis the copy never contradicts: there is no informational or execution edge;
+the only claim is sizing bets by their probability distributions in an efficient
+market. The discussion's case (a 55% clean season, q = 2.94%) is an assumed risk
+premium for selling tail insurance, not an information edge.
 
 Every number in the discussion is recomputed from the inputs in the control deck. Each
 section carries more than one view of the same quantity (a primary chart, secondary
-charts, a table) and a list of the figures the discussion quoted next to what the app
-computes for them.
+charts, a table) and a list of every figure the discussion quoted next to what the app
+computes for it, with an "agrees?" flag and a one-line reason when it does not.
 
 ## Run it
 
@@ -27,13 +32,13 @@ be swapped without touching the others.
 
 | Layer | Where | What it knows |
 |---|---|---|
-| Model | `src/model/` | Pure math. Season distributions (exact multinomial enumeration, a binned log-space engine, seeded Monte Carlo), the binary reduction, calibration and record statistics, wing rates (Normal, Student-t or an imported sample), correlation, Kelly sizing and the robust optimum averaged over a band of loss rates. No DOM, no chart library. |
-| Parameters | `src/model/params.ts` | One typed object plus a schema with tiers: primary (control deck), secondary (tuned under a section), advanced (settings dialog). Imported datasets sit beside it. |
-| View-model | `src/viewmodel/` | Turns model output into renderer-agnostic chart specs (`src/charts/spec.ts`): data table, mark, axes, series, annotations, stories. One file per section. Runs in a Web Worker (`worker.ts`) so sliders never block the page. |
+| Model | `src/model/` | Pure math. Season distributions (exact multinomial enumeration, a binned log-space engine, seeded Monte Carlo), the binary reduction, calibration and record statistics, wing rates (Normal, Student-t or an imported sample) with `ratioForLossRate`, correlation, Kelly sizing and the robust optimum averaged over a band of loss rates, the two growth figures (`growth.ts`). `policies.ts` is the single source of the three policies' names and colours. No DOM, no chart library. |
+| Parameters | `src/model/params.ts` | One typed object plus a schema with tiers: primary (control deck), secondary (tuned under a section), advanced (settings dialog). Includes the market switch (`market`: fair, discussion, custom) with `marketOf` / `marketPatch`. The wing's default realized ÷ priced sigma is solved at load so the wing's effective loss rate equals the deck's q. Imported datasets sit beside it. |
+| View-model | `src/viewmodel/` | Turns model output into renderer-agnostic chart specs (`src/charts/spec.ts`): data table, mark, axes, series, annotations, stories. One file per section, plus `desk.ts` (the Desk's policy grid, sizing line, calibration verdict and market state) and `derived.ts` (shared derived state, the deck's figures, and the one number formatter: U+2212 minus everywhere, milliseconds under a second). Runs in a Web Worker (`worker.ts`) so sliders never block the page. |
 | Axis resolution | `src/charts/resolve.ts` | Computes concrete domains, tick positions and tick labels once, so every backend draws the same ranges and puts reference lines in the same place. |
 | Switchboard | `src/charts/registry.ts`, `src/charts/backends/` | Routes a spec to ECharts, Plotly, Vega-Lite, or an HTML table. Each backend is loaded on first use. |
-| Authoring | `src/ui/Authoring.tsx`, stories in each spec | A story is a one-click re-definition of a chart (and sometimes of the deck), shown as chips under the chart title. The ⚙ panel edits the spec by hand (backend, mark, axis scale and domain in the axis's own units, x field, series visibility, mark and emphasis, extra columns, legend, height) and stores only the diff, keyed by chart id. |
-| State | `src/state/store.ts` | Parameters, imported data, chart edits, default backend. Validated on load, persisted locally, exported and imported as one JSON file. `#reset` in the address clears it. |
+| Authoring | `src/ui/Authoring.tsx`, stories in each spec | A story is a trader's question ("Half my nights have one name", "The chain is right: q = break-even") with a one-line answer; when it moves the deck it carries a badge ("moves deck: q 2.94% → 2.52%"). Display choices (axis scales, backends, zooms) are not stories; they live in ⚙, which edits the spec by hand (backend, mark, axis scale and domain in the axis's own units, x field, series visibility, mark and emphasis, extra columns, legend, height) and stores only the diff, keyed by chart id. |
+| State | `src/state/store.ts` | Parameters, imported data, chart edits, default backend, and the snapshot of parameters a story moved. Only one deck-moving story is active at a time: applying one turns the other off and restores its parameters. Validated on load, persisted locally, exported and imported as one JSON file (version 4). `#reset` in the address clears it. |
 | UI | `src/ui/` | Control deck, section layout, chart host, tables, dialogs. One dark theme, graphite, with three policy hues and two status colours. |
 
 ## Using the app
@@ -65,8 +70,13 @@ be swapped without touching the others.
   pauses everything. Inputs that make no sense to sweep (seed, engine caps) are marked.
 - **Undo.** Ctrl+Z / Ctrl+Shift+Z step through parameter changes, including the state
   before a sweep started.
-- **Story chips** under a chart title re-define it in one click ("zoom on the range
-  you cannot rule out", "what if q is really 3.2%?"). Clicking an active chip undoes it.
+- **Story chips** under a chart title ask a trader's question in one click ("What if
+  q is really 3.2%?", "I widen the wing to 1σ") and answer it in one line. Clicking an
+  active chip undoes it, including the deck parameters it moved.
+- **Market.** "Fair market" sets q = b/(1+b) (zero premium; the growth-optimal risk is
+  then 0 and sizing only changes the median, P(below threshold) and ruin). "Discussion
+  case" sets q so that a clean coin season has probability 55%. Typing q makes it
+  custom.
 - **⚙ on any chart** opens the chart definition as a popover that leaves the layout
   alone and closes when the pointer moves away; **⊞** shows the numbers behind it.
 - **Data** imports a trade log (0/1 losses or P&L per unit of max loss) and realized
@@ -78,19 +88,31 @@ be swapped without touching the others.
 
 ## Conventions worth knowing
 
-- Growth is reported as E[log end | the tranche survives], always next to the
-  probability of ruin. The unconditional expectation is −∞ whenever ruin is possible.
+- **Expected value per season** is mean − 1 (≈ 2p − 1): the average over a pool of
+  independent replays, the same for Coin and Spread, and not what one tranche earns.
+- **Premium over fair per event** is b/(1+b) − q: how far the deck's loss rate sits
+  below the chain's fair rate. Deviations from fair are phrased as a premium the chain
+  pays for tail insurance, never as an edge.
+- **Log growth of surviving paths** is E[log end | the tranche survives], always shown
+  next to P(ruin); the unconditional expectation is −∞ whenever ruin is possible.
+  **Median growth per season** is median_N^(1/N) − 1, the rate the middle path
+  compounds at; the two differ whenever the end distribution is skewed.
 - The effective loss rate of a wing is E[payout]/W. A fairly priced wing has
-  effective rate c/W, which equals the break-even rate b/(1+b): any deck rate below
-  it is a claim about the chain.
-- The robust risk per night maximises growth averaged over loss rates drawn uniformly
+  effective rate c/W, which equals the break-even rate b/(1+b). The default wing is
+  solved so its effective rate equals the deck's q, and the section's first action
+  takes the deck to the fair rate.
+- The robust risk a night maximises growth averaged over loss rates drawn uniformly
   between the optimistic rate and break-even, or from a Beta posterior when a trade log
   is imported.
+- Rates palette: optimistic = green, deck = ink, break-even = red. Policy colours are
+  reserved for policies.
 
 ## The three policies
 
-Every section compares the same three policies, derived from the deck:
+Every section compares the same three policies, derived from the deck and named from
+`src/model/policies.ts` (never by letter):
 
-- **A** one name, whole tranche (the coin)
-- **B** k names, whole tranche (diversified, no reserve)
-- **C** k names, the deck's share of the tranche (diversified, with reserve)
+- **Coin** 1 name, whole tranche (amber)
+- **Spread** k names, whole tranche, no reserve (cyan)
+- **Spread + reserve** k names, the deck's share of the tranche a night (violet); the
+  policy the reader holds

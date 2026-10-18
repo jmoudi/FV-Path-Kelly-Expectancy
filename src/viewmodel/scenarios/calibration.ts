@@ -1,16 +1,17 @@
 import { f, table, tableSpec, type Annotation, type ChartSpec, type Row } from "../../charts/spec";
 import { eventsForTest, eventsToResolve, eventsUntilUpperBelow, observedRatePmf, wilsonInterval } from "../../model/calibration";
 import type { Datasets, Params } from "../../model/params";
-import { linspace, logspace } from "../../model/stats";
-import { pct2, type Derived } from "../derived";
+import { linspace, logspace, normalQuantile } from "../../model/stats";
+import { fig, fmtInt, movesDeck, near, pct2, years, type Derived } from "../derived";
 import type { KPI, ScenarioView } from "../types";
 
-function years(events: number, perYear: number): string {
-  const y = events / perYear;
-  if (!Number.isFinite(y)) return "never";
-  if (y < 1) return `${(y * 12).toFixed(0)} months`;
-  if (y < 10) return `${y.toFixed(1)} years`;
-  return `${y.toFixed(0)} years`;
+/** Events for a two-sided 5% test with 80% power (the one-sided version is eventsForTest). */
+function eventsTwoSided(q0: number, q1: number): number {
+  const dlt = Math.abs(q0 - q1);
+  const za = normalQuantile(0.975);
+  const zb = normalQuantile(0.8);
+  const num = za * Math.sqrt(q0 * (1 - q0)) + zb * Math.sqrt(q1 * (1 - q1));
+  return (num * num) / (dlt * dlt);
 }
 
 export function buildCalibration(p: Params, d: Derived, _data: Datasets): ScenarioView {
@@ -23,6 +24,7 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
   const nDeckBE = eventsToResolve(qDeck, qBE, z);
   const nOptDeck = eventsToResolve(qOpt, qDeck, z);
   const nFrequent = eventsToResolve(0.5, 0.6, z);
+  const nFrequentTest = eventsForTest(0.5, 0.6, 0.05, 0.8);
   const nTest = eventsForTest(qBE, qOpt, 0.05, 0.8);
   const qbar = (qOpt + qBE) / 2;
   const rec = d.record;
@@ -32,24 +34,32 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
   const need: ChartSpec = {
     id: "cal-events",
     title: "Events needed to tell two loss rates apart",
-    subtitle: `At ${z}σ separation around a ${pct2(qbar)} base rate.`,
+    subtitle: `x gap between the two rates · y name-events needed (log) · ${z}σ separation around a ${pct2(qbar)} base rate · lines = one and ten years at your pace · dots = the deck's two questions`,
     kind: "xy",
     data: table([f("gap", "Gap between the two rates", "pct2"), f("events", "Name-events needed", "int")], needRows),
     mark: "line",
     x: { field: "gap", format: "pct1", domain: [0, 0.02] },
     y: { field: "events", scale: "log", format: "int", domain: [10, 1_000_000] },
-    series: [{ field: "events", color: "b", label: "Events needed" }],
+    series: [{ field: "events", color: "ink", label: "Events needed" }],
     height: 320,
     annotations: [
       { kind: "hline", y: perYear, text: `one year of events (${perYear})`, color: "muted", at: "end" },
       { kind: "hline", y: perYear * 10, text: "ten years", color: "muted", at: "end" },
-      { kind: "point", x: Math.abs(qBE - qOpt), y: nOptBE, text: `optimistic vs break-even: ${Math.round(nOptBE).toLocaleString()} events`, color: "ink", at: "end" },
-      { kind: "point", x: Math.abs(qBE - qDeck), y: nDeckBE, text: `deck vs break-even: ${Math.round(nDeckBE).toLocaleString()}`, color: "ink", at: "end" },
+      { kind: "point", x: Math.abs(qBE - qOpt), y: nOptBE, text: `optimistic vs break-even: ${fmtInt(nOptBE)} events`, color: "ink", at: "end" },
+      { kind: "point", x: Math.abs(qBE - qDeck), y: nDeckBE, text: `deck vs break-even: ${fmtInt(nDeckBE)}`, color: "ink", at: "end" },
     ],
-    stories: [
-      { id: "linear", label: "Linear event count", patch: { y: { scale: "linear", domain: [0, 20000] } } },
-      { id: "strict", label: "Demand 3σ instead", narrative: "A stricter bar more than doubles the count.", params: { zSigma: 3 } },
-    ],
+    stories:
+      z === 3
+        ? []
+        : [
+            {
+              id: "strict",
+              label: "What if I demand 3σ?",
+              narrative: `${fmtInt(eventsToResolve(qOpt, qBE, 3))} events instead of ${fmtInt(nOptBE)}: ${years(eventsToResolve(qOpt, qBE, 3), perYear)} at your pace.`,
+              params: { zSigma: 3 },
+              badge: movesDeck("separation", `${z}σ`, "3σ"),
+            },
+          ],
   };
 
   const pmfChart = (id: string, title: string, n: number): ChartSpec => {
@@ -62,7 +72,7 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
     return {
       id,
       title,
-      subtitle: `Observed loss rate after ${n.toLocaleString()} name-events under the optimistic and the break-even rate.`,
+      subtitle: `x observed loss rate after ${fmtInt(n)} name-events · y probability · green = true rate optimistic ${pct2(qOpt)} · red = true rate break-even ${pct2(qBE)} · line = deck q`,
       kind: "xy",
       data: table([f("rate", "Observed loss rate", "pct2"), f("opt", `true rate ${pct2(qOpt)}`, "pct2"), f("be", `true rate ${pct2(qBE)}`, "pct2")], rows),
       mark: "bar",
@@ -75,11 +85,13 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
       barWidthPx: n > 400 ? 2 : 4,
       height: 260,
       annotations: [{ kind: "vline", x: qDeck, text: `deck q ${pct2(qDeck)}`, color: "ink", at: "start" }],
-      stories: [{ id: "area", label: "Outline instead of stems", patch: { mark: "area" } }],
     };
   };
   const oneYear = pmfChart("cal-pmf-year", "After one year", perYear);
-  const resolved = pmfChart("cal-pmf-resolved", "After enough events to resolve", Math.round(nOptBE));
+  // When the two rates coincide no record resolves them; show a long record instead of an infinite one.
+  const PMF_CAP = 20_000;
+  const nResolved = Number.isFinite(nOptBE) ? Math.min(Math.round(nOptBE), PMF_CAP) : PMF_CAP;
+  const resolved = pmfChart("cal-pmf-resolved", nResolved === Math.round(nOptBE) ? "After enough events to resolve" : `After ${fmtInt(nResolved)} events`, nResolved);
 
   const ns = logspace(10, 20000, 90);
   const bandRows: Row[] = ns.map((n) => {
@@ -92,38 +104,38 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
     { kind: "hline", y: qOpt, text: `optimistic ${pct2(qOpt)}`, color: "good", at: "start" },
     { kind: "vline", x: perYear * 10, text: "ten years", color: "muted", at: "end" },
   ];
-  if (nStar != null) bandAnn.push({ kind: "point", x: nStar, y: qBE, text: `band clears break-even after ${nStar.toLocaleString()} events (${years(nStar, perYear)})`, color: "ink", at: "start" });
+  if (nStar != null) bandAnn.push({ kind: "point", x: nStar, y: qBE, text: `band clears break-even after ${fmtInt(nStar)} events (${years(nStar, perYear)})`, color: "ink", at: "start" });
   if (rec) bandAnn.push({ kind: "point", x: rec.events, y: rec.rate, text: `your record: ${rec.events} events, ${pct2(rec.rate)}`, color: "ink", at: "end" });
   const band: ChartSpec = {
     id: "cal-band",
     title: "Confidence band as the record grows",
-    subtitle: `Wilson interval at ${z}σ around an observed rate equal to the deck's.`,
+    subtitle: `x name-events observed (log) · y loss rate · band = Wilson interval at ${z}σ around an observed rate equal to the deck's · green = optimistic · red = break-even`,
     kind: "xy",
     data: table([f("n", "Name-events observed", "int"), f("lo", "Lower bound", "pct2"), f("hat", "Observed rate", "pct2"), f("hi", "Upper bound", "pct2")], bandRows),
     mark: "line",
     x: { field: "n", scale: "log", domain: [10, 20000] },
     y: { field: "hat", label: "Loss rate", format: "pct1", domain: [0.01, 0.06] },
     series: [
-      { field: "hi", color: "ramp2", label: "Upper bound" },
+      { field: "hi", color: "ramp2", label: "Upper bound", band: "lo" },
       { field: "hat", color: "ink", label: "Observed rate", dash: true },
       { field: "lo", color: "ramp2", label: "Lower bound" },
     ],
     height: 280,
     annotations: bandAnn,
-    stories: [{ id: "wide", label: "Show the whole band", patch: { y: { domain: [0, 0.15] } } }],
   };
 
   const tbl = tableSpec({
     id: "cal-table",
-    title: "Four calibration questions and their price",
+    title: "Calibration questions and their price",
     data: table(
       [f("question", "Question"), f("q1", "Rate 1", "pct2"), f("q2", "Rate 2", "pct2"), f("events", "Events needed", "int"), f("years", "At your pace")],
       [
-        { question: "Optimistic rate vs break-even", q1: qOpt, q2: qBE, events: nOptBE, years: years(nOptBE, perYear) },
+        { question: `Optimistic rate vs break-even, ${z}σ apart`, q1: qOpt, q2: qBE, events: nOptBE, years: years(nOptBE, perYear) },
         { question: "Same, as a one-sided 5% test with 80% power", q1: qOpt, q2: qBE, events: nTest, years: years(nTest, perYear) },
-        { question: "Deck rate vs break-even", q1: qDeck, q2: qBE, events: nDeckBE, years: years(nDeckBE, perYear) },
-        { question: "Optimistic rate vs deck rate", q1: qOpt, q2: qDeck, events: nOptDeck, years: years(nOptDeck, perYear) },
-        { question: "A 60% win-rate system vs 50%", q1: 0.5, q2: 0.6, events: nFrequent, years: `${Math.round(nFrequent)} trades` },
+        { question: `Deck rate vs break-even, ${z}σ apart`, q1: qDeck, q2: qBE, events: nDeckBE, years: years(nDeckBE, perYear) },
+        { question: `Optimistic rate vs deck rate, ${z}σ apart`, q1: qOpt, q2: qDeck, events: nOptDeck, years: years(nOptDeck, perYear) },
+        { question: `A 60% win-rate system vs 50%, ${z}σ apart`, q1: 0.5, q2: 0.6, events: nFrequent, years: `${fmtInt(nFrequent)} trades` },
+        { question: "Same, as a one-sided 5% test with 80% power", q1: 0.5, q2: 0.6, events: nFrequentTest, years: `${fmtInt(nFrequentTest)} trades` },
       ],
     ),
     columns: [{ field: "question", emphasize: true }, { field: "q1" }, { field: "q2" }, { field: "events" }, { field: "years" }],
@@ -131,23 +143,25 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
   });
 
   const kpis: KPI[] = [
-    { label: "Events to resolve the edge", value: Math.round(nOptBE).toLocaleString(), sub: `${pct2(qOpt)} vs ${pct2(qBE)} at ${z}σ`, help: "Name-events needed before the record separates the optimistic rate from break-even." },
-    { label: "At your pace", value: years(nOptBE, perYear), sub: `${perYear} events a year`, color: "loss" },
-    { label: "Deck rate vs break-even", value: years(nDeckBE, perYear), sub: `${Math.round(nDeckBE).toLocaleString()} events`, help: "The gap between the deck's rate and fair is smaller, so it takes even longer to confirm." },
-    { label: "The frequent game", value: `${Math.round(nFrequent)} trades`, sub: "60% vs 50% win rate", color: "good", help: "A symmetric-payoff system with a 10-point edge resolves in a season." },
+    { label: "Events to tell optimistic from break-even", value: fmtInt(nOptBE), sub: `${pct2(qOpt)} vs ${pct2(qBE)} at ${z}σ`, help: "Name-events needed before the record separates the optimistic rate from break-even." },
+    { label: "At your pace", value: years(nOptBE, perYear), sub: `${perYear} events a year` },
+    { label: "Deck rate vs break-even", value: years(nDeckBE, perYear), sub: `${fmtInt(nDeckBE)} events`, help: "The gap between the deck's rate and fair is smaller, so it takes even longer to confirm." },
+    { label: "The frequent game", value: `${fmtInt(nFrequent)} trades`, sub: `60% vs 50% win rate at ${z}σ · ${fmtInt(nFrequentTest)} as a 5%/80% test`, help: "A symmetric-payoff system with a 10-point gap in win rate resolves within a season or two." },
   ];
   if (rec) kpis.splice(1, 0, { label: "Your record", value: `${pct2(rec.rate)} over ${rec.events}`, sub: `band ${pct2(rec.interval[0])} to ${pct2(rec.interval[1])}`, color: "ink", help: rec.kind === "binary" ? "Full losses counted over the events you imported." : "Expected loss as a fraction of max loss, from the P&L you imported." });
+
+  const n1500 = eventsToResolve(0.0252, 0.0341, 2);
 
   return {
     id: "calibration",
     number: 3,
     title: "Calibration",
-    claim: "The edge sits in a rare-event rate that a decade of your own trading cannot resolve; it has to come from cross-sectional history.",
-    lede: `Events needed to separate two loss rates, what a record looks like after one year and after ${Math.round(nOptBE).toLocaleString()} events, and the band around an observed rate as the record grows.`,
+    claim: "The premium over fair sits in a rare-event rate that a decade of your own trading cannot resolve; the estimate has to come from cross-sectional history.",
+    lede: "How long until my record can tell the deck's loss rate from break-even?",
     views: [
-      { id: "events-needed", title: "Events needed", blurb: "How many name-events separate two loss rates, and what that is in years.", charts: ["cal-events", "cal-table"], params: ["altLossRate", "zSigma", "eventsPerYear"], kpis: [0, 1, 2, 3] },
-      { id: "sampling", title: "Sampling distributions", blurb: "What an observed loss rate can look like under either true rate.", charts: ["cal-pmf-year", "cal-pmf-resolved"], params: ["eventsPerYear", "altLossRate"] },
-      { id: "confidence-band", title: "Confidence band", blurb: "How the uncertainty around an observed rate shrinks with the record.", charts: ["cal-band"], params: ["zSigma", "eventsPerYear"] },
+      { id: "events-needed", title: "How long until my record proves q", blurb: "How many name-events separate two loss rates, and what that is in years.", charts: ["cal-events", "cal-table"], params: ["altLossRate", "zSigma", "eventsPerYear"], kpis: [0, 1, 2, 3] },
+      { id: "sampling", title: "How wide the record's error bar is", blurb: "What an observed loss rate can look like under either true rate.", charts: ["cal-pmf-year", "cal-pmf-resolved"], params: ["eventsPerYear", "altLossRate"] },
+      { id: "confidence-band", title: "Which rates my record cannot rule out", blurb: "How the uncertainty around an observed rate shrinks with the record.", charts: ["cal-band"], params: ["zSigma", "eventsPerYear"] },
     ],
     kpis,
     primary: [need],
@@ -157,11 +171,11 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
     notes: [
       {
         title: "Noise versus calibration",
-        body: "The strategy is not more exposed to noise than a wick-counting system. It is more exposed to calibration: the number that sets the edge is a rare-event frequency, and rare events are expensive to count. The track record cannot resolve it, so the estimate must come from many names across many quarters, and from the assumption that those distributions still apply.",
+        body: "The strategy is not more exposed to noise than a wick-counting system. It is more exposed to calibration: the number that sets the premium over fair is a rare-event frequency, and rare events are expensive to count. The track record cannot resolve it, so the estimate must come from many names across many quarters, and from the assumption that those distributions still apply.",
       },
       {
         title: "How the count is made",
-        body: `The observed frequency after n events has standard error √(q̄(1 − q̄)/n). Demanding the gap between two candidate rates to be z standard errors gives n = z² q̄(1 − q̄)/Δq². That is a loose bar. A proper one-sided test of “is it break-even?” at 5% with 80% power needs about ${Math.round(nTest).toLocaleString()} events. The Wilson band in the third chart is the same statement from the other side: how wide the uncertainty around an observed rate is after n events.`,
+        body: `The observed frequency after n events has standard error √(q̄(1 − q̄)/n). Demanding the gap between two candidate rates to be z standard errors gives n = z² q̄(1 − q̄)/Δq². That is a loose bar. A one-sided test of “is it break-even?” at 5% with 80% power needs about ${fmtInt(nTest)} events. The Wilson band in the third chart is the same statement from the other side: how wide the uncertainty around an observed rate is after n events.`,
       },
       {
         title: "Your own record",
@@ -169,8 +183,10 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
       },
     ],
     sourceFigures: [
-      { label: "Events to split 3.41% from 2.52% at 2σ, as quoted", quoted: "roughly 1,500", computed: Math.round(eventsToResolve(0.0252, 0.0341, 2)).toLocaleString() },
-      { label: "Trades to split 60% from 50%", quoted: "a few hundred", computed: Math.round(nFrequent).toLocaleString() },
+      fig(p, "Events to tell 3.41% from 2.52% apart at two sigma", "roughly 1,500", fmtInt(n1500), near(1500, n1500, 100), []),
+      fig(p, "At ~80 events a year", "cannot resolve this decade", years(n1500, 80), n1500 / 80 >= 10, []),
+      fig(p, "Trades to tell a 60% win rate from 50%, 2σ apart", "a few hundred", fmtInt(eventsToResolve(0.5, 0.6, 2)), false, [], "2σ separation is a loose bar: each rate two standard errors from the other, not a test at a stated power."),
+      fig(p, "Same, as a 5% test with 80% power", "a few hundred", `${fmtInt(eventsForTest(0.5, 0.6, 0.05, 0.8))} one-sided · ${fmtInt(eventsTwoSided(0.5, 0.6))} two-sided`, true, []),
     ],
   };
 }

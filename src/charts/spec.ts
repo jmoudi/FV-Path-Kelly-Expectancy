@@ -70,6 +70,11 @@ export interface SeriesSpec {
   width?: number;
   /** Per-row colours for bar marks on a categorical axis (one per category). */
   colors?: ColorRole[];
+  /**
+   * This series is the upper edge of a band whose lower edge is the named field;
+   * backends fill between the two with the series colour at low opacity.
+   */
+  band?: string;
 }
 
 export interface Annotation {
@@ -116,12 +121,15 @@ export interface ColumnSpec {
  */
 export interface Story {
   id: string;
+  /** The trader's question, e.g. "Half my nights have one name". */
   label: string;
-  /** One sentence on what the reader is asking. */
+  /** The one-line answer. */
   narrative?: string;
   patch?: SpecOverride;
   /** Deck parameters the story sets, by key. */
   params?: Record<string, number | string>;
+  /** Shown when the story moves the deck: "moves deck: q 2.94% → 2.52%". */
+  badge?: string;
 }
 
 export interface ChartSpec {
@@ -137,6 +145,11 @@ export interface ChartSpec {
   annotations?: Annotation[];
   /** Plot height in px (the backend adds its own axis band). */
   height?: number;
+  /**
+   * Bar direction. "horizontal" lays the x field down the vertical axis and extends
+   * the series values along the horizontal one; annotations placed on x follow it.
+   */
+  orientation?: "horizontal" | "vertical";
   legend?: boolean;
   /** Bar width hint for numeric-x bars, in px. */
   barWidthPx?: number;

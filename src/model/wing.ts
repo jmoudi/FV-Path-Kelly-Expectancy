@@ -11,7 +11,8 @@
  *   effective = E[payout]/W       the rate that reproduces the event's expected value
  *                                 in the binary {+b, −1} abstraction with b = c/(W−c)
  * In an efficient market the credit equals the expected payout, so the fair effective
- * rate is c/W, which is exactly the break-even rate b/(1+b).
+ * rate is c/W, which is exactly the break-even rate b/(1+b). A deck rate below c/W is
+ * a premium the chain pays for tail insurance, not information about the chain.
  */
 import { integrate, normalCdf, normalPdf, studentTCdf, studentTPdf } from "./stats";
 
@@ -82,8 +83,8 @@ export interface WingRates {
   expectedPnlPerMaxLoss: number;
   /** The rate at which the wing is fairly priced: c/W = b/(1+b). */
   fairRate: number;
-  /** fairRate − effective: the per-event edge the inputs assert, as a rate. */
-  edgeRate: number;
+  /** fairRate − effective: the premium over fair the inputs assert, as a rate per event. */
+  premiumRate: number;
 }
 
 export function wingRates(p: WingParams): WingRates {
@@ -112,7 +113,7 @@ export function wingRates(p: WingParams): WingRates {
     expectedPayout,
     expectedPnlPerMaxLoss: (r - expectedPayout) / maxLoss,
     fairRate: r,
-    edgeRate: r - expectedPayout,
+    premiumRate: r - expectedPayout,
   };
 }
 
@@ -122,15 +123,17 @@ export function payoutFraction(x: number, p: WingParams): number {
   return Math.min(1, Math.max(0, t));
 }
 
+/** The realized ÷ priced sigma range the solvers search. */
+export const RATIO_RANGE: [number, number] = [0.3, 4];
+
 /**
- * The realized-over-priced sigma at which the wing is fairly priced
- * (effective rate = c/W). Bisection on [0.3, 4]; null if no solution in range.
+ * The realized-over-priced sigma at which the wing's effective rate equals a
+ * target loss rate q. Bisection on RATIO_RANGE; null if no solution in range (the
+ * empirical distribution is a step function, so it may have none).
  */
-export function fairRealizedRatio(p: WingParams): number | null {
-  const target = p.creditFraction;
-  const eff = (s: number) => wingRates({ ...p, realizedRatio: s }).effective - target;
-  let lo = 0.3;
-  let hi = 4;
+export function ratioForLossRate(q: number, p: WingParams): number | null {
+  const eff = (s: number) => wingRates({ ...p, realizedRatio: s }).effective - q;
+  let [lo, hi] = RATIO_RANGE;
   let flo = eff(lo);
   const fhi = eff(hi);
   if (flo > 0 || fhi < 0) return null;
@@ -144,4 +147,12 @@ export function fairRealizedRatio(p: WingParams): number | null {
     } else hi = mid;
   }
   return (lo + hi) / 2;
+}
+
+/**
+ * The realized-over-priced sigma at which the wing is fairly priced
+ * (effective rate = c/W, zero premium).
+ */
+export function fairRealizedRatio(p: WingParams): number | null {
+  return ratioForLossRate(p.creditFraction, p);
 }

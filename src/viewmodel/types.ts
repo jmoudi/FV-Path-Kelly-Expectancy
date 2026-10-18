@@ -24,15 +24,29 @@ export interface Action {
   warning?: string;
 }
 
+/**
+ * One figure the discussion quotes, next to what the app computes for it. Every
+ * quoted figure of a section is listed, including the ones the app does not
+ * reproduce; `why` says in one line what the difference is.
+ */
 export interface SourceFigure {
   label: string;
   quoted: string;
   computed: string;
+  /** Whether the recomputed figure matches the quoted one to its rounding. */
+  agrees: boolean;
+  /** One line on why it does not, when it does not. */
+  why?: string;
+}
+
+export function quoted(label: string, quotedText: string, computed: string, agrees: boolean, why?: string): SourceFigure {
+  return agrees || !why ? { label, quoted: quotedText, computed, agrees } : { label, quoted: quotedText, computed, agrees, why };
 }
 
 /**
  * A responsibility: one chart with its context, or a group of charts a finance
- * desk would read together. Each has its own page.
+ * desk would read together. Each has its own page. The title is the trader's
+ * question the page answers.
  */
 export interface ResponsibilityView {
   id: string;
@@ -48,11 +62,11 @@ export interface ResponsibilityView {
 export interface ScenarioView {
   id: string;
   number: number;
-  /** Functional name: what the section is about. */
+  /** Functional name: what the section is about. Goes with the number in the eyebrow. */
   title: string;
-  /** The one statement the section defends, shown in an inline box. */
+  /** The one statement the section defends, shown in an aside. */
   claim: string;
-  /** One sentence on what the section shows. */
+  /** The one question the section answers. */
   lede: string;
   /** The first two are shown; the rest sit behind "more figures". */
   kpis: KPI[];

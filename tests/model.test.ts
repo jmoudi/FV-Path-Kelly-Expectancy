@@ -3,9 +3,12 @@ import { breakEvenLossRate, cleanEnd, lossRateFromPClean, pCleanFromLossRate, se
 import { eventsForTest, eventsToResolve, eventsUntilUpperBelow, parseNumberList, recordStats } from "../src/model/calibration";
 import { breachBeyond, crossoverSharedOutcome, jointLossProb, ruinPerSeason } from "../src/model/correlation";
 import { betaPosterior, breadthTable, kellyFraction, nightOptimum, robustOptimum, robustSeasonLogGrowth, seasonLogGrowth, seasonRuin, uniformBand } from "../src/model/kelly";
+import { medianGrowthPerSeason } from "../src/model/growth";
+import { DEFAULT_PARAMS, DISCUSSION_P_CLEAN, marketLossRate, marketOf, marketPatch, sanitizeParams } from "../src/model/params";
+import { POLICY_IDS, POLICY_META, policies, policyLabel } from "../src/model/policies";
 import { binnedDistributions, nightDist, nightLogGrowth, nightRuin, scheduleDistribution, summarize } from "../src/model/season";
 import { normalCdf, normalQuantile, studentTCdf } from "../src/model/stats";
-import { fairRealizedRatio, wingRates } from "../src/model/wing";
+import { fairRealizedRatio, ratioForLossRate, wingRates } from "../src/model/wing";
 
 const b = 0.035;
 const n = 20;
@@ -88,6 +91,29 @@ describe("wing rates (section 4)", () => {
     expect(s).not.toBeNull();
     expect(wingRates({ ...base, realizedRatio: s! }).effective).toBeCloseTo(base.creditFraction, 6);
   });
+  it("solves the realized ratio for any target loss rate", () => {
+    for (const q of [0.01, q55, 0.0338, 0.05]) {
+      const s = ratioForLossRate(q, base);
+      expect(s).not.toBeNull();
+      expect(wingRates({ ...base, realizedRatio: s! }).effective).toBeCloseTo(q, 7);
+    }
+    // Above break-even the ratio must exceed 1 (the chain under-priced the move); below, the reverse.
+    expect(ratioForLossRate(q55, base)!).toBeGreaterThan(1);
+    expect(ratioForLossRate(0.01, base)!).toBeLessThan(1);
+    // The fair ratio is the special case q = c/W.
+    expect(ratioForLossRate(base.creditFraction, base)).toBeCloseTo(fairRealizedRatio(base)!, 12);
+    // No solution in range: a rate no realized sigma in [0.3, 4] can produce.
+    expect(ratioForLossRate(0.9, base)).toBeNull();
+    expect(ratioForLossRate(1e-14, base)).toBeNull();
+  });
+  it("defaults the wing so its effective rate equals the deck's q", () => {
+    const wp = { strikeDistance: DEFAULT_PARAMS.strikeDistance, wingWidth: DEFAULT_PARAMS.wingWidth, creditFraction: DEFAULT_PARAMS.creditFraction, moveDist: DEFAULT_PARAMS.moveDist, tailDf: DEFAULT_PARAMS.tailDf, realizedRatio: DEFAULT_PARAMS.realizedRatio };
+    expect(wingRates(wp).effective).toBeCloseTo(DEFAULT_PARAMS.lossRate, 9);
+    expect(DEFAULT_PARAMS.realizedRatio).toBeGreaterThan(1);
+    expect(DEFAULT_PARAMS.realizedRatio).toBeLessThan(1.5);
+    // The default survives its own sanitizer unchanged.
+    expect(sanitizeParams(DEFAULT_PARAMS)).toEqual(DEFAULT_PARAMS);
+  });
   it("uses an empirical sample", () => {
     const sample = [0, 0.5, -1, 2.2, 2.6, 3, 1.9, -0.4];
     const r = wingRates({ ...base, moveDist: "empirical", sample });
@@ -169,6 +195,57 @@ describe("correlation (section 6)", () => {
   it("a 30% vol shock takes a 3-sigma breach from 0.27% to 2.1%", () => {
     expect(breachBeyond(3, 1)).toBeCloseTo(0.0027, 4);
     expect(breachBeyond(3, 1.3)).toBeCloseTo(0.021, 3);
+  });
+});
+
+describe("growth figures", () => {
+  it("median growth per season is median_N^(1/N) − 1", () => {
+    expect(medianGrowthPerSeason(1.09, 4)).toBeCloseTo(Math.pow(1.09, 0.25) - 1, 12);
+    expect(medianGrowthPerSeason(1.09, 4)).toBeCloseTo(0.0218, 3);
+    expect(medianGrowthPerSeason(0.92, 4)).toBeCloseTo(-0.0206, 3);
+    expect(medianGrowthPerSeason(1.5, 1)).toBeCloseTo(0.5, 12);
+    expect(medianGrowthPerSeason(0, 4)).toBe(-1);
+    expect(medianGrowthPerSeason(1.09, 0)).toBeNaN();
+  });
+  it("differs from the log growth of surviving paths", () => {
+    // The coin after four seasons: survivors compound at the clean rate while the median is zero.
+    const d = scheduleDistribution([{ nights: 4 * n, policy: { gain: b, lossRate: q55, sharedOutcome: 0, names: 1, riskPerName: 1 } }]);
+    const s = summarize(d);
+    expect(s.expLog / 4).toBeCloseTo(n * Math.log(1 + b), 6);
+    expect(medianGrowthPerSeason(s.median, 4)).toBe(-1);
+  });
+});
+
+describe("market switch", () => {
+  it("fair sets q to break-even, discussion to the 55% clean season", () => {
+    const p = { gain: b, nights: n };
+    expect(marketLossRate("fair", p)).toBeCloseTo(breakEvenLossRate(b), 12);
+    expect(marketLossRate("discussion", p)).toBeCloseTo(lossRateFromPClean(DISCUSSION_P_CLEAN, n), 12);
+    expect(marketPatch("fair", p)).toEqual({ market: "fair", lossRate: breakEvenLossRate(b) });
+    expect(marketPatch("custom", p)).toEqual({ market: "custom" });
+  });
+  it("reads the deck's q back as fair, discussion or custom", () => {
+    expect(marketOf(DEFAULT_PARAMS)).toBe("discussion");
+    expect(marketOf({ ...DEFAULT_PARAMS, lossRate: breakEvenLossRate(b) })).toBe("fair");
+    expect(marketOf({ ...DEFAULT_PARAMS, lossRate: 0.0338 })).toBe("fair");
+    expect(marketOf({ ...DEFAULT_PARAMS, lossRate: 0.0252 })).toBe("custom");
+    expect(marketOf({ ...DEFAULT_PARAMS, nights: 30 })).toBe("custom");
+    expect(DEFAULT_PARAMS.market).toBe("discussion");
+    expect(sanitizeParams({ market: "nonsense" }).market).toBe("discussion");
+    expect(sanitizeParams({ market: "fair" }).market).toBe("fair");
+  });
+});
+
+describe("policies", () => {
+  it("are named from one source, without letters", () => {
+    const pols = policies(DEFAULT_PARAMS);
+    expect(pols.map((x) => x.id)).toEqual(POLICY_IDS);
+    expect(pols.map((x) => x.name)).toEqual(["Coin", "Spread", "Spread + reserve"]);
+    expect(pols.map((x) => x.color)).toEqual(["a", "b", "c"]);
+    expect(policyLabel("reserve", DEFAULT_PARAMS)).toBe("Spread + reserve (3 names, 50% a night)");
+    expect(policyLabel("spread", { ...DEFAULT_PARAMS, names: 1 })).toBe("Spread (1 name, whole tranche)");
+    for (const x of pols) expect(x.label).not.toMatch(/\b[ABC]\b/);
+    expect(POLICY_META.coin.name).toBe("Coin");
   });
 });
 
