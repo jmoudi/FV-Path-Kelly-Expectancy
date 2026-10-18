@@ -15,6 +15,8 @@ import { useBuild } from "@kit/build/useBuild";
 import { BUILD } from "@app/build";
 import { useSweepEngine, useSweepHotkeys } from "@kit/sweeps/useSweeps";
 import { ViewPage } from "@kit/ui/ViewPage";
+import { GuideFrame } from "@kit/ui/GuideFrame";
+import { GUIDE_LEDE, GUIDE_SECTIONS } from "@app/copy/guide";
 import type { ScenarioView } from "@app/scenarios/types";
 
 type Dialog = "io" | "settings" | "data" | null;
@@ -36,6 +38,7 @@ function TopBar({ route, scenarios, onDialog }: { route: Route; scenarios: Scena
     { id: "data", label: "Data", hint: "Import a trade log or realized moves", onSelect: () => onDialog("data") },
     { id: "io", label: "Import / export", hint: "The whole state as JSON", onSelect: () => onDialog("io") },
     { id: "settings", label: "Quick settings", hint: "Backend, drag, sweep rate, reset", onSelect: () => onDialog("settings") },
+    { id: "guide", label: "Guide", hint: "How every control works", onSelect: () => (location.hash = "#guide") },
   ];
   return (
     <header className="topbar">
@@ -69,6 +72,9 @@ function TopBar({ route, scenarios, onDialog }: { route: Route; scenarios: Scena
         <a href="#settings" className={`topnav-link${route.page === "settings" ? " on" : ""}`} aria-current={route.page === "settings" ? "page" : undefined}>
           Settings
         </a>
+        <a href="#guide" className={`topnav-link topnav-guide${route.page === "guide" ? " on" : ""}`} aria-current={route.page === "guide" ? "page" : undefined}>
+          Guide
+        </a>
       </nav>
       <div className="topbar-tools">
         <button type="button" className="btn small quiet" onClick={() => onDialog("data")} title="Import a trade log or realized moves">
@@ -91,7 +97,7 @@ function TopBar({ route, scenarios, onDialog }: { route: Route; scenarios: Scena
 }
 
 /** This explainer's pages; #view/<id> and #s-<id> are built in. */
-const ROUTES: RouteConfig = { home: "desk", pages: ["desk", "explain", "settings"], aliases: { tour: "explain" }, sectionsPage: "explain" };
+const ROUTES: RouteConfig = { home: "desk", pages: ["desk", "explain", "settings", "guide"], aliases: { tour: "explain" }, sectionsPage: "explain" };
 
 export function App() {
   const params = useStore((s) => s.params);
@@ -117,8 +123,9 @@ export function App() {
     if (!section || !hasResult) return;
     document.getElementById(`s-${section}`)?.scrollIntoView({ block: "start" });
   }, [section, hasResult]);
+  // A section in the address (#s-<id> on Explain, #guide/<id> on the Guide) scrolls there instead.
   useEffect(() => {
-    if (route.page !== "explain" || !route.section) window.scrollTo(0, 0);
+    if (!route.section) window.scrollTo(0, 0);
   }, [route]);
 
   return (
@@ -132,8 +139,13 @@ export function App() {
       {route.page === "settings" ? (
         <div className="page">
           <h1 className="page-title">Settings</h1>
+          <p className="page-lede">
+            How every control on these pages works, parameter settings and the replayer included, is in the <a href="#guide">Guide</a>.
+          </p>
           <FullSettings data={<DataSettings />} />
         </div>
+      ) : route.page === "guide" ? (
+        <GuideFrame title="Guide" lede={GUIDE_LEDE} sections={GUIDE_SECTIONS} current={route.section} page="guide" />
       ) : route.page === "view" ? (
         <div className="page">{result ? <ViewPage scenarios={scenarios} viewId={route.id ?? ""} notFound={<>Pick one from the Views menu, or go back to the <a href="#desk">Desk</a>.</>} /> : <p className="status-line">Computing…</p>}</div>
       ) : route.page === "desk" ? (
@@ -153,7 +165,7 @@ export function App() {
         </div>
       )}
       {dialog === "io" && <ImportExportDialog onClose={() => setDialog(null)} />}
-      {dialog === "settings" && <SettingsDialog onClose={() => setDialog(null)} />}
+      {dialog === "settings" && <SettingsDialog onClose={() => setDialog(null)} guideHref="#guide" />}
       {dialog === "data" && <DataDialog onClose={() => setDialog(null)} />}
     </ErrorBoundary>
   );

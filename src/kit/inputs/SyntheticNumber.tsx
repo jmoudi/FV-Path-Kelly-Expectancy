@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent as RKeyboardEvent, type PointerEvent as RPointerEvent, type ReactNode } from "react";
-import { decimalsFor, fractionOf, fromDisplay, snapTo, suffix, toDisplay } from "./display";
+import { decimalsFor, fractionOf, fromDisplay, suffix, toDisplay } from "./display";
+import { clampTyped, quantize, stepOnGrid } from "./paramSettings";
 import { lastPageScrollAt, watchPageScroll, WheelAccumulator, wheelAllowed } from "./wheelGate";
 import "./number-field.css";
 
@@ -13,6 +14,17 @@ export interface SyntheticConfig {
   wheelStep?: number;
   /** Decimal places shown in the box, in display units. */
   decimals?: number;
+  /** The quantum with Shift held (wheel, arrows, drag); defaults to the step. */
+  fineStep?: number;
+}
+
+/** A box that may stand empty: a setting left at its default shows the default as a placeholder. */
+export interface SyntheticEmpty {
+  /** The box is empty now; `value` is the default it stands for (the wheel and arrows start from it). */
+  active: boolean;
+  placeholder: string;
+  /** Clearing the box and leaving it: back to the default. */
+  onClear: () => void;
 }
 
 /** A range drawn on the track (a sweep preset's span), with optional marks (its spots). */
@@ -54,6 +66,12 @@ export interface SyntheticNumberProps {
   dragScale?: number;
   /** Written to data-key on the root, for styling and tests. */
   dataKey?: string;
+
+  // Parameter settings' editors (kit/inputs/ParamSettings.tsx) use these two.
+  /** The box may stand empty with a placeholder (a setting at its default). */
+  empty?: SyntheticEmpty;
+  /** The sign after the number instead of the unit's ("pp" for a step of a percentage). */
+  suffix?: string;
 }
 
 const DRAG_THRESHOLD_PX = 3;
@@ -67,13 +85,16 @@ const DRAG_THRESHOLD_PX = 3;
  *   returns to the default.
  * - The wheel changes the value only while the field is focused, or after the pointer
  *   has rested on it for 400 ms with no page scroll in progress; otherwise the page
- *   scrolls. Shift ×10, Alt ×0.1.
+ *   scrolls. One notch is the wheel step; with Shift, the fine step.
+ * - The wheel, the arrow keys and the drag land on multiples of the step (of the fine
+ *   step with Shift); a typed value is clamped to the range and kept as typed.
  * - The sweep marker sits inside the box in a reserved slot, so starting a sweep
  *   never shifts the layout; a sweep's range shows as a band on the track.
  */
 export function SyntheticNumber(p: SyntheticNumberProps) {
   const decimals = decimalsFor(p.unit, p.step, p.config.decimals);
-  const [text, setText] = useState(() => toDisplay(p.value, p.unit, decimals));
+  const isEmpty = !!p.empty?.active;
+  const [text, setText] = useState(() => (isEmpty ? "" : toDisplay(p.value, p.unit, decimals)));
   const [editing, setEditing] = useState(false);
   const [live, setLive] = useState<number | null>(null);
   const committedText = useRef(text);
@@ -92,12 +113,12 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
 
   useEffect(() => {
     if (!editing) {
-      const t = toDisplay(p.value, p.unit, decimals);
+      const t = isEmpty ? "" : toDisplay(p.value, p.unit, decimals);
       setText(t);
       committedText.current = t;
     }
     if (!drag.current && !pendingCommit.current) setLive(null);
-  }, [p.value, p.unit, decimals, editing]);
+  }, [p.value, p.unit, decimals, editing, isEmpty]);
 
   useEffect(
     () => () => {
@@ -106,18 +127,18 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
     [],
   );
 
-  const snap = (v: number) => {
+  /** The quantum the wheel, the arrows and the drag land on: the step, or the fine step with Shift. */
+  const gridOf = (fine: boolean) => {
     const q = latest.current;
-    return snapTo(v, q.min, q.max, q.step);
+    return fine ? (q.config.fineStep ?? q.step) : q.step;
   };
+  /** Commit a value as given (callers put it on the grid, or clamp what was typed). An empty box always takes it. */
   const commitNow = (v: number) => {
     const q = latest.current;
-    const s = snap(v);
-    if (s !== q.value) q.onChange(s);
+    if (v !== q.value || q.empty?.active) q.onChange(v);
   };
   /** Show the value at once and commit it at most once a frame. */
-  const commitLive = (v: number) => {
-    const s = snap(v);
+  const commitLive = (s: number) => {
     setLive(s);
     setText(toDisplay(s, latest.current.unit, decimals));
     if (pendingCommit.current) {
@@ -150,9 +171,10 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
       if (!steps) return;
       activate();
       const q = latest.current;
-      const base = q.config.wheelStep ?? q.step;
-      const mult = e.shiftKey ? 10 : e.altKey ? 0.1 : 1;
-      commitLive((liveRef.current ?? q.value) + steps * base * mult);
+      // One notch is the wheel step; with Shift, the fine step. Either lands on its grid.
+      const grid = gridOf(e.shiftKey);
+      const notch = e.shiftKey ? grid : (q.config.wheelStep ?? q.step);
+      commitLive(stepOnGrid(liveRef.current ?? q.value, steps * notch, grid, q.min, q.max));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
@@ -188,7 +210,8 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
       d.fine = e.shiftKey;
     }
     const dx = e.clientX - d.x;
-    commitLive(d.v + dx * perPx() * (d.fine ? 0.1 : 1));
+    const q = latest.current;
+    commitLive(quantize(d.v + dx * perPx() * (d.fine ? 0.1 : 1), gridOf(d.fine), q.min, q.max));
   };
   const endDrag = () => {
     drag.current = null;
@@ -207,12 +230,17 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
     if (v !== q.value) q.onChange(v);
   };
 
-  /** Arrow and page keys step the value; on the track (a slider) Home and End go to the ends, in the box they move the caret. */
+  /**
+   * Arrow and page keys step the value: the arrows by the step (the fine step with
+   * Shift), Page Up and Page Down by ten steps. On the track (a slider) Home and End go
+   * to the ends; in the box they move the caret.
+   */
   const stepKey = (e: RKeyboardEvent<HTMLElement>, onTrack: boolean): boolean => {
-    const mult = e.shiftKey ? 10 : 1;
+    const arrow = e.key === "ArrowUp" || e.key === "ArrowDown" || (onTrack && (e.key === "ArrowRight" || e.key === "ArrowLeft"));
+    const grid = gridOf(arrow && e.shiftKey);
     let d = 0;
-    if (e.key === "ArrowUp" || (onTrack && e.key === "ArrowRight")) d = p.step * mult;
-    else if (e.key === "ArrowDown" || (onTrack && e.key === "ArrowLeft")) d = -p.step * mult;
+    if (e.key === "ArrowUp" || (onTrack && e.key === "ArrowRight")) d = grid;
+    else if (e.key === "ArrowDown" || (onTrack && e.key === "ArrowLeft")) d = -grid;
     else if (e.key === "PageUp") d = p.step * 10;
     else if (e.key === "PageDown") d = -p.step * 10;
     else if (onTrack && (e.key === "Home" || e.key === "End")) {
@@ -222,7 +250,7 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
     }
     if (d === 0) return false;
     e.preventDefault();
-    commitLive((live ?? p.value) + d);
+    commitLive(stepOnGrid(live ?? p.value, d, grid, p.min, p.max));
     return true;
   };
   // Escape abandons the edit: the blur it causes must not commit the typed text.
@@ -244,9 +272,15 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
       return;
     }
     if (text === committedText.current) return;
+    // A box that may stand empty: clearing it goes back to the default.
+    if (p.empty && text.trim() === "") {
+      if (!p.empty.active) p.empty.onClear();
+      return;
+    }
     const v = fromDisplay(text, p.unit);
     if (v == null) setText(committedText.current);
-    else commitNow(v);
+    // Typed values keep the precision typed: clamped to the range (whole for an integer), never put on the step.
+    else commitNow(clampTyped(v, p.min, p.max, p.unit === "int"));
   };
 
   const shown = live ?? p.value;
@@ -258,6 +292,7 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
   const running = p.run === "running";
   const paused = p.run === "paused";
   const cls = ["nf", p.compact && "compact", p.active && "active", running && "running", paused && "paused", band && "banded"].filter(Boolean).join(" ");
+  const sign = p.suffix ?? suffix(p.unit);
 
   return (
     <div
@@ -287,7 +322,7 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
             aria-valuemin={p.min}
             aria-valuemax={p.max}
             aria-valuenow={shown}
-            aria-valuetext={`${toDisplay(shown, p.unit, decimals)}${suffix(p.unit)}`}
+            aria-valuetext={`${toDisplay(shown, p.unit, decimals)}${sign}`}
             aria-label={label}
             tabIndex={0}
             onFocus={activate}
@@ -318,7 +353,8 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
             inputMode="decimal"
             autoComplete="off"
             spellCheck={false}
-            value={editing ? text : text + suffix(p.unit)}
+            value={editing || text === "" ? text : text + sign}
+            placeholder={p.empty?.placeholder}
             onFocus={() => {
               activate();
               setEditing(true);

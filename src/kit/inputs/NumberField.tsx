@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
-import { SyntheticNumber } from "./SyntheticNumber";
+import { SyntheticNumber, type SyntheticEmpty } from "./SyntheticNumber";
 import type { InputConfig, Unit } from "./schema";
+import { perHundredPxOf } from "./paramSettings";
 import { useKit, useKitApi } from "@kit/state/context";
 import { useSweepTrack } from "@kit/sweeps/useSweeps";
+
+export { perHundredPxOf };
 
 export interface NumberFieldProps {
   id: string;
@@ -24,16 +27,10 @@ export interface NumberFieldProps {
   ariaLabel?: string;
   /** Double-clicking the slider returns to this value. */
   defaultValue?: number;
-}
-
-/**
- * Units per 100 px of drag. The schema sets it per parameter (`input.perHundredPx`);
- * where it does not, the old "pixels from the middle to an extreme" converts.
- */
-export function perHundredPxOf(config: InputConfig, min: number, max: number): number {
-  if (config.perHundredPx != null && config.perHundredPx > 0) return config.perHundredPx;
-  const px = Math.max(40, config.sensitivityPx || 220);
-  return (((max - min) / 2) * 100) / px;
+  /** An empty box with a placeholder (a setting left at its default); see SyntheticNumber. */
+  empty?: SyntheticEmpty;
+  /** The sign after the number instead of the unit's ("pp" for a step of a percentage). */
+  suffix?: string;
 }
 
 /**
@@ -62,7 +59,9 @@ export function NumberField(p: NumberFieldProps) {
       max={p.max}
       step={p.step}
       unit={p.unit}
-      config={{ slider: p.config.slider, perHundredPx: perHundredPxOf(p.config, p.min, p.max), wheelStep: p.config.wheelStep, decimals: p.config.decimals }}
+      config={{ slider: p.config.slider, perHundredPx: perHundredPxOf(p.config, p.min, p.max), wheelStep: p.config.wheelStep, decimals: p.config.decimals, fineStep: p.config.fineStep }}
+      empty={p.empty}
+      suffix={p.suffix}
       onChange={p.onChange}
       compact={p.compact}
       ariaLabel={p.ariaLabel}

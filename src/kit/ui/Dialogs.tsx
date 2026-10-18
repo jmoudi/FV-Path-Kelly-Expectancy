@@ -102,17 +102,27 @@ export function ImportExportDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** The reduced settings: default backend, drag sensitivity, sweep rate, reset. */
-export function SettingsDialog({ onClose }: { onClose: () => void }) {
+/** The reduced settings: default backend, drag sensitivity, sweep rate, reset. `guideHref` adds a link to the app's guide page. */
+export function SettingsDialog({ onClose, guideHref }: { onClose: () => void; guideHref?: string }) {
   return (
     <Modal title="Settings" onClose={onClose}>
       <QuickSettings />
       <p className="caption">
-        Presets, the engine, your data, import and export and the hotkeys are on the{" "}
+        Presets, parameter settings, the engine, your data, import and export and the hotkeys are on the{" "}
         <a href="#settings" onClick={onClose}>
           full settings page
         </a>
         .
+        {guideHref && (
+          <>
+            {" "}
+            How every control works:{" "}
+            <a href={guideHref} onClick={onClose}>
+              the Guide
+            </a>
+            .
+          </>
+        )}
       </p>
     </Modal>
   );

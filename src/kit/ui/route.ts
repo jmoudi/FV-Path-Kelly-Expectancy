@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
  * Hash routes. Two shapes are built in, because kit frames link to them: a view page
  * (#view/<id>) and a section of the sections page (#s-<id>). The app names its other
  * pages, its landing page (also the default for an empty or unknown hash) and any
- * aliases in a RouteConfig, a module constant it passes to useRoute.
+ * aliases in a RouteConfig, a module constant it passes to useRoute. A page's part is
+ * #<page>/<part> (a section of the guide page: #guide/keys).
  */
 export interface Route {
   page: string;
   /** The view id on page "view". */
   id?: string;
-  /** The section to scroll to on the sections page. */
+  /** The section to scroll to on the sections page, or the part of another page (#<page>/<part>). */
   section?: string;
 }
 
@@ -34,6 +35,9 @@ export function parseHash(hash: string, cfg: RouteConfig): Route {
   if (v) return { page: "view", id: v[1] };
   const s = /^s-([\w-]+)$/.exec(h);
   if (s) return { page: cfg.sectionsPage, section: s[1] };
+  // #<page>/<part>: a part of one of the app's pages (a section of a guide page).
+  const sub = /^([\w-]+)\/([\w-]+)$/.exec(h);
+  if (sub && cfg.pages.includes(cfg.aliases?.[sub[1]] ?? sub[1])) return { page: cfg.aliases?.[sub[1]] ?? sub[1], section: sub[2] };
   const name = cfg.aliases?.[h] ?? h;
   return cfg.pages.includes(name) ? { page: name } : { page: cfg.home };
 }
@@ -41,6 +45,7 @@ export function parseHash(hash: string, cfg: RouteConfig): Route {
 export function hrefFor(r: Route, cfg: RouteConfig): string {
   if (r.page === "view" && r.id) return viewHref(r.id);
   if (r.page === cfg.sectionsPage && r.section) return sectionHref(r.section);
+  if (r.section) return `#${r.page}/${r.section}`;
   return `#${r.page}`;
 }
 

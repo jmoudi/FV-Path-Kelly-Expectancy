@@ -46,6 +46,11 @@ export interface InputConfig {
   wheelStep?: number;
   /** Decimal places shown in the box (in display units). */
   decimals?: number;
+
+  // Parameter settings (kit/inputs/paramSettings.ts): the fields above are the defaults
+  // a person's settings override; this one exists only as such a default.
+  /** The quantum with Shift held; default: step ÷ 10 (or ÷ 5, ÷ 2) as far as the box can show it. */
+  fineStep?: number;
 }
 
 export interface Choice {

@@ -15,7 +15,8 @@ export const useStore = createAppStore<Params, Datasets>({
   // Saved states and the interaction scripts read this key: never change it.
   storageKey: "tranche-replay:v1",
   // 4: the snapshot of parameters a story moved (storyPrev) travels with the state.
-  version: 4,
+  // 5: parameter settings (paramSettings: step, fine step, wheel step, drag, decimals, slider per parameter).
+  version: 5,
   presets: PRESET_CATALOG,
   planner: plannerFor(SWEEPS),
 });

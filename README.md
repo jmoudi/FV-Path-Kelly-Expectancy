@@ -24,7 +24,7 @@ for it, with an "agrees?" flag and a one-line reason when it does not.
 npm install
 npm run dev        # http://localhost:5173
 npm run build      # type check, then the static site in dist/
-npm test           # model, chart, deck and sweep tests
+npm test           # model, chart, deck, sweep, parameter-settings and Guide tests
 npm run parity     # every chart × backend draws the same marks (see below)
 ```
 
@@ -80,11 +80,11 @@ swapped without touching the others.
 | Charts | `src/kit/charts/` | `ChartSpec` and chart edits (`spec.ts`): data table, mark, axes, series, annotations, stories. `resolveChart` (`resolve.ts`) computes, once per render, everything a backend needs: domains, ticks and tick labels, which axis is drawn where (`orientation: "horizontal"` puts the x field up the side), the bar plan (`bars.ts`: grouped when series share a position, overlaid when they never do, stacked on request; px thickness that never overruns its neighbours), where each annotation label goes (`collide.ts`), and how the legend wraps. `ChartFrame` is the borderless frame (tools on hover, a plot box of fixed height). `format.ts` prints every chart number (U+2212 minus everywhere, milliseconds under a second) and `numbers.ts` holds the text helpers (`pct`, `x2`, `signedPp`, …). `theme.ts` is the palette (`configureTheme` replaces it for another explainer). `scenario.ts` is `ScenarioView<P>`, the unit a scenario builder returns. See its README. |
 | Switchboard | `src/kit/charts/registry.ts`, `src/kit/charts/backends/` | Routes a spec to ECharts, Plotly, Vega-Lite or an HTML table, each loaded on first use. All three draw from the same point lists (`backends/types.ts`); the Plotly figure and the Vega-Lite spec are built by pure modules (`plotlyFigure.ts`, `vegaSpec.ts`) that the tests inspect without a DOM. `probe.ts` and `parity.ts` record what a backend drew and run the comparison behind `npm run parity`. |
 | Figures | `src/kit/charts/figures/` | Charts of kind `figure`, drawn by a React SVG component the app registers (`registerFigures` in `registry.ts`, before the first render), in a `FigureFrame` with the theme's `tokens.ts`. Not backend-switchable: ⊞ shows their data and ⚙ offers only the height. |
-| Inputs | `src/kit/inputs/` | `ParamDef<P>` and `createSchema` (`schema.ts`: `byKey`, `sanitize`, `sanitizePatch`, `coerce`). `SyntheticNumber` (box, wheel, relative drag track, sweep band and tick, the run marker's reserved slot), the wheel gate, the display rules, `NumberField` (the field wired to the store and the sweeps), `Num`, `ParamInput`, and `number-field.css` (also the sweep strip's styles). |
+| Inputs | `src/kit/inputs/` | `ParamDef<P>` and `createSchema` (`schema.ts`: `byKey`, `sanitize`, `sanitizePatch`, `coerce`). `SyntheticNumber` (box, wheel, relative drag track, sweep band and tick, the run marker's reserved slot), the wheel gate, the display rules, `NumberField` (the field wired to the store and the sweeps), `Num`, `ParamInput`, and `number-field.css` (also the sweep strip's styles). Parameter settings: `paramSettings.ts` (the six settings, their resolution over the schema's `input` defaults, the sanitizer, and the grid the wheel, arrows and drag land on) and `ParamSettings.tsx` (the field's ⚙ popover and the Settings page's table, styled by `param-settings.css`). |
 | Sweeps | `src/kit/sweeps/` | Presets, plans and their sanitizers (`types.ts`, `engine.ts`, `sanitize.ts`, over the app's `PresetCatalog`); the frame-locked sweep clock (`runner.ts`: the next value only after the last one rendered, each value on screen at least its interval); the driver and the hotkeys (`useSweeps.ts`); the strip and the preset editor (`SweepStrip`, `SweepPanel`); and the `SweepAdapter` (`adapter.ts`) through which they ask the app for an input's context, its format and whether a build has rendered. |
-| State | `src/kit/state/` | `createAppStore(config)`: parameters with undo and redo, imported data, chart edits, default backend, presets and links, settings, and the snapshot of parameters a story moved (only one deck-moving story is active at a time). Sweep runs are saved as input, preset and pre-sweep value only (ticks are never saved), so a reload mid-sweep puts the input back. Validated on load, persisted locally under one key, exported and imported as one versioned JSON file; `#reset` in the address clears it. `<KitProvider>` with `useKit`, `useKitApi`, `useSchema`, `useKitSweeps`, `useKitCopy` is how kit components reach the store, the schema, the sweep adapter and the copy. |
+| State | `src/kit/state/` | `createAppStore(config)`: parameters with undo and redo, imported data, chart edits, default backend, presets and links, settings, parameter settings (`paramSettings`, `setParamSettings`, `resetParamSettings`; never read by the sweeps), and the snapshot of parameters a story moved (only one deck-moving story is active at a time). Sweep runs are saved as input, preset and pre-sweep value only (ticks are never saved), so a reload mid-sweep puts the input back. Validated on load, persisted locally under one key, exported and imported as one versioned JSON file; `#reset` in the address clears it. `<KitProvider>` with `useKit`, `useKitApi`, `useSchema`, `useKitSweeps`, `useKitCopy` is how kit components reach the store, the schema, the sweep adapter and the copy. |
 | Build | `src/kit/build/` | `defineBuildWorker` (the worker side) and `useBuild(input, { createWorker, build, settled })`: the build queue (`coalesce.ts`: one request in flight, the newest waiting, every answer newer than the last one shown rendered), `only` partial builds of the scenarios on screen during a sweep (`scope.ts`), and an inline fallback when the worker does not answer. |
-| Frames | `src/kit/ui/` | The section skeleton and its composition (`SectionFrame`, `Section`), the answer strip, the footer line and its tabbed panel, the view page (`ViewFrame`, `ViewPage`), the chart host with the editor in ⚙ and the ⊞ table (`ChartHost`, `Authoring`, `TableView`), the comparison grid (`DeskGrid`), portal menus, settings (`Settings`, `SettingsBody`) and the hotkey legend, dialogs, popovers, routes (`route.ts`: a `RouteConfig`, `viewHref`, `sectionHref`), the shell hooks (`Shell.tsx`: scroll spy, `[` / `]` between views, the crash screen), adapters from a `ScenarioView` to frame props (`scenarioProps.tsx`: KPIs into figures, sections into chips and the Views menu), the frames' default copy (`copy.ts`), and the deck (`deck/`: the two-row bar, the drawer, the linked value, the segmented switch), all through props. One dark theme, graphite: `theme.css` holds the colour tokens and the token-only type scale, `kit.css` reads only those tokens, `deck/deck.css` styles the deck frame; the chrome (focus, primary buttons, sliders, running sweeps) reads `--accent` / `--accent-2`. Stacking: deck 25, top bar 30, drawer 35, dialogs 50, popovers 70, menus 80. See `src/kit/ui/README.md` and `src/kit/ui/deck/README.md`. |
+| Frames | `src/kit/ui/` | The section skeleton and its composition (`SectionFrame`, `Section`), the answer strip, the footer line and its tabbed panel, the view page (`ViewFrame`, `ViewPage`), the chart host with the editor in ⚙ and the ⊞ table (`ChartHost`, `Authoring`, `TableView`), the comparison grid (`DeskGrid`), portal menus, settings (`Settings`, `SettingsBody`) and the hotkey legend, dialogs, popovers, the guide page (`GuideFrame`: a rail of section links beside prose, tables and key rows, from the app's `GuideSection[]`; `guide.css`), routes (`route.ts`: a `RouteConfig`, `viewHref`, `sectionHref`, and `#<page>/<part>` for a page's part), the shell hooks (`Shell.tsx`: scroll spy, `[` / `]` between views, the crash screen), adapters from a `ScenarioView` to frame props (`scenarioProps.tsx`: KPIs into figures, sections into chips and the Views menu), the frames' default copy (`copy.ts`), and the deck (`deck/`: the two-row bar, the drawer, the linked value, the segmented switch), all through props. One dark theme, graphite: `theme.css` holds the colour tokens and the token-only type scale, `kit.css` reads only those tokens, `deck/deck.css` styles the deck frame; the chrome (focus, primary buttons, sliders, running sweeps) reads `--accent` / `--accent-2`. Stacking: deck 25, top bar 30, drawer 35, dialogs 50, popovers 70, menus 80. See `src/kit/ui/README.md` and `src/kit/ui/deck/README.md`. |
 | Maths | `src/kit/math/stats.ts` | The error function and the normal distribution, Student-t, lgamma, binomial, the regularized incomplete Beta, a seeded RNG, linspace and logspace, integration. No domain. |
 
 ### The app (`src/app/`)
@@ -97,18 +97,24 @@ swapped without touching the others.
 | Deck | `src/app/deck/` | `deckView.ts` (the deck's figures, built in the worker); `DeckBar.tsx`, the kit's `Deck` with this app's content; `useDeckProps.tsx`, `layout.ts` and `status.ts` (the schema and `DeckView` into the deck's groups, status, legend and drawer sections); the clean-season linked field (`CleanSeason.tsx`); the market switch (`MarketSwitch.tsx`); the strip slot (`DeckStrip.tsx`). |
 | Desk | `src/app/desk/` | `desk.ts` (the Desk's policy grid, sizing line, calibration verdict, market state, built in the worker), `grid.ts` (the `DeskView` into the kit grid's columns and groups), `DeskPage.tsx`. |
 | Figures | `src/app/figures/` | The railroad schematic and the season calendar (`Railroad.tsx`, `Calendar.tsx`), and `FIGURES` with their labels and blurbs (`index.ts`), registered in `main.tsx`. |
-| Copy | `src/app/copy/` | `kitCopy.ts`: this app's sentences for the kit's frames (`KIT_COPY`, including `storyMoved`, which is `movedBadge`). `market.ts`: the market switch's lines. |
-| Wiring | `src/app/*.ts(x)` | `App.tsx`: the pages (Desk, Explain, view, Settings) and `ROUTES`. `store.ts`: the one store (`createAppStore` with storage key `tranche-replay:v1` and export version 4). `build.ts`: `BUILD` and `BUILD_SETTLED`. `sweeps.ts`: the `SweepAdapter`. `worker.ts`: the worker entry (`defineBuildWorker`). `DataDialog.tsx`: the trade-log and moves editors, in the Data dialog and the settings page's data group. |
+| Copy | `src/app/copy/` | `kitCopy.ts`: this app's sentences for the kit's frames (`KIT_COPY`, including `storyMoved`, which is `movedBadge`). `market.ts`: the market switch's lines. `guide.ts`: the Guide's ten sections as structured blocks (`GUIDE_SECTIONS`); keep it true to the GUI. |
+| Wiring | `src/app/*.ts(x)` | `App.tsx`: the pages (Desk, Explain, view, Settings, Guide) and `ROUTES`. `store.ts`: the one store (`createAppStore` with storage key `tranche-replay:v1` and export version 5). `build.ts`: `BUILD` and `BUILD_SETTLED`. `sweeps.ts`: the `SweepAdapter`. `worker.ts`: the worker entry (`defineBuildWorker`). `DataDialog.tsx`: the trade-log and moves editors, in the Data dialog and the settings page's data group. |
 
 ## Using the app
 
 - **Pages.** `#desk` is the landing page (an empty address opens it); `#explain` the
   guided tour (`#tour` and `#s-<section>` still work); `#view/<id>` one responsibility
-  on its own page; `#settings` the full settings. The top bar reads Desk · Explain ·
-  Views ▾ · Settings, with Data, Import / export and ⚙ on the right; at 700px and
-  below those three fold into one "⋯" menu. The Views menu and "⋯" render above
-  everything, so nothing clips them.
-- **Deck.** Anchored under the top bar on every page except Settings, two rows when
+  on its own page; `#settings` the full settings; `#guide` the Guide. The top bar reads
+  Desk · Explain · Views ▾ · Settings · Guide, with Data, Import / export and ⚙ on the
+  right; at 700px and below those three fold into one "⋯" menu (which also lists the
+  Guide). The Views menu and "⋯" render above everything, so nothing clips them.
+- **Guide.** `#guide` documents how the GUI works, in ten sections (the screen,
+  parameters, editing a parameter by hand, parameter settings, the replayer, charts,
+  pages, data and state, keys, for builders), each at `#guide/<section>`
+  (`#guide/keys` is every shortcut in one table). A rail of section links marks the one
+  being read. Linked from the top bar, the quick-settings dialog and the Settings page.
+  Its text is `src/app/copy/guide.ts`; change it with the GUI.
+- **Deck.** Anchored under the top bar on every page except Settings and the Guide, two rows when
   reduced. Row 1: eight fields in three groups set apart by 40px and a hairline (Per
   event: loss rate q, gain b, optimistic loss rate · Per season: nights n, names a
   night k, shared-cause nights c · Sizing: at risk a night, seasons chained N), and
@@ -122,8 +128,9 @@ swapped without touching the others.
 - **Full deck** is a 460px drawer on the right, from under the top bar to the bottom
   of the window; it scrolls on its own and the charts stay live beside it. Sections:
   Event, Season, Sizing, Shared risk, Calibration band (every input with its full name,
-  symbol and help), Market, Figures (every policy named), Definitions. Collapse ▴ or
-  Escape closes it. Presets are edited in Settings.
+  symbol and help, and a ⚙ on hover or focus for its parameter settings), Market,
+  Figures (every policy named), Definitions. Collapse ▴ or Escape closes it (Escape
+  closes an open ⚙ popover first). Presets are edited in Settings.
 - **Desk** answers "given my book, what happens?": the three policies side by side for
   one season and for N seasons (mean, median, 10th percentile, P(below threshold),
   ruin; each row links to the view that explains it), the sizing heatmap with your
@@ -140,13 +147,27 @@ swapped without touching the others.
   a night", …), with the context beside the charts. Open them from the Views menu, the
   links next to a section's number, or the ↗ on any chart; `[` and `]` step to the
   previous or next view from any page when focus is not in a text field.
-- **Inputs** are synthetic number fields: type, use the arrow keys, the wheel (Shift
-  ×10, Alt ×0.1), or drag the track beside the box. A click on the track focuses the
-  field and leaves the value alone; double-click returns to the default. Dragging is
-  relative, in the input's units per 100 px (q and b 0.25 pp, nights 5, names 1, risk
-  a night 10 pp, seasons 1; Shift ×0.1), times the drag sensitivity in Settings. The
-  wheel acts only on a focused field, or after the pointer has rested on it for 400 ms
-  with no page scroll in progress. Focusing a field makes it the active input.
+- **Inputs** are synthetic number fields: type, use the arrow keys (Page Up / Down ten
+  steps), the wheel, or drag the track beside the box; Shift makes the wheel, the arrows
+  and the drag fine. A click on the track focuses the field and leaves the value alone;
+  double-click returns to the default. Dragging is relative, in the input's units per
+  100 px (q and b 0.25 pp, nights 5, names 1, risk a night 10 pp, seasons 1; Shift
+  ×0.1), times the drag sensitivity in Settings. The wheel acts only on a focused
+  field, or after the pointer has rested on it for 400 ms with no page scroll in
+  progress. The wheel, arrows and drag land on multiples of the step (the fine step with
+  Shift), counted from zero; a typed value is clamped to the range and kept as typed.
+  Focusing a field makes it the active input.
+- **Parameter settings** are how a parameter is edited by hand, kept apart from its
+  value and from the replayer: step (the quantum of the wheel, arrows and drag), fine
+  step (Shift; default a tenth of the step, or a fifth or a half where the box cannot
+  show a tenth), wheel step (one notch, a whole number of steps), drag per 100 px,
+  decimals and slider. The schema's `input` block holds the defaults; your values
+  override them. Change them in the drawer (⚙ beside a field: "Settings for
+  <parameter>", defaults as placeholders, Reset) or on the Settings page's Parameters
+  group (one row per parameter with its range, a Reset per row, Reset all). They are
+  saved and exported with the state; Reset every parameter leaves them alone. A sweep
+  preset never reads them: with q's step set to 0.5 pp the wheel moves q 0.5 pp while
+  "Optimistic to break-even" still steps 0.05 pp (a test holds the plan to it).
 - **Sweeps** drive the active input from a saved preset, in the input's own units:
   loop, ping-pong, or spots with hold times; between two named anchors (q: optimistic,
   deck, break-even; risk a night: robust, Kelly, deck; every input: min, current, max,
@@ -185,10 +206,12 @@ swapped without touching the others.
   moves in priced sigmas. The record feeds calibration and the robust sizing curve; the
   moves can replace the Normal in the effective-loss-rate section.
 - **Settings.** The quick dialog (⚙ in the top bar) holds exactly the default backend,
-  drag sensitivity, sweep rate and the resets. The full page adds the sweep's cap in
-  values a second, the engine (engine, enumeration cap, Monte Carlo paths, seed, fan
-  paths, as plain boxes), the hotkey legend, the sweep presets, your data, and import
-  and export of the whole state as JSON.
+  drag sensitivity, sweep rate and the resets, and links the full page and the Guide.
+  The full page adds the sweep's cap in values a second, the engine (engine,
+  enumeration cap, Monte Carlo paths, seed, fan paths, as plain boxes), the hotkey
+  legend, Parameters (every parameter's settings), the sweep presets, your data, and
+  import and export of the whole state as JSON (export version 5: parameter settings
+  travel with it; an older file keeps the current ones).
 
 ## Conventions worth knowing
 
