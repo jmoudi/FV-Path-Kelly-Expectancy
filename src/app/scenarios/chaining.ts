@@ -75,24 +75,26 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
       badge: movesDeck("at risk a night", pct(p.riskPerNight), pct(robustRisk)),
     });
   }
-  if (Math.abs(p.lossRate - 0.032) > 5e-5) {
-    sweepStories.push({
-      id: "worse",
-      label: "What if q is really 3.2%?",
-      narrative: `At your ${pct(p.riskPerNight)} a night the log growth of surviving paths is ${signedPct1(seasonLogGrowth(p.riskPerNight, k, 0.032, p.gain, n, p.sharedOutcome))} a season instead of ${signedPct1(d.growthYours)}.`,
-      params: { lossRate: 0.032, market: "custom" },
-      badge: movesDeck("q", pct2(p.lossRate), "3.20%"),
-    });
-  }
-  if (!d.market.zeroPremium) {
-    sweepStories.push({
-      id: "be",
-      label: "The chain is right: q = break-even",
-      narrative: "At zero premium the growth-optimal risk is 0; every curve sits at or below zero, and sizing only changes the median, P(below threshold) and ruin.",
-      params: { lossRate: d.breakEven, market: "fair" },
-      badge: movesDeck("q", pct2(p.lossRate), pct2(d.breakEven)),
-    });
-  }
+  // These two are always offered: once applied, an answered question stays on its chart
+  // (pressed, with its answer line) after a reload, where the deck already sits at its value.
+  const growthAt320 = signedPct1(seasonLogGrowth(p.riskPerNight, k, 0.032, p.gain, n, p.sharedOutcome));
+  sweepStories.push({
+    id: "worse",
+    label: "What if q is really 3.2%?",
+    narrative:
+      Math.abs(p.lossRate - 0.032) > 5e-5
+        ? `At your ${pct(p.riskPerNight)} a night the log growth of surviving paths is ${growthAt320} a season instead of ${signedPct1(d.growthYours)}.`
+        : `At q = 3.20% and your ${pct(p.riskPerNight)} a night the log growth of surviving paths is ${growthAt320} a season.`,
+    params: { lossRate: 0.032, market: "custom" },
+    badge: movesDeck("q", pct2(p.lossRate), "3.20%"),
+  });
+  sweepStories.push({
+    id: "be",
+    label: "The chain is right: q = break-even",
+    narrative: "At zero premium the growth-optimal risk is 0; every curve sits at or below zero, and sizing only changes the median, P(below threshold) and ruin.",
+    params: { lossRate: d.breakEven, market: "fair" },
+    badge: movesDeck("q", pct2(p.lossRate), pct2(d.breakEven)),
+  });
   const sweep: ChartSpec = {
     id: "chain-sweep",
     title: "Growth averaged over the loss-rate band",
@@ -275,16 +277,18 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const fYours = navKellyShare(yoursOutcomes);
   const fCoin = navKellyShare(coinAtDeck);
   const twoP = doubleOrNothingShare(d.pClean);
-  const navRamp: ColorRole[] = ["ramp1", "ramp2", "ramp3"];
+  // Three distinct colours for p = 50% / 55% / 60%: the fair coin grey, the discussion's case white, the better coin green.
+  const navColors: ColorRole[] = ["muted", "ink", "good"];
+  const navWords = ["grey", "white", "green"];
   const navSeries: SeriesSpec[] = [
-    ...navPs.map((pp, i): SeriesSpec => ({ field: `coin${i}`, color: navRamp[i], label: `${P.coin.name}, p = ${pct(pp)}` })),
+    ...navPs.map((pp, i): SeriesSpec => ({ field: `coin${i}`, color: navColors[i], label: `${P.coin.name}, p = ${pct(pp)}` })),
     ...(deckPShown ? [] : [{ field: "coinDeck", color: "ink", label: `${P.coin.name} at the deck's p = ${pct(d.pClean)}`, dash: true } as SeriesSpec]),
     { field: "yours", color: "c", label: yours.label, emphasis: "strong" },
   ];
   const nav: ChartSpec = {
     id: "chain-nav",
     title: "Refilling the tranche from NAV each season",
-    subtitle: `x share of NAV allocated to the tranche per season · y NAV log growth per season, E[log(1 − f + f·X)] with X the season-end multiple · ${P.coin.name} at three clean-season probabilities · violet = ${yours.label} · dots = growth-optimal share · double-or-nothing: f* ≈ 2p − 1 · curves below ${signedPct1(navFloor)} are cut`,
+    subtitle: `x share of NAV allocated to the tranche per season · y NAV log growth per season, E[log(1 − f + f·X)] with X the season-end multiple · ${P.coin.name} at three clean-season probabilities: ${navPs.map((pp, i) => `${navWords[i]} = p ${pct(pp)}`).join(" · ")}${deckPShown ? "" : ` · dashed white = the deck's p ${pct(d.pClean)}`} · violet = ${yours.label} · dots = growth-optimal share · double-or-nothing: f* ≈ 2p − 1 · curves below ${signedPct1(navFloor)} are cut`,
     kind: "xy",
     data: table(
       [f("share", "Share of NAV allocated per season", "pct"), ...navPs.map((pp, i) => f(`coin${i}`, `${P.coin.name}, p = ${pct(pp)}`, "pct1")), f("coinDeck", `${P.coin.name} at the deck's p = ${pct(d.pClean)}`, "pct1"), f("yours", yours.label, "pct1")],
@@ -352,14 +356,21 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const hitFactorFull = 1 + (1 / k) * ((k - 1) * p.gain - 1);
   const hitFactorYours = 1 + (p.riskPerNight / k) * ((k - 1) * p.gain - 1);
   const recoveryNights = hitFactorFull > 0 ? Math.ceil(Math.log(1 / hitFactorFull) / Math.log(1 + p.gain)) : NaN;
+  // The nights those hits take back: expected hits a season times the clean nights each one costs to recover.
+  const nightsTakenBack = hitFactorFull > 0 ? Math.round(k * n * p.lossRate * recoveryNights) : NaN;
   const recovery =
     hitFactorFull > 0
-      ? `One partial hit at full exposure costs about ${pct(1 - hitFactorFull)} of the tranche. Recovering takes +${pct(1 / hitFactorFull - 1)}, roughly ${recoveryNights} clean nights at +${pct1(p.gain)}. With ${k * n} name-events at ${pct2(p.lossRate)} you expect about ${typographic((k * n * p.lossRate).toFixed(1))} hits a season, which take back roughly ${Math.round(k * n * p.lossRate * recoveryNights)} of the season's ${n} nights.`
+      ? `One partial hit at full exposure costs about ${pct(1 - hitFactorFull)} of the tranche. Recovering takes +${pct(1 / hitFactorFull - 1)}, roughly ${recoveryNights} clean nights at +${pct1(p.gain)}. With ${k * n} name-events at ${pct2(p.lossRate)} you expect about ${typographic((k * n * p.lossRate).toFixed(1))} hits a season, which take back roughly ${nightsTakenBack} of the season's ${n} nights.`
       : `With one name at full exposure a hit is not partial: it is the whole tranche, and there is nothing to recover from.`;
   const halfVsKelly = d.nightKelly.risk > 0 ? p.riskPerNight / d.nightKelly.risk : NaN;
   const medianGrowth = medianGrowthPerSeason(sYours.median, N);
   const seasonsWord = `${N} season${N === 1 ? "" : "s"}`;
   const expectedHits = 3 * 20 * 0.02945;
+  // The claim states where growth peaks, as a fact: averaged over the band, and at the deck's rate alone.
+  const chainClaim =
+    d.robust.risk > 0
+      ? `Over chained seasons the typical path follows the median, not the mean. Growth averaged over the loss rates you cannot rule out peaks at ${pct(d.robust.risk)} a night; at the deck's rate alone ${d.nightKelly.risk > 0 ? `it peaks at ${pct(d.nightKelly.risk)}` : "the growth-optimal risk is 0"}.`
+      : "Over chained seasons the typical path follows the median, not the mean. With the whole band of loss rates at or past break-even, growth peaks at zero risk.";
 
   // Quoted growth grid at the discussion's columns, with the deck's k, n and b.
   const gridFig = (qq: number, label: string, quotedText: string, quotedVals: number[]) => {
@@ -371,10 +382,10 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
     id: "chaining",
     number: 8,
     title: "Chained seasons",
-    claim: "Over seasons the median becomes your number. Sit where growth stays best averaged over the loss rates you cannot rule out, not where it peaks at one rate.",
+    claim: chainClaim,
     lede: `${N} season${N === 1 ? "" : "s"} later, where does the tranche stand, and how much should a night risk?`,
     views: [
-      { id: "sizing-grid", title: "How much to risk a night", blurb: "Growth per season by risk a night and true loss rate, and the curve averaged over the band of rates you cannot rule out.", charts: ["chain-heat", "chain-sweep", "chain-grid-table"], kpis: [0, 4, 5] },
+      { id: "sizing-grid", title: "How much to risk a night", blurb: "Log growth per season by risk a night and true loss rate, and the curve averaged over the band of rates you cannot rule out.", charts: ["chain-heat", "chain-sweep", "chain-grid-table"], kpis: [0, 4, 5] },
       { id: "chained-outcomes", title: N === 1 ? "One season later" : `${SEASON_WORDS[N] ?? N} seasons later`, blurb: "Mean and median as seasons are chained, the distribution after N seasons, and sampled paths.", charts: ["chain-curve", "chain-dist", "chain-fan", "chain-table"], kpis: [1, 2, 3, 5] },
       {
         id: "nav-refill",
@@ -429,6 +440,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
       fig(p, "Surviving coin paths after four seasons end at", "15.7×", x2(Math.pow(d.cleanEnd, 4)), near(15.7, Math.pow(d.cleanEnd, 4), 0.06), ["b", "n"]),
       fig(p, "One partial hit at full exposure: cost / recovery / clean nights", "31% / +45% / about 11", hitFactorFull > 0 ? `${pct(1 - hitFactorFull)} / +${pct(1 / hitFactorFull - 1)} / ${recoveryNights}` : "the whole tranche", hitFactorFull > 0 && near(0.31, 1 - hitFactorFull, 0.006) && near(0.45, 1 / hitFactorFull - 1, 0.006) && recoveryNights === 11, ["b", "k"]),
       fig(p, "Hits a season, 60 name-events at 2.94%", "about 1.8", typographic((k * n * p.lossRate).toFixed(1)), near(expectedHits, k * n * p.lossRate, 0.06), ["q", "n", "k"]),
+      fig(p, "Nights those hits erase: hits a season × clean nights to recover each", "roughly 19 of the season's 20", Number.isFinite(nightsTakenBack) ? `${nightsTakenBack} of ${n}` : "the whole tranche", nightsTakenBack === 19 && n === 20, ["q", "b", "n", "k"]),
       fig(p, "Log growth per season, 3 names at full exposure", "−4%", signedPct1(seasonLogGrowth(1, k, p.lossRate, p.gain, n, p.sharedOutcome)), near(-0.04, seasonLogGrowth(1, k, p.lossRate, p.gain, n, p.sharedOutcome), 0.006), ["q", "b", "n", "k", "c"]),
       fig(p, "The mean keeps rising per season", "about +10%", signedPct1(d.meanSeason - 1), near(0.1, d.meanSeason - 1, 0.011), ["q", "b", "n"]),
       gridFig(0.0252, "2.52%", "+5.5% / +6.5% / +7.4% / +6.5%", [0.055, 0.065, 0.074, 0.065]),

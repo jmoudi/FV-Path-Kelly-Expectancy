@@ -4,7 +4,7 @@ import { POLICY_META } from "@app/model/policies";
 import { useStore } from "@app/store";
 import { MARKET_LINE } from "@app/copy/market";
 import { marketState } from "@app/scenarios/derived";
-import { pct, pct2, signedPp } from "@kit/charts/numbers";
+import { pct, pct2 } from "@kit/charts/numbers";
 
 /**
  * The market switch: Fair market (q = b/(1+b)) · Discussion case (55% clean Coin
@@ -29,14 +29,14 @@ export function MarketSwitch({ customFocusId }: { customFocusId?: string }) {
     }
     setParams(marketPatch(v, params));
   };
-  const premium = `Premium over fair per event: ${signedPp(m.premium)} (fair rate ${pct2(m.fairRate)}, q ${pct2(params.lossRate)}).`;
   // Where q sits decides, except that choosing Custom shows as Custom until another state is chosen.
   const selected: Market = m.chosen === "custom" ? "custom" : m.actual;
+  // The premium sentence comes from the view-model (marketState().line), the one source the Desk and the drawer share.
   return (
     <div className="dkb-market">
       <Segmented options={options} value={selected} onChange={onChange} ariaLabel="Market" />
       <p className="dkb-market-line">{MARKET_LINE}</p>
-      <p className="dkb-market-state">{m.sizingNote ? `${premium} ${m.sizingNote}` : premium}</p>
+      <p className="dkb-market-state">{m.sizingNote ? `${m.line} ${m.sizingNote}` : m.line}</p>
     </div>
   );
 }

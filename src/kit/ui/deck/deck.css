@@ -105,10 +105,11 @@
   min-width: 44px;
   max-width: 140px;
 }
+/* 64px holds "8.00%" beside the run marker's reserved slot (--nf-slot, number-field.css). */
 .dkb .dkb-inputs .nf .nf-box {
   width: 64px;
   font-size: var(--fs-ui);
-  padding: 2px 6px;
+  padding: 2px 5px 2px var(--nf-slot, 16px);
 }
 
 /* Row 2: lead · figures · note over legend · strip slot · toggle. */
@@ -391,7 +392,7 @@
 }
 .dkb-sec-blurb {
   margin: 4px 0 0;
-  font-size: var(--fs-ui);
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 .dkb-sec-h + :not(.dkb-sec-blurb),
@@ -400,7 +401,7 @@
 }
 .dkb-sec-note {
   margin-top: 12px;
-  font-size: var(--fs-ui);
+  font-size: var(--fs-body);
   color: var(--ink-2);
 }
 .dkb-sec-fields {
@@ -505,14 +506,38 @@
   color: var(--ink);
 }
 .dkb-market-state {
-  font-size: var(--fs-ui);
-  color: var(--muted);
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  color: var(--ink-2);
 }
 
 /* ---------- below 1280px the groups wrap; row 2 may take a second line ---------- */
+/* Narrow: the muted note and the legend leave their stacked slot and take row 2's last
+   line, side by side (each piece whole), so neither disappears and nothing overflows. The
+   toggle, which wraps at these widths anyway, comes first so the context joins its line
+   when there is room. */
 @media (max-width: 900px) {
+  .dkb-status .dkb-toggle {
+    order: 4;
+  }
   .dkb-context {
-    display: none;
+    order: 5;
+    flex: 1 1 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 16px;
+    row-gap: 2px;
+    min-width: 0;
+    white-space: normal;
+  }
+  .dkb-note,
+  .dkb-legend li {
+    white-space: nowrap;
+  }
+  .dkb-legend {
+    flex-wrap: wrap;
+    row-gap: 2px;
   }
 }
 
@@ -537,9 +562,6 @@
   }
   .dkb .dkb-inputs .nf .nf-track {
     max-width: none;
-  }
-  .dkb .dkb-inputs .nf .nf-box {
-    width: 60px;
   }
   .dkb-inputs {
     padding-top: 6px;
@@ -571,8 +593,12 @@
     justify-content: space-between;
     gap: 10px;
   }
-  .dkb-strip {
+  .dkb-context {
     order: 3;
+    flex: 1 1 100%;
+  }
+  .dkb-strip {
+    order: 4;
     flex: 1 1 100%;
     min-width: 0;
     margin-left: 0;

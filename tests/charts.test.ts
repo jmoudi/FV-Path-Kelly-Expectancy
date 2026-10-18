@@ -309,12 +309,15 @@ describe("the whole build", () => {
     expect(desk.sizing.ratioToKelly).toBeCloseTo(1.28, 2);
     expect(desk.sizing.noPremium).toBe(false);
     expect(desk.market.actual).toBe("discussion");
-    expect(desk.market.line).toMatch(/not an information edge/);
+    // One sentence states the premium; the "not an information edge" line is its own sentence beside it.
+    expect(desk.market.line).toBe("The chain pays +0.44 pp premium over fair per event at the deck's q.");
+    expect(desk.market.line).not.toMatch(/edge/);
     expect(desk.market.sizingNote).toBe("");
     // Fair pricing: zero premium, growth-optimal risk 0, and the sizing note.
     const fair = buildAll({ ...DEFAULT_PARAMS, market: "fair", lossRate: breakEvenLossRate(DEFAULT_PARAMS.gain) }, EMPTY_DATASETS);
     expect(fair.desk.market.actual).toBe("fair");
     expect(fair.desk.market.zeroPremium).toBe(true);
+    expect(fair.desk.market.line).toBe("The chain pays 0.00 pp premium: fair pricing.");
     expect(fair.desk.sizing.nightKelly).toBe(0);
     expect(fair.desk.sizing.ratioToKelly).toBeNull();
     // The band still reaches the optimistic rate, so the averaged curve keeps its peak.
@@ -330,8 +333,8 @@ describe("the whole build", () => {
     const past = buildAll({ ...DEFAULT_PARAMS, market: "custom", lossRate: breakEvenLossRate(DEFAULT_PARAMS.gain) + 0.003 }, EMPTY_DATASETS);
     expect(past.desk.market.zeroPremium).toBe(false);
     expect(past.desk.market.noPremium).toBe(true);
-    expect(past.desk.market.line).not.toMatch(/Fair pricing/);
-    expect(past.desk.market.line).toMatch(/−0\.30 pp premium over fair/);
+    expect(past.desk.market.line).not.toMatch(/fair pricing/i);
+    expect(past.desk.market.line).toMatch(/^The chain pays −0\.30 pp premium over fair per event at the deck's q/);
     expect(past.desk.sizing.noPremium).toBe(true);
     expect(past.desk.sizing.text).toMatch(/^With a negative premium the growth-optimal risk is 0/);
   });
@@ -755,5 +758,135 @@ describe("chart rendering", () => {
     acc.add(50, 140);
     expect(acc.extent()).toBe(0.5);
     expect(acc.center()).toBe(0.5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Residuals of the adversarial verification: market line, stories after a reload,
+// copy as statements of fact, the quoted row, chart titles and label clamping.
+// ---------------------------------------------------------------------------
+import { activeStoryOf, STORY_LABEL_MAX, STORY_NARRATIVE_MAX } from "@kit/charts/spec";
+
+describe("stories keep their question and answer with the override", () => {
+  const worse: Story = { id: "worse", label: "What if q is really 3.2%?", narrative: "At your 50% a night the log growth of surviving paths is −1.2% a season instead of +1.6%.", params: { lossRate: 0.032 }, badge: "moves deck: q 2.94% → 3.20%" };
+
+  it("lets the sanitizer keep a story's label and answer, only beside its id, cut to length", () => {
+    expect(sanitizeOverride({ story: "worse", storyLabel: "What if q is really 3.2%?", storyNarrative: "An answer." })).toEqual({ story: "worse", storyLabel: "What if q is really 3.2%?", storyNarrative: "An answer." });
+    // Without a story id the text has nothing to belong to; non-strings and blanks are dropped.
+    expect(sanitizeOverride({ storyLabel: "x", storyNarrative: "y" })).toBeNull();
+    expect(sanitizeOverride({ story: "s", storyLabel: 3, storyNarrative: "  " })).toEqual({ story: "s" });
+    const long = sanitizeOverride({ story: "s", storyLabel: "q".repeat(500), storyNarrative: "a".repeat(5000) })!;
+    expect(long.storyLabel!.length).toBe(STORY_LABEL_MAX);
+    expect(long.storyNarrative!.length).toBe(STORY_NARRATIVE_MAX);
+  });
+
+  it("saves the label and answer when a story is applied, drops them on a hand edit, and round-trips them", () => {
+    const s = useStore.getState();
+    s.resetEverything();
+    s.applyStory("chain-sweep", worse);
+    expect(useStore.getState().overrides["chain-sweep"]).toEqual({ story: "worse", storyLabel: worse.label, storyNarrative: worse.narrative });
+    const exported = useStore.getState().exportState();
+    s.resetEverything();
+    expect(useStore.getState().importState(JSON.stringify(exported)).ok).toBe(true);
+    expect(useStore.getState().overrides["chain-sweep"]).toEqual({ story: "worse", storyLabel: worse.label, storyNarrative: worse.narrative });
+    // A hand edit of the chart is no longer the story: its text goes with it.
+    useStore.getState().setOverride("chain-sweep", { height: 300 });
+    expect(useStore.getState().overrides["chain-sweep"]).toEqual({ height: 300 });
+    useStore.getState().resetEverything();
+  });
+
+  it("shows the saved copy when the chart no longer offers the story, and the saved answer for a deck-moving one", () => {
+    const override = { story: "worse", storyLabel: worse.label, storyNarrative: worse.narrative };
+    // Not offered any more: the saved copy, pressed with its answer.
+    expect(activeStoryOf("worse", [], override, true)).toEqual({ id: "worse", label: worse.label, narrative: worse.narrative });
+    // Offered again with text rebuilt from the moved deck: a deck-moving story keeps the answer it gave.
+    const rebuilt: Story = { ...worse, narrative: "At q = 3.20% and your 50% a night the log growth of surviving paths is −1.2% a season." };
+    expect(activeStoryOf("worse", [rebuilt], override, true)!.narrative).toBe(worse.narrative);
+    expect(activeStoryOf("worse", [rebuilt], override, true)!.params).toEqual(worse.params);
+    // A display-only story follows the deck: the fresh text wins.
+    const zoom: Story = { id: "uncapped", label: "What does the capital ceiling cost?", narrative: "fresh" };
+    expect(activeStoryOf("uncapped", [zoom], { story: "uncapped", storyLabel: zoom.label, storyNarrative: "saved" }, false)!.narrative).toBe("fresh");
+    // A state saved before stories carried their text, for a story no longer offered: nothing to show but undo.
+    expect(activeStoryOf("worse", [], { story: "worse" }, true)).toBeUndefined();
+  });
+
+  it("keeps offering the questions whose answer moves the deck to their own value", () => {
+    const storiesOf = (params: typeof DEFAULT_PARAMS, chartId: string) =>
+      buildAll(params, EMPTY_DATASETS)
+        .scenarios.flatMap((x) => [...x.primary, ...x.secondary])
+        .find((c) => c.id === chartId)!
+        .stories!.map((st) => st.id);
+    expect(storiesOf({ ...DEFAULT_PARAMS, lossRate: 0.032, market: "custom" }, "chain-sweep")).toContain("worse");
+    expect(storiesOf({ ...DEFAULT_PARAMS, lossRate: breakEvenLossRate(DEFAULT_PARAMS.gain), market: "fair" }, "chain-sweep")).toContain("be");
+    expect(storiesOf({ ...DEFAULT_PARAMS, sharedOutcome: 0.05 }, "cor-curve")).toContain("five");
+    // At its own value the answer says so instead of comparing a number with itself.
+    const at = buildAll({ ...DEFAULT_PARAMS, lossRate: 0.032, market: "custom" }, EMPTY_DATASETS).scenarios.flatMap((x) => [...x.primary, ...x.secondary]).find((c) => c.id === "chain-sweep")!;
+    expect(at.stories!.find((st) => st.id === "worse")!.narrative).toMatch(/^At q = 3\.20% and your 50% a night/);
+  });
+});
+
+describe("copy and figures the verification flagged", () => {
+  const built = buildAll(DEFAULT_PARAMS, EMPTY_DATASETS);
+  const scen = (id: string) => built.scenarios.find((s) => s.id === id)!;
+  const chartOf = (id: string) => built.scenarios.flatMap((s) => [...s.primary, ...s.secondary]).find((c) => c.id === id)!;
+
+  it("keeps the names-per-night subtitle to the encoding and states where the cap binds in the caption", () => {
+    const c = chartOf("axes-breadth");
+    expect(c.title).toBe("Log growth per season by names per night");
+    expect(c.subtitle).toMatch(/green = optimistic q$/);
+    expect(c.subtitle).not.toMatch(/binds|does not bind/);
+    expect(c.caption).toBe("The cap does not bind at the deck's rate; it binds from 4 names at the optimistic rate.");
+    const view = scen("chaining").views.find((v) => v.id === "sizing-grid")!;
+    expect(view.blurb).toMatch(/^Log growth per season by risk a night/);
+  });
+
+  it("states facts in the claims and note titles instead of telling the reader what to feel", () => {
+    const div = scen("diversification");
+    expect(div.claim).toBe("Spreading a night over names leaves the mean unchanged and changes survivability.");
+    expect(div.notes.map((n) => n.title)).toContain("Same mean, less variance");
+    const chain = scen("chaining");
+    expect(chain.claim).toMatch(/peaks at 38% a night; at the deck's rate alone it peaks at 39%\.$/);
+    for (const s of built.scenarios) for (const t of [s.claim, ...s.notes.map((n) => n.title)]) expect(t, s.id).not.toMatch(/free lunch|\bSit where\b|becomes your number/i);
+  });
+
+  it("says the zero-premium sentence on the per-name Kelly figure under fair pricing", () => {
+    expect(scen("axes").kpis[0].sub).toBe("p − q/b at the deck's q");
+    const fair = buildAll({ ...DEFAULT_PARAMS, market: "fair", lossRate: breakEvenLossRate(DEFAULT_PARAMS.gain) }, EMPTY_DATASETS).scenarios.find((s) => s.id === "axes")!;
+    expect(fair.kpis[0].value).toBe("0%");
+    expect(fair.kpis[0].sub).toMatch(/At zero premium the growth-optimal risk is 0/);
+  });
+
+  it("lists the nights the expected hits erase as a quoted-vs-recomputed row", () => {
+    const row = scen("chaining").sourceFigures!.find((q) => /hits erase/.test(q.label))!;
+    expect(row.quoted).toBe("roughly 19 of the season's 20");
+    expect(row.computed).toBe("19 of 20");
+    expect(row.agrees).toBe(true);
+    // The derivation note quotes the same number.
+    expect(scen("chaining").notes.find((n) => n.title === "Recovering from one partial hit")!.body).toMatch(/take back roughly 19 of the season's 20 nights/);
+    const moved = buildAll({ ...DEFAULT_PARAMS, lossRate: 0.0252 }, EMPTY_DATASETS).scenarios.find((s) => s.id === "chaining")!.sourceFigures!.find((q) => /hits erase/.test(q.label))!;
+    expect(moved.computed).toBe("17 of 20");
+    expect(moved.agrees).toBe(false);
+    expect(moved.why).toMatch(/q 2\.52%/);
+  });
+
+  it("draws the three coin lines on the NAV chart in three distinct colours", () => {
+    const nav = chartOf("chain-nav");
+    const coins = nav.series.filter((s) => /^coin\d$/.test(s.field)).map((s) => s.color);
+    expect(coins).toEqual(["muted", "ink", "good"]);
+    expect(nav.subtitle).toMatch(/grey = p 50% · white = p 55% · green = p 60%/);
+  });
+
+  it("slides a long point label inside a narrow plot instead of over the axis labels", () => {
+    const band = chartOf("cal-band");
+    for (const width of [368, 420, 900]) {
+      const rc = resolveChart(band, width);
+      const a = rc.annotations.find((x) => x.text?.startsWith("band clears break-even"))!;
+      expect(a.label, `@${width}`).toBeTruthy();
+      // Never left of the plot, where the y-axis labels are.
+      expect(a.label!.box.x0, `@${width}`).toBeGreaterThanOrEqual(0);
+      // Estimated wider than a phone's plot (the estimate errs wide), it starts at the plot's left edge.
+      if (a.label!.box.x1 - a.label!.box.x0 > rc.plot.width) expect(a.label!.box.x0, `@${width}`).toBe(0);
+      else expect(a.label!.box.x1, `@${width}`).toBeLessThanOrEqual(rc.plot.width);
+    }
   });
 });

@@ -3,7 +3,7 @@ import type { RenderHandle } from "@kit/charts/backends/types";
 import { FIGURE_DEFAULT_HEIGHT, figureFor } from "@kit/charts/figures/registry";
 import { FigureFrame } from "@kit/charts/figures/FigureFrame";
 import { loadBackend, BACKEND_INFO } from "@kit/charts/registry";
-import { applyOverride, toCsv, type BackendId, type ChartSpec, type SpecOverride, type Story } from "@kit/charts/spec";
+import { activeStoryOf, applyOverride, toCsv, type BackendId, type ChartSpec, type SpecOverride } from "@kit/charts/spec";
 import { ChartFrame } from "@kit/charts/ChartFrame";
 import { useKit, useKitCopy } from "@kit/state/context";
 import { viewHref } from "./route";
@@ -21,9 +21,6 @@ export function boxHeightOf(spec: ChartSpec): number {
   // The backends get the spec's plot height plus a band for axes and legend.
   return (spec.height ?? 300) + (spec.kind === "heatmap" ? 90 : 70);
 }
-
-/** The last version of every story seen, by chart and story id. */
-const STORY_CACHE = new Map<string, Story>();
 
 /** Pixels at the top of the viewport covered by the sticky top bar and deck. */
 function stickyInset(): number {
@@ -175,12 +172,10 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
   const height = boxHeightOf(spec);
   const edited = !!override && !override.story;
   const activeStory = override?.story;
-  // A story the rebuilt spec no longer offers (its condition stopped holding once it moved
-  // the deck) stays listed while it is active, so its link and the row do not vanish.
   const offered = base.stories ?? [];
-  for (const st of offered) STORY_CACHE.set(`${base.id}:${st.id}`, st);
-  const story = offered.find((s) => s.id === activeStory) ?? (activeStory ? STORY_CACHE.get(`${base.id}:${activeStory}`) : undefined);
-  const stories = story && !offered.includes(story) ? [...offered, story] : offered;
+  const story = activeStory ? activeStoryOf(activeStory, offered, override, !!before) : undefined;
+  // The active story stays listed (pressed) even when the rebuilt spec no longer offers it.
+  const stories = story ? (offered.some((st) => st.id === story.id) ? offered.map((st) => (st.id === story.id ? story : st)) : [...offered, story]) : offered;
   // The backend tag shows only when it says something: another backend than the default, or edits.
   const offDefault = !isFigure && !isTable && backendId !== defaultBackend;
   const tag = edited || offDefault ? `${isFigure ? "Figure" : BACKEND_INFO[backendId].label}${edited ? " · edited" : ""}` : null;

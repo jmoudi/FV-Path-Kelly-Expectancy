@@ -9,7 +9,7 @@ import type { Unit } from "@kit/inputs/schema";
 import { YOUR_POLICY, policies, type PolicyDef, type PolicyId } from "@app/model/policies";
 import { scheduleDistribution, summarize, type Distribution, type DistributionOptions, type Summary } from "@app/model/season";
 import { pct, pct2, x2, signedPp, fmtInt, sigma } from "@kit/charts/numbers";
-import { MARKET_LINE, ZERO_PREMIUM_NOTE, NEGATIVE_PREMIUM_NOTE } from "@app/copy/market";
+import { ZERO_PREMIUM_NOTE, NEGATIVE_PREMIUM_NOTE } from "@app/copy/market";
 
 export function methodLabel(m: Distribution["method"]): string {
   return m === "exact" ? "computed exactly" : m === "binned" ? "computed on a fine log grid" : "Monte Carlo";
@@ -76,7 +76,11 @@ export interface MarketState {
   zeroPremium: boolean;
   /** No positive premium (fair, or q above the fair rate): the growth-optimal risk at the deck's rate is 0. */
   noPremium: boolean;
-  /** The one line next to the switch. */
+  /**
+   * The premium the deck's q implies, as one sentence: "The chain pays +0.44 pp premium
+   * over fair per event at the deck's q." The market switch shows it under MARKET_LINE
+   * on the Desk and in the drawer.
+   */
   line: string;
   /** What the Desk and the sizing views say when there is no positive premium (empty otherwise). */
   sizingNote: string;
@@ -90,10 +94,10 @@ export function marketState(p: Params): MarketState {
   const zeroPremium = Math.abs(premium) <= MARKET_TOL;
   const noPremium = premium <= MARKET_TOL;
   const line = zeroPremium
-    ? `Fair pricing: q = b/(1+b) = ${pct2(fairRate)}, premium over fair 0.`
+    ? `The chain pays ${signedPp(0)} premium: fair pricing.`
     : noPremium
-      ? `The deck's q ${pct2(p.lossRate)} sits above the fair rate ${pct2(fairRate)}: the chain pays ${signedPp(premium)} premium over fair per event.`
-      : `${MARKET_LINE} The deck's q asserts ${signedPp(premium)} premium over fair per event.`;
+      ? `The chain pays ${signedPp(premium)} premium over fair per event at the deck's q, which sits above the fair rate ${pct2(fairRate)}.`
+      : `The chain pays ${signedPp(premium)} premium over fair per event at the deck's q.`;
   return {
     chosen: p.market,
     actual,

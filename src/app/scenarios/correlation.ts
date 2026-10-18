@@ -35,7 +35,8 @@ export function buildCorrelation(p: Params, d: Derived, _data: Datasets): Scenar
   const cs = logspace(1e-5, 0.3, 120);
   const cRows: Row[] = cs.map((cc) => ({ c: cc, joint: jointLossProb(q, k, cc), ruin: ruinPerSeason(jointLossProb(q, k, cc), n), indep: ruinIndep }));
   const curveStories: Story[] = [];
-  if (!single && Math.abs(c - 0.05) > 1e-9) {
+  // Offered at any c (also once applied, so it stays pressed after a reload); with one name a night there is nothing to share.
+  if (!single) {
     const ruin5 = ruinPerSeason(jointLossProb(q, k, 0.05), n);
     curveStories.push({
       id: "five",

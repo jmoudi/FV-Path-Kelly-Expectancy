@@ -4,7 +4,10 @@ Generic chart helpers. Nothing here knows about tranches, seasons or policies; t
 files take numbers, positions and boxes, and the chart spec types from `spec.ts`.
 
 - `spec.ts`: `ChartSpec` (data table, mark, axes, series, annotations, stories), the
-  chart edits a reader makes in ⚙ (`SpecOverride`) and their sanitizer.
+  chart edits a reader makes in ⚙ (`SpecOverride`) and their sanitizer. An applied
+  story is an override that also keeps the story's label and answer
+  (`storyLabel`, `storyNarrative`), so `activeStoryOf` can show it pressed with its
+  answer after a reload even when the rebuilt chart no longer offers it.
 - `resolve.ts`: `resolveChart`, everything a backend needs, once per render.
 - `registry.ts` and `backends/`: the switchboard to ECharts, Plotly, Vega-Lite or an
   HTML table, each loaded on first use, all drawing from the same point lists.
@@ -21,7 +24,9 @@ files take numbers, positions and boxes, and the chart spec types from `spec.ts`
   `spanOfPx` convert px to axis units on linear and log axes; `stackBases`;
   `stepVertices` for "after" and "middle" steps.
 - `collide.ts`: `placeLabels` puts labels at the first free candidate position (or the
-  least bad one); `estimateTextWidth` is deterministic so every backend agrees.
+  least bad one); `estimateTextWidth` is deterministic so every backend agrees. The
+  candidates (`resolve.ts`) end with the same spots slid inside the plot's width, so a
+  long label on a narrow plot stays over the plot, not over the axis labels.
 - `probe.ts`: the `RenderProbe` a backend reports about what it drew, `exposeProbe` to
   attach it to the element it drew into, `BarAccumulator` for bar geometry.
 - `parity.ts`: `compareProbes(reference, other)` lists every disagreement.

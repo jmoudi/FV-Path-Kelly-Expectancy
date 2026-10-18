@@ -4,7 +4,7 @@ import { SettingsGroup } from "@kit/ui/Settings";
 import { useRef, useState } from "react";
 import { parseNumberList, recordStats } from "@app/model/calibration";
 import { useStore } from "@app/store";
-import { pct2 } from "@kit/charts/numbers";
+import { pct2, sigma } from "@kit/charts/numbers";
 import { Modal } from "@kit/ui/Dialogs";
 
 function DatasetEditor({ kind, title, blurb, placeholder }: { kind: "record" | "moves"; title: string; blurb: string; placeholder: string }) {
@@ -35,7 +35,7 @@ function DatasetEditor({ kind, title, blurb, placeholder }: { kind: "record" | "
             ? "Nothing imported."
             : kind === "record" && stats
               ? `${values.length} events · effective rate ${pct2(stats.rate)} · band ${pct2(stats.interval[0])} to ${pct2(stats.interval[1])} (${stats.kind === "binary" ? "0/1 losses" : "P&L per max loss"})`
-              : `${values.length} moves · mean ${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(2)}σ · beyond 2σ: ${pct2(values.filter((v) => v > 2).length / values.length)}`}
+              : `${values.length} moves · mean ${sigma(values.reduce((a, b) => a + b, 0) / values.length)} · beyond 2σ: ${pct2(values.filter((v) => v > 2).length / values.length)}`}
         </span>
         {values.length > 0 && (
           <button type="button" className="btn small quiet" onClick={() => setDataset(kind, [])}>

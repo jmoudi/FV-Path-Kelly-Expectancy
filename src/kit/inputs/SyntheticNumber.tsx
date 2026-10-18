@@ -328,8 +328,9 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
             onKeyDown={onBoxKey}
             aria-label={label}
           />
-          <span className="nf-run" aria-hidden={!running && !paused} title={running ? "sweep running" : paused ? "sweep paused" : undefined}>
-            {running ? "▶" : paused ? "❚❚" : ""}
+          {/* The marker is drawn in its reserved slot (number-field.css): ▶ running, ❚❚ paused. */}
+          <span className="nf-run" data-run={running ? "running" : paused ? "paused" : undefined} aria-hidden={!running && !paused} title={running ? "sweep running" : paused ? "sweep paused" : undefined}>
+            {(running || paused) && <span className="sr-only">{running ? "sweep running" : "sweep paused"}</span>}
           </span>
         </span>
       </div>

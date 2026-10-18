@@ -237,7 +237,7 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
     id: "diversification",
     number: 5,
     title: "Diversification",
-    claim: "Spreading a night over names leaves the mean alone and changes everything else: the free lunch is survivability, not a better typical season.",
+    claim: "Spreading a night over names leaves the mean unchanged and changes survivability.",
     lede: `What does spreading a night over ${k} names buy, and what does it cost?${degenerate}`,
     views: [
       { id: "season-shape", title: "What spreading buys", blurb: "The cumulative distribution of one season under each policy, with sampled paths.", charts: ["div-shape", "div-fan-coin", "div-fan-spread", "div-table"], params: ["thresholdBelow"], kpis: [0, 1, 2, 3] },
@@ -255,7 +255,7 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
     localParams: ["singleNameShare", "thresholdBelow"],
     notes: [
       {
-        title: "Why it is still a free lunch",
+        title: "Same mean, less variance",
         body: "You replay the tranche. A single-name tranche survives s seasons with probability p^s, while the diversified one keeps compounding. Geometric growth is roughly the mean minus half the variance, and variance is what diversification removes without touching the mean. It is close to fee-neutral too: fees and spreads scale with contract count, and splitting across names does not change the count.",
       },
       {

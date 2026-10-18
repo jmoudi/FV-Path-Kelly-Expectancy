@@ -124,7 +124,7 @@ kbd {
   gap: 4px 16px;
 }
 .k-chip-link {
-  font-size: var(--fs-label);
+  font-size: var(--fs-ui);
   color: var(--ink-2);
   text-decoration: none;
 }
@@ -861,7 +861,7 @@ kbd {
 .k-settings-blurb {
   margin: 0;
   max-width: 70ch;
-  font-size: var(--fs-ui);
+  font-size: var(--fs-body);
   color: var(--ink-2);
 }
 .k-settings-body {

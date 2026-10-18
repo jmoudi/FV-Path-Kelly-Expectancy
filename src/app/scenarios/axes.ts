@@ -8,7 +8,7 @@ import { nightDist, sampleGrid } from "@app/model/season";
 import { linspace } from "@kit/math/stats";
 import { fig } from "./discussion";
 import { movesDeck, near } from "@kit/charts/scenario";
-import { pct, pct1, pct2, signedPct, signedPct1 } from "@kit/charts/numbers";
+import { pct, pct1, pct2, signedPct, signedPct1, signedPp } from "@kit/charts/numbers";
 import { typographic } from "@kit/charts/format";
 import type { Derived } from "./derived";
 import type { ScenarioView } from "./types";
@@ -144,10 +144,20 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
   const capDeck = rowsDeck.find((r) => r.capBinds)?.names;
   const capOpt = rowsOpt.find((r) => r.capBinds)?.names;
   const fifthShare = logGrowthPerBet(0.2, alt, b) / logGrowthPerBet(kellyFraction(alt, b), alt, b);
+  // Where the capital ceiling binds, at each rate (the subtitle carries the encoding only).
+  const maxNames = rowsDeck.length;
+  const capCaption =
+    capDeck && capOpt
+      ? `The cap binds from ${capDeck} names at the deck's rate and from ${capOpt} names at the optimistic rate.`
+      : capDeck
+        ? `The cap binds from ${capDeck} names at the deck's rate; it does not bind at the optimistic rate up to ${maxNames} names.`
+        : capOpt
+          ? `The cap does not bind at the deck's rate; it binds from ${capOpt} names at the optimistic rate.`
+          : `The cap binds at neither rate up to ${maxNames} names.`;
   const breadthChart: ChartSpec = {
     id: "axes-breadth",
-    title: "Growth per season by names per night",
-    subtitle: `x names a night · y log growth per season at the Kelly fraction per name, capped once k·f* passes 100% · white = deck q · green = optimistic q · the cap ${capDeck ? `binds from ${capDeck} names at the deck's rate` : "does not bind at the deck's rate"}${capOpt ? ` and from ${capOpt} at the optimistic rate` : ""}`,
+    title: "Log growth per season by names per night",
+    subtitle: "x names a night · y log growth per season at the Kelly fraction per name, capped once k·f* passes 100% · white = deck q · green = optimistic q",
     kind: "xy",
     data: table(
       [f("names", "Names per night", "int"), f("deck", `at the deck's q ${pct2(q)}`, "pct1"), f("opt", `at the optimistic q ${pct2(alt)}`, "pct1"), f("optUncapped", "optimistic, uncapped", "pct1")],
@@ -161,6 +171,7 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
       { field: "opt", color: "good", label: `optimistic q ${pct2(alt)}` },
     ],
     height: 260,
+    caption: capCaption,
     stories: [
       {
         id: "uncapped",
@@ -272,7 +283,7 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
     lede: "Is a name added to tonight worth the same as a name added next night, and how much should each one risk?",
     views: [
       { id: "grid-and-path", title: "Time and breadth as two axes", blurb: "The railroad schematic, then one sampled season drawn as names by nights, with the tranche it produces.", charts: ["axes-railroad", "axes-grid", "axes-path"] },
-      { id: "kelly-breadth", title: "How much to risk per name", blurb: "The growth-optimal fraction, the growth hump, and growth per season by names per night.", charts: ["axes-kelly", "axes-hump", "axes-breadth", "axes-table"], kpis: [0, 1, 2, 3] },
+      { id: "kelly-breadth", title: "How much to risk per name", blurb: "The growth-optimal fraction, the growth hump, and log growth per season by names per night.", charts: ["axes-kelly", "axes-hump", "axes-breadth", "axes-table"], kpis: [0, 1, 2, 3] },
       {
         id: "calendar",
         title: "A season by the calendar",
@@ -283,7 +294,9 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
       },
     ],
     kpis: [
-      { label: "Kelly fraction per name", value: pct(fstar), sub: "p − q/b at the deck's q" },
+      d.market.noPremium
+        ? { label: "Kelly fraction per name", value: pct(fstar), sub: `p − q/b at the deck's q · ${d.market.sizingNote}`, help: `Premium over fair ${signedPp(d.market.premium)} per event. ${d.market.sizingNote}` }
+        : { label: "Kelly fraction per name", value: pct(fstar), sub: "p − q/b at the deck's q" },
       { label: `Log growth per season at Kelly, ${k} name${k === 1 ? "" : "s"}`, value: signedPct1(rowsDeck[k - 1].growthCapped), sub: `${k} × ${pct(rowsDeck[k - 1].fractionPerName)} = ${pct(rowsDeck[k - 1].totalAtRisk)} at risk`, help: "At the Kelly fraction per name, capped so the names never exceed the tranche." },
       { label: "Growth per name-night", value: signedPct(gBet, 3), sub: "the same beside or after another bet", help: "Each independent bet contributes this whether it sits next to another bet on the same night or on the next night." },
       { label: "Capital ceiling", value: capDeck ? `from ${capDeck} names` : "not binding", sub: capOpt ? `optimistic rate: from ${capOpt}` : "at either rate" },

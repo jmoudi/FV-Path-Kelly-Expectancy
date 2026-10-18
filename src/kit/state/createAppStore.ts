@@ -10,7 +10,7 @@
  * constants moved into the config. Behaviour is unchanged.
  */
 import { create, type StoreApi, type UseBoundStore } from "zustand";
-import { sanitizeOverride, type BackendId, type SpecOverride, type Story } from "@kit/charts/spec";
+import { sanitizeOverride, STORY_LABEL_MAX, STORY_NARRATIVE_MAX, type BackendId, type SpecOverride, type Story } from "@kit/charts/spec";
 import type { Schema } from "@kit/inputs/schema";
 import { migratePresetId, sanitizePreset, sanitizePresets } from "@kit/sweeps/sanitize";
 import { clonePreset, type PersistedRun, type PresetCatalog, type SweepPlan, type SweepPreset, type SweepRun } from "@kit/sweeps/types";
@@ -349,7 +349,7 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
       },
       setOverride: (id, patch) => {
         const prev = get().overrides[id] ?? {};
-        const merged = sanitizeOverride({ ...prev, ...patch, story: undefined }) ?? {};
+        const merged = sanitizeOverride({ ...prev, ...patch, story: undefined, storyLabel: undefined, storyNarrative: undefined }) ?? {};
         const overrides = { ...get().overrides, [id]: merged };
         persist({ overrides });
         set({ overrides });
@@ -357,8 +357,13 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
       applyStory: (id, story) => {
         const current = get().overrides[id];
         const active = current?.story === story.id;
-        // A story replaces the chart's edits; clicking the active story turns it off.
-        const next = active ? null : story.patch ? { ...story.patch, story: story.id } : { story: story.id };
+        // A story replaces the chart's edits; clicking the active story turns it off. Its label
+        // and answer are saved with it, so a reload shows the chip pressed with its answer line
+        // even when the rebuilt chart no longer offers the story.
+        const text: SpecOverride = {};
+        if (story.label) text.storyLabel = story.label.slice(0, STORY_LABEL_MAX);
+        if (story.narrative) text.storyNarrative = story.narrative.slice(0, STORY_NARRATIVE_MAX);
+        const next: SpecOverride | null = active ? null : { ...(story.patch ?? {}), story: story.id, ...text };
         const overrides = { ...get().overrides };
         if (next) overrides[id] = next;
         else delete overrides[id];

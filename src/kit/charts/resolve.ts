@@ -379,7 +379,19 @@ function labelCandidates(a: ScreenAnnotation, at: Annotation["at"], X: number | 
       out.push(make("point", dx, dy, side === "right" ? "left" : side === "left" ? "right" : "center", above ? "bottom" : "top", X, Y));
     }
   }
-  return out;
+  // Last resort on a narrow plot: the same spots slid sideways until the box sits inside
+  // [0, plot width], so a long label stays over the plot instead of printing over the
+  // axis labels beside it. A label estimated wider than the plot starts at its left edge
+  // (the estimate errs wide). Only tried after every unshifted spot collides or leaves the plot.
+  const clamped: Candidate<LabelPlacement>[] = [];
+  for (const c of out) {
+    const { x0, x1 } = c.box;
+    const shift = x1 - x0 > W || x0 < 0 ? -x0 : x1 > W ? W - x1 : 0;
+    if (shift === 0) continue;
+    const box = { ...c.box, x0: x0 + shift, x1: x1 + shift };
+    clamped.push({ box, value: { ...c.value, dx: c.value.dx + shift, box } });
+  }
+  return [...out, ...clamped];
 }
 
 /**

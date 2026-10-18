@@ -198,6 +198,34 @@ export interface SpecOverride {
   extraSeries?: { field: string; color: ColorRole }[];
   /** The story that produced this override, if any. */
   story?: string;
+  /**
+   * The story's question and answer as they read when it was applied, saved with it, so
+   * the chip and its answer line come back after a reload even when the rebuilt chart
+   * no longer offers that story (its condition stopped holding once it moved the deck).
+   */
+  storyLabel?: string;
+  storyNarrative?: string;
+}
+
+/** The longest story label and answer an override keeps (a saved or imported state is cut to these). */
+export const STORY_LABEL_MAX = 200;
+export const STORY_NARRATIVE_MAX = 600;
+
+/**
+ * The active story as the host shows it. The override saved its label and answer when it
+ * was applied; the rebuilt spec may offer the story again with fresh text, or no longer
+ * offer it (its condition stopped holding once it moved the deck). A story that moved the
+ * deck keeps its saved answer: the rebuilt one is computed from the deck it moved, so its
+ * before/after comparison would read the moved value twice. A story that only re-defines
+ * the chart takes the fresh text, which follows the deck. Undefined without either copy (a
+ * state saved before stories carried their text).
+ */
+export function activeStoryOf(id: string, offered: Story[], override: SpecOverride | undefined, movedDeck: boolean): Story | undefined {
+  const fresh = offered.find((st) => st.id === id);
+  const saved: Story | undefined = override?.story === id && override.storyLabel ? { id, label: override.storyLabel, narrative: override.storyNarrative } : undefined;
+  if (!fresh) return saved;
+  if (!saved) return fresh;
+  return { ...fresh, narrative: movedDeck && saved.narrative ? saved.narrative : (fresh.narrative ?? saved.narrative) };
 }
 
 const BACKENDS: BackendId[] = ["echarts", "plotly", "vega", "table"];
@@ -270,7 +298,12 @@ export function sanitizeOverride(input: unknown): SpecOverride | null {
       .filter((e): e is { field: string; color: ColorRole } => !!e && typeof e === "object" && typeof (e as { field?: unknown }).field === "string" && ROLES.includes((e as { color?: ColorRole }).color as ColorRole))
       .map((e) => ({ field: e.field, color: e.color }));
   }
-  if (typeof o.story === "string") out.story = o.story;
+  if (typeof o.story === "string") {
+    out.story = o.story;
+    // A story's own text only travels with its id.
+    if (typeof o.storyLabel === "string" && o.storyLabel.trim()) out.storyLabel = o.storyLabel.slice(0, STORY_LABEL_MAX);
+    if (typeof o.storyNarrative === "string" && o.storyNarrative.trim()) out.storyNarrative = o.storyNarrative.slice(0, STORY_NARRATIVE_MAX);
+  }
   return Object.keys(out).length ? out : null;
 }
 

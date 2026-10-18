@@ -148,12 +148,12 @@ export function Calendar({ spec, width }: FigureProps) {
           </g>
         );
       })}
-      {/* The median night's capital use. */}
+      {/* The median night's capital use; its key sits in the top margin, clear of the bars. */}
       {medianCapital > 0 && (
         <>
           <line x1={left} x2={W - right} y1={yCap(medianCapital)} y2={yCap(medianCapital)} stroke={TOKENS.ink2} strokeWidth={1} strokeDasharray="4 4" />
-          <rect x={left + 2} y={yCap(medianCapital) - 18} width={medianLabel.length * 6.3 + 8} height={16} rx={3} fill={withAlpha(TOKENS.surface, 0.88)} />
-          <text x={left + 6} y={yCap(medianCapital) - 6} textAnchor="start" fill={TOKENS.ink2} style={text}>
+          <line x1={left + 8} x2={left + 28} y1={top - 14} y2={top - 14} stroke={TOKENS.ink2} strokeWidth={1} strokeDasharray="4 4" />
+          <text x={left + 34} y={top - 10} textAnchor="start" fill={TOKENS.ink2} style={text}>
             {medianLabel}
           </text>
         </>

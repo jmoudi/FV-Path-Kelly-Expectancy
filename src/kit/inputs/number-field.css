@@ -70,29 +70,55 @@
   background: var(--ink-2);
 }
 
-/* The box with the ▶ / ❚❚ slot reserved at its left, inside the border: nothing shifts. */
+/*
+ * The box with the run marker's slot reserved at its left, inside the border, in every
+ * state: nothing shifts when a sweep starts, pauses or stops. The marker is drawn, not a
+ * glyph, so its width is the slot's in every font: a triangle while running (▶), two bars
+ * while paused (❚❚). Slot: 5px from the box edge, an 8px mark, 4px to the digits, so a
+ * 64px box still shows "8.00%" whole. Frames that set the box's padding read --nf-slot.
+ */
+.nf {
+  --nf-slot: 16px;
+}
 .nf-boxwrap {
   position: relative;
   display: inline-flex;
   flex: 0 0 auto;
 }
 .nf .nf-boxwrap .nf-box {
-  padding-left: 17px;
+  padding-left: var(--nf-slot);
 }
 .nf .nf-run {
   position: absolute;
-  left: 6px;
+  left: 5px;
   top: 50%;
-  transform: translateY(-50%);
-  width: 9px;
-  font-size: var(--fs-label);
-  line-height: 1;
-  color: var(--ink);
+  width: 8px;
+  height: 9px;
+  margin-top: -4.5px;
   pointer-events: none;
-  text-align: center;
 }
-.nf.paused .nf-boxwrap .nf-run {
-  color: var(--ink-2);
+.nf.running .nf-run::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+.nf.paused .nf-run::before,
+.nf.paused .nf-run::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 0.5px;
+  background: var(--ink-2);
+}
+.nf.paused .nf-run::before {
+  left: 0;
+}
+.nf.paused .nf-run::after {
+  right: 0;
 }
 
 /* ---------- sweep strip ---------- */

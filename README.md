@@ -117,7 +117,8 @@ swapped without touching the others.
   per season, the median after N seasons, P(below the threshold) and ruin in its
   colour; the Coin's clean season and ruin, muted, over the policy legend; the sweep
   strip of the active input in a slot whose width never changes; Full deck ▾. Below
-  1280px the groups wrap whole. On a phone row 1 keeps loss rate, gain, names a night
+  1280px the groups wrap whole; below 900px the Coin line and the legend take row 2's
+  last line. On a phone row 1 keeps loss rate, gain, names a night
   and at risk a night, and "All inputs" opens the full deck as a bottom sheet.
 - **Full deck** is a 460px drawer on the right, from under the top bar to the bottom
   of the window; it scrolls on its own and the charts stay live beside it. Sections:
@@ -167,11 +168,16 @@ swapped without touching the others.
   really 3.2%?", "I widen the wing to 1σ") and answer it in one line; when one moves
   the deck the line says what it moved, from the value before ("moves deck: q 2.94% →
   3.38% · undo"). Clicking an active story, or undo, turns it off and puts the deck
-  back, also after a reload.
+  back, also after a reload: the story's question and answer are saved with it, so
+  the chip comes back pressed with its answer line.
 - **Market.** "Fair market" sets q = b/(1+b) (zero premium; the growth-optimal risk is
   then 0 and sizing only changes the median, P(below threshold) and ruin). "Discussion
   case" sets q so that a clean coin season has probability 55%. Typing q makes it
-  custom; a q above the fair rate reads as a negative premium.
+  custom; a q above the fair rate reads as a negative premium. Beside the switch, on
+  the Desk and in the drawer: "The discussion's case is an assumed risk premium for
+  selling tail insurance, not an information edge." and the premium in one sentence
+  from the view-model ("The chain pays +0.44 pp premium over fair per event at the
+  deck's q", or "The chain pays 0.00 pp premium: fair pricing.").
 - **Charts** are borderless; their tools (↗ ⊞ ⚙) show on hover or keyboard focus. The
   plot box has the spec's height whatever it shows: **⊞** puts the numbers in the same
   box (sticky header, scrolling inside), and errors render there too. **⚙** opens the
