@@ -1,22 +1,27 @@
 import { create } from "zustand";
 import { sanitizeOverride, type BackendId, type SpecOverride, type Story } from "../charts/spec";
 import { DEFAULT_PARAMS, EMPTY_DATASETS, PARAM_BY_KEY, sanitizeDatasets, sanitizeParams, type Datasets, type Params } from "../model/params";
-import { DEFAULT_PRESETS, type SweepPreset, type SweepRange, type SweepRun } from "../sweeps/types";
+import { migratePresetId, sanitizePreset, sanitizePresets } from "../sweeps/sanitize";
+import { defaultPresets, type PersistedRun, type SweepPlan, type SweepPreset, type SweepRun } from "../sweeps/types";
+
+export { sanitizePreset };
 
 const STORAGE_KEY = "tranche-replay:v1";
 /** 4: the snapshot of parameters a story moved (storyPrev) travels with the state. */
 const EXPORT_VERSION = 4;
 
 export interface UiSettings {
-  /** How many times a second a running sweep commits a value. */
+  /** The most values a second a running sweep commits, whatever its presets ask for. */
   sweepHz: number;
-  /** Multiplier on every input's drag sensitivity. */
+  /** Sweep rate: multiplies the speed of every preset (2 = each value holds half as long). */
+  sweepSpeed: number;
+  /** Multiplier on every input's drag sensitivity (its units per 100 px). */
   dragSensitivity: number;
   /** The deck bar starts expanded. */
   deckExpanded: boolean;
 }
 
-const DEFAULT_UI: UiSettings = { sweepHz: 5, dragSensitivity: 1, deckExpanded: false };
+const DEFAULT_UI: UiSettings = { sweepHz: 10, sweepSpeed: 1, dragSensitivity: 1, deckExpanded: false };
 
 export interface ExportedState {
   version: number;
@@ -32,6 +37,22 @@ export interface ExportedState {
   storyPrev: Record<string, Partial<Params>>;
 }
 
+/** What local storage holds: the exported state plus the sweeps that were running, with each input's pre-sweep value. */
+interface StoredState extends ExportedState {
+  runs?: PersistedRun[];
+}
+
+/**
+ * Resolves a preset for one input when a run starts (its anchors need the app's
+ * schema and the last build). Registered by the sweep engine; without one a run has
+ * no plan and does not move.
+ */
+export type SweepPlanner = (key: string, preset: SweepPreset, at: { origin: number; current: number }) => SweepPlan | null;
+let planner: SweepPlanner | null = null;
+export function registerSweepPlanner(fn: SweepPlanner | null): void {
+  planner = fn;
+}
+
 interface AppState {
   params: Params;
   datasets: Datasets;
@@ -41,8 +62,10 @@ interface AppState {
   presets: SweepPreset[];
   /** input key -> preset id */
   links: Record<string, string>;
-  /** input key -> running sweep (transient) */
+  /** input key -> running or paused sweep. Saved as key, preset and pre-sweep value only; a reload puts the value back. */
   runs: Record<string, SweepRun>;
+  /** input key -> its value before the last sweep, kept after stop for "↺ before sweep" until the input is edited by hand. */
+  sweepOrigins: Record<string, number>;
   /**
    * chart id -> the parameters a story moved, as they were before it. Persisted, so a
    * reload still knows what "undo" restores. Only one deck-moving story is active at a
@@ -55,7 +78,8 @@ interface AppState {
   past: Params[];
   future: Params[];
   setParam: <K extends keyof Params>(key: K, value: Params[K]) => void;
-  setParams: (patch: Partial<Params>, opts?: { history?: boolean }) => void;
+  /** history: false skips the undo stack; sweep: true is a sweep tick (no history, not saved). */
+  setParams: (patch: Partial<Params>, opts?: { history?: boolean; sweep?: boolean }) => void;
   undo: () => void;
   redo: () => void;
   resetParams: () => void;
@@ -75,14 +99,19 @@ interface AppState {
   startSweep: (key: string, presetId?: string) => void;
   pauseSweep: (key: string) => void;
   toggleSweep: (key: string) => void;
+  /** Stop the run and keep the value where it is. */
   stopSweep: (key: string) => void;
+  /** Put the input (or, without a key, every running or paused sweep's input) back where it was before the sweep. */
+  restoreSweep: (key?: string) => void;
+  /** The engine moved a run to another value of its plan. */
+  setRunIndex: (key: string, index: number) => void;
   pauseAll: () => void;
   exportState: () => ExportedState;
   importState: (text: string) => { ok: true } | { ok: false; error: string };
   resetEverything: () => void;
 }
 
-function load(): Partial<ExportedState> {
+function load(): Partial<StoredState> {
   try {
     if (typeof location !== "undefined" && location.hash === "#reset") {
       localStorage.removeItem(STORAGE_KEY);
@@ -91,18 +120,18 @@ function load(): Partial<ExportedState> {
     }
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
-    const parsed = JSON.parse(raw) as Partial<ExportedState>;
+    const parsed = JSON.parse(raw) as Partial<StoredState>;
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
   }
 }
 
-type Persisted = Pick<AppState, "params" | "overrides" | "defaultBackend" | "datasets" | "presets" | "links" | "ui" | "storyPrev">;
+type Persisted = Pick<AppState, "params" | "overrides" | "defaultBackend" | "datasets" | "presets" | "links" | "ui" | "storyPrev"> & { runs?: PersistedRun[] };
 
 function save(state: Persisted) {
   try {
-    const payload: ExportedState = { version: EXPORT_VERSION, exportedAt: new Date().toISOString(), ...state };
+    const payload: StoredState = { version: EXPORT_VERSION, exportedAt: new Date().toISOString(), ...state };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
     /* storage unavailable: the app works without it */
@@ -150,50 +179,41 @@ function sanitizeStoryPrev(input: unknown, overrides: Record<string, SpecOverrid
   return out;
 }
 
-export function sanitizePreset(input: unknown): SweepPreset | null {
-  if (!input || typeof input !== "object") return null;
-  const o = input as Record<string, unknown>;
-  if (typeof o.id !== "string" || !/^[\w-]{1,64}$/.test(o.id)) return null;
-  const kind = o.kind === "loop" || o.kind === "pingpong" || o.kind === "scenarios" ? o.kind : "loop";
-  const r = (o.range && typeof o.range === "object" ? o.range : {}) as Record<string, unknown>;
-  const mode: SweepRange["mode"] = r.mode === "fraction" || r.mode === "absolute" ? r.mode : "full";
-  const range: SweepRange = mode === "full" ? { mode } : { mode, lo: num(r.lo, -1e12, 1e12, 0), hi: num(r.hi, -1e12, 1e12, 1) };
-  const scenarios = Array.isArray(o.scenarios)
-    ? o.scenarios
-        .filter((s): s is Record<string, unknown> => !!s && typeof s === "object")
-        .map((s) => ({ at: num(s.at, -1e12, 1e12, 0.5), holdMs: num(s.holdMs, 50, 600_000, 2000) }))
-        .slice(0, 32)
-    : [];
-  return {
-    id: o.id,
-    name: typeof o.name === "string" ? o.name.slice(0, 80) : o.id,
-    kind,
-    range,
-    stepFraction: num(o.stepFraction, 0.0005, 1, 0.02),
-    intervalMs: num(o.intervalMs, 10, 600_000, 300),
-    smooth: typeof o.smooth === "boolean" ? o.smooth : true,
-    scenarios,
-  };
-}
-
-function sanitizePresets(input: unknown): SweepPreset[] {
-  if (!Array.isArray(input)) return DEFAULT_PRESETS.map((p) => ({ ...p }));
-  const out = input.map(sanitizePreset).filter((p): p is SweepPreset => !!p);
-  return out.length ? out : DEFAULT_PRESETS.map((p) => ({ ...p }));
-}
-
 function sanitizeLinks(input: unknown, presets: SweepPreset[]): Record<string, string> {
   if (!input || typeof input !== "object") return {};
   const ids = new Set(presets.map((p) => p.id));
   const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(input as Record<string, unknown>)) if (PARAM_BY_KEY[k] && typeof v === "string" && ids.has(v)) out[k] = v;
+  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+    if (!PARAM_BY_KEY[k] || typeof v !== "string") continue;
+    const id = migratePresetId(v);
+    if (ids.has(id)) out[k] = id;
+  }
   return out;
+}
+
+/** Saved runs: a known numeric input, a pre-sweep value that is a number. */
+function sanitizeRuns(input: unknown): PersistedRun[] {
+  if (!Array.isArray(input)) return [];
+  const out: PersistedRun[] = [];
+  for (const r of input) {
+    if (!r || typeof r !== "object") continue;
+    const o = r as Record<string, unknown>;
+    const def = typeof o.key === "string" ? PARAM_BY_KEY[o.key] : undefined;
+    if (!def || def.unit === "choice" || typeof o.origin !== "number" || !Number.isFinite(o.origin)) continue;
+    out.push({ key: def.key, presetId: typeof o.presetId === "string" ? o.presetId : "", origin: o.origin });
+  }
+  return out;
+}
+
+function persistedRuns(runs: Record<string, SweepRun>): PersistedRun[] {
+  return Object.values(runs).map((r) => ({ key: r.key, presetId: r.presetId, origin: r.origin }));
 }
 
 function sanitizeUi(input: unknown): UiSettings {
   const o = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   return {
     sweepHz: num(o.sweepHz, 1, 30, DEFAULT_UI.sweepHz),
+    sweepSpeed: num(o.sweepSpeed, 0.25, 4, DEFAULT_UI.sweepSpeed),
     dragSensitivity: num(o.dragSensitivity, 0.25, 4, DEFAULT_UI.dragSensitivity),
     deckExpanded: typeof o.deckExpanded === "boolean" ? o.deckExpanded : DEFAULT_UI.deckExpanded,
   };
@@ -214,14 +234,37 @@ function pushHistory(past: Params[], prev: Params): Params[] {
 const initial = load();
 const initialPresets = sanitizePresets(initial.presets);
 const initialOverrides = sanitizeOverrides(initial.overrides);
+/**
+ * A reload in the middle of a sweep puts each swept input back where it was before
+ * the sweep: ticks are never saved, but an edit of another input during the run
+ * saves the parameters with the swept value in them.
+ */
+const initialParams = (() => {
+  const params = sanitizeParams(initial.params ?? DEFAULT_PARAMS);
+  const runs = sanitizeRuns(initial.runs);
+  if (!runs.length) return params;
+  return sanitizeParams({ ...params, ...Object.fromEntries(runs.map((r) => [r.key, r.origin])) });
+})();
 
 export const useStore = create<AppState>((set, get) => {
   const persist = (patch: Partial<Persisted>) => {
     const s = get();
-    save({ params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui, storyPrev: s.storyPrev, ...patch });
+    save({ params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui, storyPrev: s.storyPrev, runs: persistedRuns(s.runs), ...patch });
+  };
+  /** A hand edit of a swept input stops its run and forgets its pre-sweep value. */
+  const releaseSweeps = (keys: string[]) => {
+    const { runs, sweepOrigins } = get();
+    if (!keys.some((k) => k in runs || k in sweepOrigins)) return null;
+    const nextRuns = { ...runs };
+    const nextOrigins = { ...sweepOrigins };
+    for (const k of keys) {
+      delete nextRuns[k];
+      delete nextOrigins[k];
+    }
+    return { runs: nextRuns, sweepOrigins: nextOrigins };
   };
   return {
-    params: sanitizeParams(initial.params ?? DEFAULT_PARAMS),
+    params: initialParams,
     datasets: sanitizeDatasets(initial.datasets ?? EMPTY_DATASETS),
     overrides: initialOverrides,
     defaultBackend: VALID_BACKENDS.includes(initial.defaultBackend as BackendId) ? (initial.defaultBackend as BackendId) : "echarts",
@@ -229,6 +272,7 @@ export const useStore = create<AppState>((set, get) => {
     presets: initialPresets,
     links: sanitizeLinks(initial.links, initialPresets),
     runs: {},
+    sweepOrigins: {},
     storyPrev: sanitizeStoryPrev(initial.storyPrev, initialOverrides),
     activeInput: null,
     ui: sanitizeUi(initial.ui),
@@ -244,29 +288,40 @@ export const useStore = create<AppState>((set, get) => {
       const prev = get().params;
       if (prev[key] === v) return;
       const params = { ...prev, [key]: v } as Params;
+      const released = releaseSweeps([key]) ?? {};
+      set({ params, past: pushHistory(get().past, prev), future: [], ...released });
       persist({ params });
-      set({ params, past: pushHistory(get().past, prev), future: [] });
     },
     setParams: (patch, opts) => {
       const prev = get().params;
       const params = sanitizeParams({ ...prev, ...patch });
+      // A sweep tick is neither history nor saved: a reload restores the pre-sweep value instead.
+      if (opts?.sweep) {
+        set({ params });
+        return;
+      }
+      if (opts?.history === false) {
+        set({ params });
+      } else {
+        const released = releaseSweeps(Object.keys(patch)) ?? {};
+        set({ params, past: pushHistory(get().past, prev), future: [], ...released });
+      }
       persist({ params });
-      if (opts?.history === false) set({ params });
-      else set({ params, past: pushHistory(get().past, prev), future: [] });
     },
     undo: () => {
       const { past, params, future } = get();
       if (!past.length) return;
       const prev = past[past.length - 1];
+      // Undo takes the wheel: any sweep stops where history puts its input.
+      set({ params: prev, past: past.slice(0, -1), future: [params, ...future].slice(0, 100), runs: {} });
       persist({ params: prev });
-      set({ params: prev, past: past.slice(0, -1), future: [params, ...future].slice(0, 100) });
     },
     redo: () => {
       const { past, params, future } = get();
       if (!future.length) return;
       const next = future[0];
+      set({ params: next, past: pushHistory(past, params), future: future.slice(1), runs: {} });
       persist({ params: next });
-      set({ params: next, past: pushHistory(past, params), future: future.slice(1) });
     },
     resetParams: () => {
       const prev = get().params;
@@ -372,10 +427,18 @@ export const useStore = create<AppState>((set, get) => {
       const links = { ...get().links };
       if (presetId) links[key] = presetId;
       else delete links[key];
-      const runs = { ...get().runs };
-      if (runs[key] && runs[key].presetId !== presetId) delete runs[key];
+      const run = get().runs[key];
+      set({ links });
+      if (run && run.presetId !== presetId) {
+        // A running sweep switches to the new preset from where it is; a paused one ends (its value and ↺ stay).
+        if (presetId && run.startedAt != null) get().startSweep(key, presetId);
+        else {
+          const runs = { ...get().runs };
+          delete runs[key];
+          set({ runs });
+        }
+      }
       persist({ links });
-      set({ links, runs });
     },
     cyclePreset: (key, dir) => {
       const { presets, links } = get();
@@ -383,20 +446,32 @@ export const useStore = create<AppState>((set, get) => {
       const i = presets.findIndex((p) => p.id === links[key]);
       const next = presets[(i + dir + presets.length) % presets.length];
       get().linkPreset(key, next.id);
-      if (get().runs[key]) get().startSweep(key, next.id);
     },
     startSweep: (key, presetId) => {
-      const id = presetId ?? get().links[key] ?? get().presets[0]?.id;
-      if (!id) return;
-      if (!get().links[key] || get().links[key] !== id) get().linkPreset(key, id);
-      const runs = { ...get().runs, [key]: { key, presetId: id, elapsedMs: 0, startedAt: now() } };
-      // The sweep's ticks are not history, but where the input stood before it started is.
-      set({ runs, past: [...get().past, get().params].slice(-100), future: [] });
+      const s = get();
+      const id = presetId ?? s.links[key] ?? s.presets[0]?.id;
+      const preset = s.presets.find((p) => p.id === id);
+      const value = s.params[key as keyof Params];
+      if (!id || !preset || typeof value !== "number") return;
+      const links = s.links[key] === id ? s.links : { ...s.links, [key]: id };
+      const existing = s.runs[key];
+      // Switching presets mid-run keeps the value from before the first one.
+      const origin = existing?.origin ?? value;
+      const plan = planner ? planner(key, preset, { origin, current: value }) : null;
+      const run: SweepRun = { key, presetId: id, origin, startedAt: now(), plan, index: plan ? plan.start : -1 };
+      const runs = { ...s.runs, [key]: run };
+      const sweepOrigins = { ...s.sweepOrigins, [key]: origin };
+      // The ticks are not history, but where the input stood before the run is: Ctrl+Z goes back to it.
+      const history = existing ? {} : { past: [...s.past, s.params].slice(-100), future: [] as Params[] };
+      set({ links, runs, sweepOrigins, ...history });
+      persist({ links });
     },
     pauseSweep: (key) => {
       const r = get().runs[key];
       if (!r || r.startedAt == null) return;
-      set({ runs: { ...get().runs, [key]: { ...r, elapsedMs: r.elapsedMs + (now() - r.startedAt), startedAt: null } } });
+      set({ runs: { ...get().runs, [key]: { ...r, startedAt: null } } });
+      // While paused the value is on screen to inspect; save it (a reload still restores the pre-sweep value).
+      persist({});
     },
     toggleSweep: (key) => {
       const r = get().runs[key];
@@ -405,18 +480,47 @@ export const useStore = create<AppState>((set, get) => {
       else get().pauseSweep(key);
     },
     stopSweep: (key) => {
+      if (!get().runs[key]) return;
       const runs = { ...get().runs };
       delete runs[key];
       set({ runs });
+      // Stop keeps the value: save it now, since the ticks were not saved.
+      persist({});
+    },
+    restoreSweep: (key) => {
+      const s = get();
+      const keys = key ? [key] : Object.keys(s.runs);
+      const patch: Record<string, number> = {};
+      for (const k of keys) {
+        const origin = s.runs[k]?.origin ?? s.sweepOrigins[k];
+        if (origin != null) patch[k] = origin;
+      }
+      const runs = { ...s.runs };
+      const sweepOrigins = { ...s.sweepOrigins };
+      for (const k of keys) {
+        delete runs[k];
+        delete sweepOrigins[k];
+      }
+      const prev = s.params;
+      const params = Object.keys(patch).length ? sanitizeParams({ ...prev, ...patch }) : prev;
+      const moved = keys.some((k) => params[k as keyof Params] !== prev[k as keyof Params]);
+      set({ runs, sweepOrigins, params, ...(moved ? { past: [...s.past, prev].slice(-100), future: [] } : {}) });
+      persist({ params });
+    },
+    setRunIndex: (key, index) => {
+      const r = get().runs[key];
+      if (!r || r.index === index) return;
+      set({ runs: { ...get().runs, [key]: { ...r, index } } });
     },
     pauseAll: () => {
       const runs = { ...get().runs };
       const anyRunning = Object.values(runs).some((r) => r.startedAt != null);
       for (const k of Object.keys(runs)) {
         const r = runs[k];
-        runs[k] = anyRunning ? (r.startedAt == null ? r : { ...r, elapsedMs: r.elapsedMs + (now() - r.startedAt), startedAt: null }) : { ...r, startedAt: now() };
+        runs[k] = anyRunning ? { ...r, startedAt: null } : { ...r, startedAt: now() };
       }
       set({ runs });
+      if (anyRunning) persist({});
     },
     exportState: () => {
       const s = get();
@@ -440,8 +544,8 @@ export const useStore = create<AppState>((set, get) => {
       const ui = sanitizeUi(obj.ui ?? get().ui);
       const defaultBackend = VALID_BACKENDS.includes(obj.defaultBackend as BackendId) ? (obj.defaultBackend as BackendId) : get().defaultBackend;
       const storyPrev = sanitizeStoryPrev(obj.storyPrev, overrides);
-      set({ params, overrides, defaultBackend, datasets, presets, links, ui, storyPrev, runs: {} });
-      save({ params, overrides, defaultBackend, datasets, presets, links, ui, storyPrev });
+      set({ params, overrides, defaultBackend, datasets, presets, links, ui, storyPrev, runs: {}, sweepOrigins: {} });
+      save({ params, overrides, defaultBackend, datasets, presets, links, ui, storyPrev, runs: [] });
       return { ok: true };
     },
     resetEverything: () => {
@@ -450,7 +554,7 @@ export const useStore = create<AppState>((set, get) => {
       } catch {
         /* ignore */
       }
-      set({ params: { ...DEFAULT_PARAMS }, overrides: {}, defaultBackend: "echarts", datasets: { record: [], moves: [] }, presets: DEFAULT_PRESETS.map((p) => ({ ...p })), links: {}, runs: {}, storyPrev: {}, ui: { ...DEFAULT_UI } });
+      set({ params: { ...DEFAULT_PARAMS }, overrides: {}, defaultBackend: "echarts", datasets: { record: [], moves: [] }, presets: defaultPresets(), links: {}, runs: {}, sweepOrigins: {}, storyPrev: {}, ui: { ...DEFAULT_UI } });
     },
   };
 });

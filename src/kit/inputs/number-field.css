@@ -1,0 +1,251 @@
+/*
+ * The synthetic number field's sweep affordances: the band a preset sweeps, its
+ * spots, the moving tick, and the run marker's reserved slot inside the box.
+ * The field's base look (box, track, thumb) lives in the theme.
+ */
+
+.nf-track {
+  outline: none;
+}
+.nf-track:focus-visible {
+  outline: 1px solid var(--ink-2);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/*
+ * The preset's range: a band across the track. A sweep's range is often a small part
+ * of the schema range (optimistic to break-even is a tenth of q's), so while a band is
+ * drawn the round thumb becomes a needle that leaves the band visible around it.
+ */
+.nf-band {
+  position: absolute;
+  top: 4px;
+  height: 10px;
+  min-width: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 45%, transparent);
+  pointer-events: none;
+}
+.nf-mark {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 3px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--ink-2);
+}
+.nf.banded .nf-track .nf-thumb {
+  top: 1px;
+  width: 2px;
+  height: 16px;
+  margin-left: -1px;
+  border: 0;
+  border-radius: 1px;
+  background: var(--ink);
+  box-shadow: none;
+}
+/* While a sweep drives the field, the moving tick is the needle. */
+.nf.running .nf-track .nf-thumb,
+.nf.paused .nf-track .nf-thumb {
+  display: none;
+}
+.nf-tick {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 18px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--ink);
+  pointer-events: none;
+}
+.nf.paused .nf-tick {
+  background: var(--ink-2);
+}
+.nf.running .nf-track .nf-fill,
+.nf.paused .nf-track .nf-fill {
+  background: var(--ink-2);
+}
+
+/* The box with the ▶ / ❚❚ slot reserved at its left, inside the border: nothing shifts. */
+.nf-boxwrap {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+.nf .nf-boxwrap .nf-box {
+  padding-left: 17px;
+}
+.nf .nf-run {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 9px;
+  font-size: var(--fs-label);
+  line-height: 1;
+  color: var(--ink);
+  pointer-events: none;
+  text-align: center;
+}
+.nf.paused .nf-boxwrap .nf-run {
+  color: var(--ink-2);
+}
+
+/* ---------- sweep strip ---------- */
+.sweep-strip.sw {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: var(--fs-label);
+  color: var(--muted);
+}
+/* The compact strip keeps one width in every state, so nothing beside it moves. */
+.sweep-strip.sw.compact {
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  width: var(--sweep-strip-w, 26rem);
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+.sw > * {
+  flex-shrink: 0;
+}
+.sw .sw-name {
+  color: var(--ink);
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 3 auto;
+}
+.sw .sw-sym {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--ink-2);
+}
+.sw .sw-preset {
+  min-width: 4em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+}
+.sw .sw-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.sw .sw-step {
+  font-variant-numeric: tabular-nums;
+}
+.sw .sw-narrow {
+  display: none;
+}
+@media (max-width: 700px) {
+  .sw .sw-wide {
+    display: none;
+  }
+  .sw .sw-narrow {
+    display: inline;
+    font-family: var(--font-mono);
+  }
+  .sweep-strip.sw.compact {
+    width: auto;
+  }
+}
+.sw .sw-sep {
+  color: var(--muted);
+}
+.sw .sw-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--ink-2);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--hairline);
+  text-underline-offset: 3px;
+}
+.sw .sw-link:hover {
+  color: var(--ink);
+}
+.sw .sw-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--hairline);
+  background: none;
+  color: var(--ink);
+  font-size: var(--fs-label);
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.sw .sw-icon:hover {
+  border-color: var(--ink-2);
+}
+.sw .sw-label {
+  color: var(--ink-2);
+}
+.sw .sw-hint {
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sw .sw-keys {
+  font-family: var(--font-mono);
+  margin-left: auto;
+}
+.sw.sweeping .sw-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink);
+  flex: 0 0 auto;
+  animation: sw-pulse 1.2s ease-in-out infinite;
+}
+@keyframes sw-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sw.sweeping .sw-dot {
+    animation: none;
+  }
+}
+
+/* While the strip names the input it drives, the deck's own active-input label is redundant. */
+.dk-strip:has(> .sw.named) > .dk-active {
+  display: none;
+}
+
+/* ---------- sweep panel ---------- */
+.sweeps .row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.preset-editor .mini-field select,
+.preset-editor .mini-field input[type="text"] {
+  width: auto;
+}
+.preset-desc {
+  color: var(--ink-2);
+}
+.preset-editor .row-note {
+  font-size: var(--fs-label);
+  color: var(--muted);
+}

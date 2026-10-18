@@ -3,6 +3,7 @@
  * The schema is what the UI renders; tiers decide how prominent an input is.
  */
 import { breakEvenLossRate, lossRateFromPClean } from "./binary";
+import type { AnchorDef } from "../sweeps/types";
 import type { Engine } from "./season";
 import { ratioForLossRate, type MoveDistribution } from "./wing";
 
@@ -193,7 +194,11 @@ export interface DeckPlacement {
 export interface InputConfig {
   /** Show the drag slider under the box. */
   slider: boolean;
-  /** Pixels of drag from the middle to either extreme. */
+  /** Drag sensitivity in the input's own units per 100 px of pointer travel (Shift ×0.1). */
+  perHundredPx?: number;
+  /** What one unit of an integer input counts, for "1 name" / "5 nights" in sweep descriptions. */
+  noun?: { one: string; many: string };
+  /** Pixels of drag from the middle to either extreme; used only where perHundredPx is not set. */
   sensitivityPx: number;
   /** Change per wheel notch; defaults to the step. */
   wheelStep?: number;
@@ -227,6 +232,8 @@ export interface ParamDef {
   input?: Partial<InputConfig>;
   /** Whether a sweep preset may drive it. Engine settings and seeds are not swept. */
   sweepable?: boolean;
+  /** Named points a sweep range or spot can refer to; the app computes their values (src/app/params/sweepAnchors.ts). */
+  anchors?: AnchorDef[];
 }
 
 export const DEFAULT_INPUT: InputConfig = { slider: true, sensitivityPx: 220 };
@@ -253,7 +260,12 @@ export const PARAM_DEFS: ParamDef[] = [
     group: "event",
     help: "Probability that one name hits max loss on one night. The binary abstraction treats every bad event as a full loss, so this is expected loss as a fraction of max loss (section 04 derives it from a wing). Typing a value here makes the market state custom.",
     definition: "q: expected loss per unit of max loss on one name-event. The breach rate overstates it, the full-gap rate understates it.",
-    input: { sensitivityPx: 320, wheelStep: 0.0005 },
+    input: { sensitivityPx: 320, wheelStep: 0.0005, perHundredPx: 0.0025 },
+    anchors: [
+      { id: "optimistic", label: "optimistic", help: "The optimistic loss rate (section 03)." },
+      { id: "deck", label: "deck", help: "The deck's q when the sweep started." },
+      { id: "break-even", label: "break-even", help: "b ÷ (1 + b): the fair rate, zero premium." },
+    ],
   },
   {
     key: "gain",
@@ -267,10 +279,10 @@ export const PARAM_DEFS: ParamDef[] = [
     group: "event",
     help: "What a winning name pays as a fraction of the amount it risked. 3.5% is a wing that collects 3.4% of its width.",
     definition: "b: credit over max loss, c ÷ (W − c). Break-even loss rate is b ÷ (1 + b).",
-    input: { decimals: 2 },
+    input: { decimals: 2, perHundredPx: 0.0025 },
   },
-  { key: "nights", label: "Nights per season", short: "n", unit: "int", min: 5, max: 60, step: 1, tier: "primary", group: "season", help: "Games in a row before the tranche is reckoned. One night can carry several names.", definition: "n: nights in a season. Clean season (Coin) = (1 − q)^n; clean end = (1 + b)^n." },
-  { key: "names", label: "Names a night", short: "k", unit: "int", min: 1, max: 6, step: 1, tier: "primary", group: "season", help: "Independent bets placed on the same night in the Spread and Spread + reserve policies.", definition: "k: names on one night. Each risks 1/k of what the night risks.", input: { sensitivityPx: 140 } },
+  { key: "nights", label: "Nights per season", short: "n", unit: "int", min: 5, max: 60, step: 1, tier: "primary", group: "season", help: "Games in a row before the tranche is reckoned. One night can carry several names.", definition: "n: nights in a season. Clean season (Coin) = (1 − q)^n; clean end = (1 + b)^n.", input: { perHundredPx: 5, noun: { one: "night", many: "nights" } } },
+  { key: "names", label: "Names a night", short: "k", unit: "int", min: 1, max: 6, step: 1, tier: "primary", group: "season", help: "Independent bets placed on the same night in the Spread and Spread + reserve policies.", definition: "k: names on one night. Each risks 1/k of what the night risks.", input: { sensitivityPx: 140, perHundredPx: 1, noun: { one: "name", many: "names" } } },
   {
     key: "riskPerNight",
     label: "At risk a night",
@@ -284,8 +296,14 @@ export const PARAM_DEFS: ParamDef[] = [
     group: "sizing",
     help: "Share of the tranche that can be lost on one night in the Spread + reserve policy. 100% is the whole tranche; 50% keeps half in reserve.",
     definition: "At risk a night: the most a night can take from the tranche. The rest is the reserve.",
+    input: { perHundredPx: 0.1 },
+    anchors: [
+      { id: "robust", label: "robust", help: "The risk a night that maximises growth averaged over the loss rates you cannot rule out." },
+      { id: "kelly", label: "Kelly", help: "The growth-optimal risk a night at the deck's loss rate." },
+      { id: "deck", label: "deck", help: "The deck's risk a night when the sweep started." },
+    ],
   },
-  { key: "seasons", label: "Seasons chained", short: "N", unit: "int", min: 1, max: 12, step: 1, tier: "primary", group: "sizing", help: "Seasons played back to back without refilling the tranche.", definition: "N: seasons replayed without refilling. The median after N seasons is the number the middle path shows.", input: { sensitivityPx: 160 } },
+  { key: "seasons", label: "Seasons chained", short: "N", unit: "int", min: 1, max: 12, step: 1, tier: "primary", group: "sizing", help: "Seasons played back to back without refilling the tranche.", definition: "N: seasons replayed without refilling. The median after N seasons is the number the middle path shows.", input: { sensitivityPx: 160, perHundredPx: 1, noun: { one: "season", many: "seasons" } } },
 
   {
     key: "sharedOutcome",
@@ -315,6 +333,7 @@ export const PARAM_DEFS: ParamDef[] = [
     section: "calibration",
     affectsAll: true,
     help: "The better rate you would like to be true. Sections 03, 07 and 08 compare it with the deck's rate and with break-even.",
+    input: { perHundredPx: 0.0025 },
   },
   { key: "singleNameShare", label: "Single-name nights", unit: "pct", min: 0, max: 1, step: 0.05, tier: "secondary", section: "diversification", help: "Share of a season's nights that offer only one name." },
   { key: "thresholdBelow", label: "Drawdown threshold", unit: "x", min: 0.1, max: 0.95, step: 0.05, tier: "secondary", section: "diversification", affectsAll: true, help: "Tables and figures report the probability of ending below this multiple of the starting tranche." },
