@@ -2,9 +2,9 @@
 // public/directives.md, which Vite serves in dev and copies into dist/ on build; the
 // Guide fetches it at run time and never imports it, so its text stays out of the bundle.
 //
-// The Vite plugin (vite.config.ts) copies at the start of every build and dev server
-// (npm run build, npm run dev, npx vite build) and again whenever the source changes
-// while the dev server runs. On its own: node scripts/directives.mjs
+// The Vite plugin (vite.config.ts) copies whenever Vite starts (npm run build, npm run dev,
+// npx vite build, vite preview's config load, vitest) and again whenever the source
+// changes while the dev server runs. On its own: node scripts/directives.mjs
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,12 +29,15 @@ export function directivesPlugin() {
   let publicDir = join(root, "public");
   return {
     name: "directives-md",
+    // Copy as soon as the config is known: the dev server lists the public files when it is
+    // created, before any build hook runs, and serves only the files on that list.
     configResolved(config) {
       root = config.root;
       if (config.publicDir) publicDir = config.publicDir;
+      if (!copyDirectives(root, publicDir)) config.logger.warn(`${SOURCE} not found: the Guide's Directives will say it cannot be loaded`);
     },
     buildStart() {
-      if (!copyDirectives(root, publicDir)) this.warn(`${SOURCE} not found: the Guide's Directives will say it cannot be loaded`);
+      copyDirectives(root, publicDir);
     },
     configureServer(server) {
       const from = resolve(root, SOURCE);
