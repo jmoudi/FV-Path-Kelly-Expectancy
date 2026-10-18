@@ -1,7 +1,8 @@
 /**
  * The store factory. Parameters with undo/redo, imported number lists, chart edits and
  * stories, sweep presets, links and runs (with each swept input's pre-sweep value,
- * persisted so a reload mid-run puts it back), UI settings, versioned import/export
+ * persisted so a reload mid-run puts it back), UI settings, parameter settings (how each
+ * parameter is edited by hand; never read by the sweeps), versioned import/export
  * with sanitizers, and local persistence. Knows nothing about the explainer: the
  * schema, the defaults, the presets and the sanitizers come in the config. The app
  * instantiates it once (src/app/store.ts).
@@ -12,6 +13,7 @@
 import { create, type StoreApi, type UseBoundStore } from "zustand";
 import { sanitizeOverride, STORY_LABEL_MAX, STORY_NARRATIVE_MAX, type BackendId, type SpecOverride, type Story } from "@kit/charts/spec";
 import type { Schema } from "@kit/inputs/schema";
+import { patchParamSetting, sanitizeParamSettings, type ParamSettings, type ParamSettingsPatch } from "@kit/inputs/paramSettings";
 import { migratePresetId, sanitizePreset, sanitizePresets } from "@kit/sweeps/sanitize";
 import { clonePreset, type PersistedRun, type PresetCatalog, type SweepPlan, type SweepPreset, type SweepRun } from "@kit/sweeps/types";
 
@@ -42,6 +44,8 @@ export interface ExportedState<P extends object, D extends object> {
   ui: UiSettings;
   /** chart id -> the parameters a story moved, as they were before it. */
   storyPrev: Record<string, Partial<P>>;
+  /** parameter key -> the parameter settings a person changed (kit/inputs/paramSettings.ts). Absent in older exports. */
+  paramSettings?: Record<string, ParamSettings>;
 }
 
 /** What local storage holds: the exported state plus the sweeps that were running, with each input's pre-sweep value. */
@@ -99,6 +103,12 @@ export interface KitState<P extends object, D extends object> {
   /** Undo stack of parameter states (most recent last). Sweep ticks are not recorded. */
   past: P[];
   future: P[];
+  /**
+   * Parameter settings: parameter key -> how a person edits it by hand (step, fine step,
+   * wheel step, drag per 100 px, decimals, slider), over the schema's `input` defaults.
+   * Persisted and exported; never read by the sweeps.
+   */
+  paramSettings: Record<string, ParamSettings>;
   setParam: <K extends Extract<keyof P, string>>(key: K, value: P[K]) => void;
   /** history: false skips the undo stack; sweep: true is a sweep tick (no history, not saved). */
   setParams: (patch: Partial<P>, opts?: { history?: boolean; sweep?: boolean }) => void;
@@ -131,6 +141,10 @@ export interface KitState<P extends object, D extends object> {
   exportState: () => ExportedState<P, D>;
   importState: (text: string) => { ok: true } | { ok: false; error: string };
   resetEverything: () => void;
+  /** Change some of one parameter's settings; a null field goes back to its default. */
+  setParamSettings: (key: string, patch: ParamSettingsPatch) => void;
+  /** Back to the defaults: one parameter's settings, or (without a key) every parameter's. */
+  resetParamSettings: (key?: string) => void;
 }
 
 export type AppStore<P extends object, D extends object> = UseBoundStore<StoreApi<KitState<P, D>>>;
@@ -181,7 +195,7 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
     }
   }
 
-  type Persisted = Pick<KitState<P, D>, "params" | "overrides" | "defaultBackend" | "datasets" | "presets" | "links" | "ui" | "storyPrev"> & { runs?: PersistedRun[] };
+  type Persisted = Pick<KitState<P, D>, "params" | "overrides" | "defaultBackend" | "datasets" | "presets" | "links" | "ui" | "storyPrev" | "paramSettings"> & { runs?: PersistedRun[] };
 
   function save(state: Persisted) {
     try {
@@ -268,7 +282,7 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
   return create<KitState<P, D>>()((set, get) => {
     const persist = (patch: Partial<Persisted>) => {
       const s = get();
-      save({ params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui, storyPrev: s.storyPrev, runs: persistedRuns(s.runs), ...patch });
+      save({ params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui, storyPrev: s.storyPrev, paramSettings: s.paramSettings, runs: persistedRuns(s.runs), ...patch });
     };
     /** A hand edit of a swept input stops its run and forgets its pre-sweep value. */
     const releaseSweeps = (keys: string[]) => {
@@ -297,6 +311,7 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
       ui: sanitizeUi(initial.ui),
       past: [],
       future: [],
+      paramSettings: sanitizeParamSettings(initial.paramSettings, schema),
       setParam: (key, value) => {
         const v = schema.coerce(key, value);
         const prev = get().params;
@@ -543,7 +558,7 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
       },
       exportState: () => {
         const s = get();
-        return { version: cfg.version, exportedAt: new Date().toISOString(), params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui, storyPrev: s.storyPrev };
+        return { version: cfg.version, exportedAt: new Date().toISOString(), params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui, storyPrev: s.storyPrev, paramSettings: s.paramSettings };
       },
       importState: (text) => {
         let parsed: unknown;
@@ -563,8 +578,10 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         const ui = sanitizeUi(obj.ui ?? get().ui);
         const backend = VALID_BACKENDS.includes(obj.defaultBackend as BackendId) ? (obj.defaultBackend as BackendId) : get().defaultBackend;
         const storyPrev = sanitizeStoryPrev(obj.storyPrev, overrides);
-        set({ params, overrides, defaultBackend: backend, datasets, presets, links, ui, storyPrev, runs: {}, sweepOrigins: {} });
-        save({ params, overrides, defaultBackend: backend, datasets, presets, links, ui, storyPrev, runs: [] });
+        // An export from before parameter settings existed keeps the current ones.
+        const paramSettings = obj.paramSettings !== undefined ? sanitizeParamSettings(obj.paramSettings, schema) : get().paramSettings;
+        set({ params, overrides, defaultBackend: backend, datasets, presets, links, ui, storyPrev, paramSettings, runs: {}, sweepOrigins: {} });
+        save({ params, overrides, defaultBackend: backend, datasets, presets, links, ui, storyPrev, paramSettings, runs: [] });
         return { ok: true };
       },
       resetEverything: () => {
@@ -573,7 +590,25 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         } catch {
           /* ignore */
         }
-        set({ params: { ...defaults }, overrides: {}, defaultBackend, datasets: cfg.datasets.empty, presets: defaultPresets(), links: {}, runs: {}, sweepOrigins: {}, storyPrev: {}, ui: { ...defaultUi } });
+        set({ params: { ...defaults }, overrides: {}, defaultBackend, datasets: cfg.datasets.empty, presets: defaultPresets(), links: {}, runs: {}, sweepOrigins: {}, storyPrev: {}, ui: { ...defaultUi }, paramSettings: {} });
+      },
+
+      // ---- parameter settings (kit/inputs/paramSettings.ts): the manual feel, not the replayer's ----
+      setParamSettings: (key, patch) => {
+        const def = schema.byKey[key];
+        if (!def) return;
+        const paramSettings = { ...get().paramSettings };
+        const next = patchParamSetting(def, paramSettings[key], patch);
+        if (next) paramSettings[key] = next;
+        else delete paramSettings[key];
+        persist({ paramSettings });
+        set({ paramSettings });
+      },
+      resetParamSettings: (key) => {
+        const paramSettings = key ? { ...get().paramSettings } : {};
+        if (key) delete paramSettings[key];
+        persist({ paramSettings });
+        set({ paramSettings });
       },
     };
   });

@@ -5,9 +5,11 @@ import { useStore } from "@app/store";
 import type { DeckView } from "./deckView";
 import "@kit/ui/deck/deck.css";
 
-/** The deck sits on every page except Settings. Read from the hash the way src/kit/ui/route.ts does. */
+/** The deck sits on every page except Settings and the Guide (#guide, #guide/<section>). Read from the hash the way src/kit/ui/route.ts does. */
 function onSettingsPage(): boolean {
-  return typeof location !== "undefined" && location.hash.replace(/^#/, "") === "settings";
+  if (typeof location === "undefined") return false;
+  const h = location.hash.replace(/^#/, "");
+  return h === "settings" || h === "guide" || h.startsWith("guide/");
 }
 
 function useOnSettingsPage(): boolean {

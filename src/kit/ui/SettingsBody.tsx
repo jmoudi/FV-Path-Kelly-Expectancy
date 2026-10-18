@@ -6,6 +6,7 @@ import { useKit, useKitCopy, useSchema } from "@kit/state/context";
 import { ImportExportBody } from "./Dialogs";
 import { Num } from "@kit/inputs/Num";
 import { ParamInput } from "@kit/inputs/ParamInput";
+import { ParamSettingsTable } from "@kit/inputs/ParamSettings";
 import { SweepPanel } from "@kit/sweeps/SweepPanel";
 import { HOTKEY_HINTS } from "@kit/sweeps/useSweeps";
 
@@ -127,6 +128,10 @@ export function FullSettings({ data }: { data?: ReactNode } = {}) {
       </SettingsGroup>
       <SettingsGroup id="set-keys" title="Hotkeys">
         <KeyLegend bindings={KEYS} />
+      </SettingsGroup>
+      {/* Parameter settings: how each parameter is edited by hand. Separate from the presets below, which keep their own step. */}
+      <SettingsGroup id="set-params" title="Parameters" blurb="How each parameter moves when you edit it by hand: the step (the wheel, the arrow keys and the drag land on its multiples), the fine step with Shift, one wheel notch, the drag speed, the decimals shown and the slider. A blank box is the default it shows. Sweep presets keep their own step and timing." wide>
+        <ParamSettingsTable />
       </SettingsGroup>
       <SettingsGroup id="set-presets" title="Sweep presets" blurb="A preset drives the active input on its own, in the input's own units. Link one to an input, then run it from the deck's strip or with the hotkeys above." wide>
         <SweepPanel />

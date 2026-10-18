@@ -8,21 +8,22 @@ import { useKit } from "@kit/state/context";
 import { isEditableTarget } from "@kit/sweeps/useSweeps";
 import { stepView } from "./route";
 
-export function useScrollSpy(ids: string[], enabled: boolean): string {
+/** The id (without `prefix`) of the element `#<prefix><id>` in the reading band of the viewport. */
+export function useScrollSpy(ids: string[], enabled: boolean, prefix = "s-"): string {
   const [active, setActive] = useState("");
   useEffect(() => {
     if (!enabled || !("IntersectionObserver" in window)) return;
-    const els = ids.map((id) => document.getElementById(`s-${id}`)).filter((x): x is HTMLElement => !!x);
+    const els = ids.map((id) => document.getElementById(`${prefix}${id}`)).filter((x): x is HTMLElement => !!x);
     const io = new IntersectionObserver(
       (entries) => {
         const hit = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (hit) setActive(hit.target.id.replace(/^s-/, ""));
+        if (hit) setActive(hit.target.id.slice(prefix.length));
       },
       { rootMargin: "-25% 0px -60% 0px" },
     );
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
-  }, [ids, enabled]);
+  }, [ids, enabled, prefix]);
   return active;
 }
 

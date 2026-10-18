@@ -18,6 +18,11 @@ Drive an input automatically from a saved preset, locked to the page's frames.
 - `useSweeps.ts`: the engine hook that commits a running sweep's values, and the hotkeys.
 - `SweepStrip.tsx` and `SweepPanel.tsx`: the strip under the deck and the preset editor.
 
+A preset owns its step and its timing. The engine never reads parameter settings
+(`kit/inputs/paramSettings.ts`, how a person edits a parameter by hand), and those never
+read presets; the two share only the schema's range. A test holds a preset's plan
+unchanged when the manual step changes (`tests/paramSettings.test.ts`).
+
 What the app supplies: a `SweepAdapter` that gives a `SweepContext` per input (bounds,
 default, the value before the run, the anchors its schema declares and a `resolve(id)`
 for their values), a `SweepFormat` (value, delta, ms) and a `settledSince(t)` from its

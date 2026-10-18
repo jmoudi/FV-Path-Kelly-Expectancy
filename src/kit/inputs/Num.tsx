@@ -6,6 +6,11 @@ import { NumberField } from "./NumberField";
  * parameters: same box, wheel and drag feel, with the slider on where a range exists.
  * Drag speed is `perHundredPx` units per 100 px; by default ten steps, or a third of
  * the range when that is less.
+ *
+ * Two ways to allow "no value": `placeholder` shows a button ("auto") that sets a
+ * value on click; `emptyHint` shows an empty box with the hint as its placeholder
+ * (a setting left at its default), which typing, the wheel or the arrows fill
+ * (starting from `emptyBase`) and clearing empties again.
  */
 export function Num({
   id,
@@ -20,6 +25,10 @@ export function Num({
   decimals,
   perHundredPx,
   placeholder,
+  emptyHint,
+  emptyBase,
+  suffix,
+  ariaLabel,
 }: {
   id: string;
   label?: string;
@@ -35,8 +44,15 @@ export function Num({
   perHundredPx?: number;
   /** Allow an empty value (e.g. "auto") via the clear button. */
   placeholder?: string;
+  /** Allow an empty value shown as an empty box with this placeholder (the default it stands for). */
+  emptyHint?: string;
+  /** The value an empty box stands for: where the wheel and the arrows start. */
+  emptyBase?: number;
+  /** The sign after the number instead of the unit's. */
+  suffix?: string;
+  ariaLabel?: string;
 }) {
-  if (value == null && placeholder != null) {
+  if (value == null && placeholder != null && emptyHint == null) {
     return (
       <div className="nf compact">
         {label && (
@@ -54,10 +70,12 @@ export function Num({
   }
   const span = max - min;
   const drag = perHundredPx ?? (Number.isFinite(span) && span > 0 ? Math.min(10 * step, span / 3) : 10 * step);
+  const empty = emptyHint != null ? { active: value == null, placeholder: emptyHint, onClear: () => onChange(null) } : undefined;
+  const shown = value ?? emptyBase ?? min;
   return (
     <div className="nf-with-clear">
-      <NumberField id={id} label={label} value={value ?? min} min={min} max={max} step={step} unit={unit} config={{ slider, sensitivityPx: 200, perHundredPx: drag, decimals }} onChange={(v) => onChange(v)} compact />
-      {placeholder != null && (
+      <NumberField id={id} label={label} value={shown} min={min} max={max} step={step} unit={unit} config={{ slider, sensitivityPx: 200, perHundredPx: drag, decimals }} onChange={(v) => onChange(v)} compact empty={empty} suffix={suffix} ariaLabel={ariaLabel} />
+      {placeholder != null && emptyHint == null && (
         <button type="button" className="chip tiny" onClick={() => onChange(null)} title="Back to automatic">
           auto
         </button>

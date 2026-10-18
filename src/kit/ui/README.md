@@ -17,10 +17,11 @@ and never imports the app's types.
 | Section | `Section.tsx` | one `ScenarioView`, through `SectionFrame` and the adapters in `scenarioProps.tsx` |
 | View page | `ViewPage.tsx` | the `ScenarioView`s and a view id; `notFound` (a node) for an unknown id |
 | Chart host | `ChartHost.tsx`, `Authoring.tsx`, `TableView.tsx` | one `ChartSpec`: the backend, the editor in ⚙, the ⊞ table, stories (the badge from `copy.storyMoved`) |
-| Full and quick settings | `SettingsBody.tsx` | `FullSettings` takes a `data` slot and lists the schema's advanced tier; `QuickSettings` holds the everyday settings and the resets |
-| Dialogs | `Dialogs.tsx` | `Modal`, import and export, the settings dialog |
-| Routes | `route.ts` | a `RouteConfig` (`home`, `pages`, `aliases`, `sectionsPage`); `#view/<id>` and `#s-<id>` built in |
-| Shell hooks | `Shell.tsx` | `useScrollSpy`, `useViewKeys` (`[` and `]` between views), `CrashScreen` |
+| Full and quick settings | `SettingsBody.tsx` | `FullSettings` takes a `data` slot and lists the schema's advanced tier and, under Parameters, every numeric parameter's settings (`kit/inputs/ParamSettings.tsx`); `QuickSettings` holds the everyday settings and the resets |
+| Dialogs | `Dialogs.tsx` | `Modal`, import and export, the settings dialog (`guideHref` links a guide page) |
+| Guide page | `GuideFrame.tsx`, `guide.css` | `title`, `lede`, `sections: GuideSection[]` (blocks: paragraph, sub-heading, list, table, key rows; inline `code`, **term**, [label](#href)), `current` (the section in the address, scrolled to), `page` (links are `#<page>/<id>`). A rail of section links that highlights the one being read; a contents list above the text on narrow screens |
+| Routes | `route.ts` | a `RouteConfig` (`home`, `pages`, `aliases`, `sectionsPage`); `#view/<id>` and `#s-<id>` built in; `#<page>/<part>` puts the part in `route.section` |
+| Shell hooks | `Shell.tsx` | `useScrollSpy(ids, enabled, prefix = "s-")`, `useViewKeys` (`[` and `]` between views), `CrashScreen` |
 | Copy | `copy.ts` | `KitCopy`: every sentence a frame says on its own; neutral defaults, the app overrides them |
 
 Styles live in `kit.css` and read only the theme's tokens: `--fs-title`, `--fs-view`,

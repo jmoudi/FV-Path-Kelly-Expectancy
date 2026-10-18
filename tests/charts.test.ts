@@ -439,7 +439,7 @@ describe("story rules in the store", () => {
     const q0 = useStore.getState().params.lossRate;
     s.applyStory("binary-outcomes", opt);
     const exported = useStore.getState().exportState();
-    expect(exported.version).toBe(4);
+    expect(exported.version).toBe(5);
     expect(exported.storyPrev).toEqual({ "binary-outcomes": { lossRate: q0 } });
     // Round trip: the snapshot comes back and undo still works.
     s.resetEverything();

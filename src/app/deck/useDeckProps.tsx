@@ -54,7 +54,7 @@ export function useDeckProps(deck: DeckView | null): DeckContent {
         title: g.title,
         blurb: g.blurb,
         fields: g.keys.flatMap((k) => {
-          const field = { id: k, node: <ParamInput k={k} id={drawerFieldId(k)} /> };
+          const field = { id: k, node: <ParamInput k={k} id={drawerFieldId(k)} withSettings /> };
           return k === "lossRate" ? [field, { id: "pClean", node: <CleanSeasonField id={drawerFieldId("pClean")} /> }] : [field];
         }),
         note:

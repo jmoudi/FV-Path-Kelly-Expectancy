@@ -1,0 +1,207 @@
+/*
+ * The guide page (GuideFrame.tsx): a rail of section links beside one prose column.
+ * Type from the theme's scale only; no boxes, structure from type, spacing and one
+ * hairline between sections.
+ */
+.k-guide {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 48px;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding-left: var(--gutter-l);
+  padding-right: var(--gutter-r);
+  padding-block: 40px var(--space-section);
+}
+.k-guide-rail {
+  position: sticky;
+  top: calc(var(--topbar-h) + var(--deck-h) + 24px + env(safe-area-inset-top, 0px));
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.k-guide-rail-title {
+  font-size: var(--fs-label);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding: 0 10px 8px;
+}
+.k-guide-rail a {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 6px;
+  align-items: baseline;
+  padding: 5px 10px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--ink-2);
+  font-size: var(--fs-ui);
+  line-height: 1.3;
+}
+.k-guide-rail a .n {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--muted);
+}
+.k-guide-rail a:hover {
+  color: var(--ink);
+}
+.k-guide-rail a.on {
+  color: var(--ink);
+  background: var(--surface);
+}
+.k-guide-rail a.on .n {
+  color: var(--ink);
+}
+
+.k-guide-main {
+  min-width: 0;
+  max-width: calc(var(--prose-max) + 8ch);
+  /* Room under the last section, so the rail can mark it as read. */
+  padding-bottom: 40vh;
+}
+.k-guide-head {
+  display: grid;
+  gap: 12px;
+  margin-bottom: var(--space-block);
+}
+.k-guide-sec {
+  scroll-margin-top: calc(var(--topbar-h) + var(--deck-h) + 24px);
+  padding-top: 32px;
+  margin-top: 32px;
+  border-top: 1px solid var(--hairline);
+}
+.k-guide-sec:first-of-type {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+.k-guide-h2 {
+  margin: 0 0 12px;
+  font-size: var(--fs-h);
+  font-weight: var(--fw-h);
+  line-height: 1.3;
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+.k-guide-h2 .n {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: 400;
+  color: var(--muted);
+  min-width: 1.6em;
+}
+.k-guide-h3 {
+  margin: 24px 0 6px;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.k-guide-p {
+  margin: 0 0 10px;
+  max-width: var(--prose-max);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.k-guide-p strong,
+.k-guide-list strong,
+.k-guide-table strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.k-guide-list {
+  margin: 0 0 12px;
+  padding-left: 1.3em;
+  max-width: var(--prose-max);
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: var(--ink-2);
+  display: grid;
+  gap: 4px;
+}
+.k-guide code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-ui);
+  color: var(--ink);
+  background: var(--surface);
+  border-radius: 4px;
+  padding: 0 4px;
+  overflow-wrap: anywhere;
+}
+.k-guide a {
+  color: var(--ink);
+  text-decoration-color: var(--muted);
+  text-underline-offset: 3px;
+}
+.k-guide-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 4px 0 16px;
+}
+.k-guide-table {
+  border-collapse: collapse;
+  font-size: var(--fs-ui);
+  min-width: min(100%, 520px);
+}
+.k-guide-table caption {
+  caption-side: bottom;
+  text-align: left;
+  padding-top: 6px;
+  font-size: var(--fs-label);
+  color: var(--muted);
+}
+.k-guide-table th,
+.k-guide-table td {
+  padding: 6px 18px 6px 0;
+  border-bottom: 1px solid var(--grid);
+  text-align: left;
+  vertical-align: baseline;
+  color: var(--ink-2);
+  line-height: 1.45;
+}
+.k-guide-table thead th {
+  font-size: var(--fs-label);
+  font-weight: 500;
+  color: var(--muted);
+  border-bottom-color: var(--hairline);
+  white-space: nowrap;
+}
+.k-guide-table tbody th {
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.k-guide .k-keys td {
+  line-height: 1.6;
+}
+
+/* Narrow screens: the rail becomes a short contents list above the text. */
+@media (max-width: 900px) {
+  .k-guide {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    padding-top: 24px;
+  }
+  .k-guide-rail {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0 8px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .k-guide-rail-title {
+    grid-column: 1 / -1;
+  }
+  .k-guide-rail a {
+    padding: 4px 6px;
+  }
+  .k-guide-table tbody th {
+    white-space: normal;
+  }
+}
