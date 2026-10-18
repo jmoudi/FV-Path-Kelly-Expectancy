@@ -1,8 +1,8 @@
-import type { Datasets } from "@app/params/datasets";
-import type { Params } from "@app/params/params";
-import { deckView, type DeckView } from "@app/deck/deckView";
+import type { Datasets } from "@app/model/datasets";
+import type { Params } from "@app/model/params";
+import { deckView, type DeckView } from "@app/scenarios/deck";
 import { derive, type Derived } from "./derived";
-import { buildDesk, type DeskView } from "@app/desk/desk";
+import { buildDesk, type DeskView } from "@app/scenarios/desk";
 import { buildAxes } from "./axes";
 import { buildBinary } from "./binary";
 import { buildCalibration } from "./calibration";

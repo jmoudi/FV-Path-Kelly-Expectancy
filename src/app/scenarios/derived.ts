@@ -1,54 +1,17 @@
-import { typographic } from "@kit/charts/format";
 import { breakEvenLossRate, cleanEnd, pCleanFromLossRate } from "@app/model/binary";
 import { recordStats, type RecordStats } from "@app/model/calibration";
+import type { Datasets } from "@app/model/datasets";
 import { betaPosterior, kellyFraction, nightOptimum, robustOptimum, seasonLogGrowth, seasonRuin, uniformBand, type RateWeights } from "@app/model/kelly";
-import { MARKET_TOL, marketLossRate, marketOf, type Market, type Params } from "@app/params/params";
-import { PARAM_BY_KEY } from "@app/params/schema";
-import type { Datasets } from "@app/params/datasets";
-import type { Unit } from "@kit/inputs/schema";
-import { YOUR_POLICY, policies, type PolicyDef, type PolicyId } from "@app/model/policies";
+import { MARKET_TOL, marketLossRate, marketOf, type Market, type Params } from "@app/model/params";
+import type { PolicyId } from "@app/model/policies";
 import { scheduleDistribution, summarize, type Distribution, type DistributionOptions, type Summary } from "@app/model/season";
-import { pct, pct2, x2, signedPp, fmtInt, sigma } from "@kit/charts/numbers";
-import { ZERO_PREMIUM_NOTE, NEGATIVE_PREMIUM_NOTE } from "@app/copy/market";
+import { ZERO_PREMIUM_NOTE, NEGATIVE_PREMIUM_NOTE } from "@app/data/copy/market";
+import { DISCUSSION_P_CLEAN } from "@app/data/params";
+import { YOUR_POLICY, policies, type PolicyDef } from "@app/data/policies";
+import { pct2, signedPp } from "@kit/charts/numbers";
 
 export function methodLabel(m: Distribution["method"]): string {
   return m === "exact" ? "computed exactly" : m === "binned" ? "computed on a fine log grid" : "Monte Carlo";
-}
-
-/** A parameter value in its schema unit, as the deck prints it. */
-export function formatIn(unit: Unit, v: number): string {
-  switch (unit) {
-    case "pct":
-      return pct(v);
-    case "pct2":
-      return pct2(v);
-    case "int":
-      return fmtInt(v);
-    case "x":
-      return x2(v);
-    case "sigma":
-      return sigma(v);
-    default:
-      return typographic(v.toFixed(2));
-  }
-}
-
-/**
- * What an active story moved, from the snapshot the store took before it moved the
- * deck: "moves deck: q 2.94% → 2.52%". A rebuilt chart's own badge is computed from
- * the deck as it is after the move, so the host reads this one instead. Null when
- * nothing numeric moved.
- */
-export function movedBadge(before: Partial<Params> | undefined, now: Params): string | null {
-  if (!before) return null;
-  const parts: string[] = [];
-  for (const [k, v] of Object.entries(before)) {
-    const def = PARAM_BY_KEY[k];
-    const cur = now[k as keyof Params];
-    if (!def || typeof v !== "number" || typeof cur !== "number" || v === cur) continue;
-    parts.push(`${def.short ?? def.shortLabel ?? def.label} ${formatIn(def.unit, v)} → ${formatIn(def.unit, cur)}`);
-  }
-  return parts.length ? `moves deck: ${parts.join(", ")}` : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,9 +50,9 @@ export interface MarketState {
 }
 
 export function marketState(p: Params): MarketState {
-  const fairRate = marketLossRate("fair", p);
-  const discussionRate = marketLossRate("discussion", p);
-  const actual = marketOf(p);
+  const fairRate = marketLossRate("fair", p, DISCUSSION_P_CLEAN);
+  const discussionRate = marketLossRate("discussion", p, DISCUSSION_P_CLEAN);
+  const actual = marketOf(p, DISCUSSION_P_CLEAN);
   const premium = fairRate - p.lossRate;
   const zeroPremium = Math.abs(premium) <= MARKET_TOL;
   const noPremium = premium <= MARKET_TOL;

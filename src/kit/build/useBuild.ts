@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useKit } from "@kit/state/context";
+import { useBus } from "@kit/events/react";
 import { BuildQueue, type Dispatch, type SettleTracker } from "./coalesce";
 import { mergeResult, sweepScope, type BuildOutput } from "./scope";
 import type { BuildOptions, BuildResponse } from "./worker";
@@ -44,9 +45,12 @@ interface Request<I> {
  * builds plus the scenarios on screen; when it stops, one full build follows.
  *
  * `input` must be memoised by the caller: a new identity is a new build.
+ *
+ * Each answer on screen is announced as build:settled on the event bus, after it rendered.
  */
 export function useBuild<I, O extends BuildOutput>(input: I, cfg: UseBuildConfig<I, O>): BuildState<O> {
   const [state, setState] = useState<BuildState<O>>({ result: null, pending: true, error: null, settled: 0 });
+  const bus = useBus();
   const sweeping = useKit((s) => Object.values(s.runs).some((r) => r.startedAt != null));
   const cfgRef = useRef(cfg);
   cfgRef.current = cfg;
@@ -59,7 +63,7 @@ export function useBuild<I, O extends BuildOutput>(input: I, cfg: UseBuildConfig
   /** The newest request made, re-sent when the queue is recreated. */
   const latestReqRef = useRef<Request<I> | null>(null);
   /** The answer just shown, to mark as rendered after React commits it. */
-  const toMarkRef = useRef<{ at: number; result: O | null } | null>(null);
+  const toMarkRef = useRef<{ at: number; result: O | null; partial: string[] | null; error?: string } | null>(null);
   const prevRef = useRef<I | null>(null);
 
   useEffect(() => {
@@ -72,10 +76,10 @@ export function useBuild<I, O extends BuildOutput>(input: I, cfg: UseBuildConfig
       if (out) {
         const merged = mergeResult(lastRef.current, out);
         lastRef.current = merged;
-        toMarkRef.current = { at: requestedAt, result: merged };
+        toMarkRef.current = { at: requestedAt, result: merged, partial: out.partial ?? null };
         setState((s) => ({ result: merged, pending, error: null, settled: s.settled + 1 }));
       } else {
-        toMarkRef.current = { at: requestedAt, result: null };
+        toMarkRef.current = { at: requestedAt, result: null, partial: null, error: error ?? "unknown error" };
         setState((s) => ({ ...s, pending, error: error ?? "unknown error", settled: s.settled + 1 }));
       }
     };
@@ -154,8 +158,11 @@ export function useBuild<I, O extends BuildOutput>(input: I, cfg: UseBuildConfig
     const m = toMarkRef.current;
     if (!m) return;
     toMarkRef.current = null;
-    requestAnimationFrame(() => cfgRef.current.settled.markRendered(m.at, m.result));
-  }, [state.settled]);
+    requestAnimationFrame(() => {
+      cfgRef.current.settled.markRendered(m.at, m.result);
+      bus.emit("build:settled", { at: m.at, ok: !m.error, partial: m.partial, ...(m.error ? { error: m.error } : {}) });
+    });
+  }, [state.settled, bus]);
 
   return state;
 }

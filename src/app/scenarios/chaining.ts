@@ -2,12 +2,12 @@ import { f, table, tableSpec, type ChartSpec, type Row, type SeriesSpec, type St
 import { medianGrowthPerSeason } from "@app/model/growth";
 import { robustSeasonLogGrowth, seasonLogGrowth, seasonRuin } from "@app/model/kelly";
 import { coinOutcomes, doubleOrNothingShare, navKellyShare, navLogGrowth } from "@app/model/nav";
-import type { Datasets } from "@app/params/datasets";
-import type { Params } from "@app/params/params";
+import type { Datasets } from "@app/model/datasets";
+import type { Params } from "@app/model/params";
 import { POLICY_IDS, type PolicyId } from "@app/model/policies";
 import { binnedDistributions, logHistogram, samplePaths, summarize, weightedQuantile } from "@app/model/season";
 import { linspace } from "@kit/math/stats";
-import { fig } from "./discussion";
+import { fig } from "@app/data/discussion";
 import { formatNumber, typographic } from "@kit/charts/format";
 import { methodLabel, type Derived } from "./derived";
 import { movesDeck, near } from "@kit/charts/scenario";

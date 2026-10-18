@@ -1,9 +1,9 @@
 import { f, table, tableSpec, type ChartSpec, type Row, type Story } from "@kit/charts/spec";
 import { breachBeyond, crossoverSharedOutcome, jointLossProb, ruinPerSeason, ruinWithShock, shockedLossRate } from "@app/model/correlation";
-import type { Datasets } from "@app/params/datasets";
-import type { Params } from "@app/params/params";
+import type { Datasets } from "@app/model/datasets";
+import type { Params } from "@app/model/params";
 import { linspace, logspace } from "@kit/math/stats";
-import { fig } from "./discussion";
+import { fig } from "@app/data/discussion";
 import { movesDeck, near } from "@kit/charts/scenario";
 import { pct, pct1, pct2, ratio, smallPct } from "@kit/charts/numbers";
 import { typographic } from "@kit/charts/format";

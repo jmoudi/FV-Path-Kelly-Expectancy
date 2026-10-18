@@ -7,6 +7,12 @@
  * schema, the defaults, the presets and the sanitizers come in the config. The app
  * instantiates it once (src/app/store.ts).
  *
+ * Every action that changes something says so on the event bus (kit/events), once the
+ * store holds the new state: param:changed per parameter with its source, sweep:started,
+ * paused and stopped, story:applied and cleared, chart:edited, data:changed,
+ * state:imported, state:reset, settings:changed. The bus comes in the config or, from
+ * <KitProvider bus>, through connectBus.
+ *
  * This file is the former src/state/store.ts with Params -> P, Datasets -> D and its module-level
  * constants moved into the config. Behaviour is unchanged.
  */
@@ -16,6 +22,8 @@ import type { Schema } from "@kit/inputs/schema";
 import { patchParamSetting, sanitizeParamSettings, type ParamSettings, type ParamSettingsPatch } from "@kit/inputs/paramSettings";
 import { migratePresetId, sanitizePreset, sanitizePresets } from "@kit/sweeps/sanitize";
 import { clonePreset, type PersistedRun, type PresetCatalog, type SweepPlan, type SweepPreset, type SweepRun } from "@kit/sweeps/types";
+import type { Bus } from "@kit/events/bus";
+import type { KitEvents, ParamSource, SweepStopReason } from "@kit/events/types";
 
 export { sanitizePreset };
 
@@ -77,6 +85,8 @@ export interface AppStoreConfig<P extends object, D extends object> {
   planner?: SweepPlanner<P>;
   defaultBackend?: BackendId;
   ui?: Partial<UiSettings>;
+  /** The event bus the actions emit on; <KitProvider bus> connects one too (connectBus). */
+  bus?: Bus<any>;
 }
 
 export interface KitState<P extends object, D extends object> {
@@ -109,9 +119,10 @@ export interface KitState<P extends object, D extends object> {
    * Persisted and exported; never read by the sweeps.
    */
   paramSettings: Record<string, ParamSettings>;
-  setParam: <K extends Extract<keyof P, string>>(key: K, value: P[K]) => void;
-  /** history: false skips the undo stack; sweep: true is a sweep tick (no history, not saved). */
-  setParams: (patch: Partial<P>, opts?: { history?: boolean; sweep?: boolean }) => void;
+  /** `source` (default "hand") is what param:changed reports. */
+  setParam: <K extends Extract<keyof P, string>>(key: K, value: P[K], source?: ParamSource) => void;
+  /** history: false skips the undo stack; sweep: true is a sweep tick (no history, not saved); source defaults to "sweep" for a tick and "hand" otherwise. */
+  setParams: (patch: Partial<P>, opts?: { history?: boolean; sweep?: boolean; source?: ParamSource }) => void;
   undo: () => void;
   redo: () => void;
   resetParams: () => void;
@@ -145,6 +156,9 @@ export interface KitState<P extends object, D extends object> {
   setParamSettings: (key: string, patch: ParamSettingsPatch) => void;
   /** Back to the defaults: one parameter's settings, or (without a key) every parameter's. */
   resetParamSettings: (key?: string) => void;
+  /** The bus the actions emit on (null: none, nothing is emitted). */
+  connectBus: (bus: Bus<any> | null) => void;
+  getBus: () => Bus<any> | null;
 }
 
 export type AppStore<P extends object, D extends object> = UseBoundStore<StoreApi<KitState<P, D>>>;
@@ -279,6 +293,24 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
     return sanitizeParams({ ...params, ...Object.fromEntries(runs.map((r) => [r.key, r.origin])) });
   })();
 
+  let bus: Bus<KitEvents> | null = cfg.bus ?? null;
+  const emit = <K extends keyof KitEvents & string>(name: K, payload: KitEvents[K]) => bus?.emit(name, payload);
+  /** param:changed for every parameter whose value differs between the two. */
+  const emitChanges = (prev: P, next: P, source: ParamSource) => {
+    if (!bus || prev === next) return;
+    for (const key of Object.keys(next)) {
+      const from = valueOf(prev, key);
+      const to = valueOf(next, key);
+      if (!Object.is(from, to)) emit("param:changed", { key, from, to, source });
+    }
+  };
+  /** sweep:stopped for every run that is gone. */
+  const emitStopped = (before: Record<string, SweepRun>, after: Record<string, SweepRun>, reason: SweepStopReason) => {
+    for (const key of Object.keys(before)) if (!(key in after)) emit("sweep:stopped", { key, reason });
+  };
+  /** The values of these parameters now. */
+  const valuesOf = (params: P, keys: string[]) => Object.fromEntries(keys.map((k) => [k, valueOf(params, k)]));
+
   return create<KitState<P, D>>()((set, get) => {
     const persist = (patch: Partial<Persisted>) => {
       const s = get();
@@ -312,23 +344,29 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
       past: [],
       future: [],
       paramSettings: sanitizeParamSettings(initial.paramSettings, schema),
-      setParam: (key, value) => {
+      setParam: (key, value, source = "hand") => {
         const v = schema.coerce(key, value);
         const prev = get().params;
         if (prev[key] === v) return;
         const params = { ...prev, [key]: v } as P;
+        const runsBefore = get().runs;
         const released = releaseSweeps([key]) ?? {};
         set({ params, past: pushHistory(get().past, prev), future: [], ...released });
         persist({ params });
+        emitStopped(runsBefore, get().runs, "edit");
+        emitChanges(prev, params, source);
       },
       setParams: (patch, opts) => {
         const prev = get().params;
         const params = sanitizeParams({ ...prev, ...patch });
+        const source: ParamSource = opts?.source ?? (opts?.sweep ? "sweep" : "hand");
         // A sweep tick is neither history nor saved: a reload restores the pre-sweep value instead.
         if (opts?.sweep) {
           set({ params });
+          emitChanges(prev, params, source);
           return;
         }
+        const runsBefore = get().runs;
         if (opts?.history === false) {
           set({ params });
         } else {
@@ -336,31 +374,42 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
           set({ params, past: pushHistory(get().past, prev), future: [], ...released });
         }
         persist({ params });
+        emitStopped(runsBefore, get().runs, "edit");
+        emitChanges(prev, params, source);
       },
       undo: () => {
         const { past, params, future } = get();
         if (!past.length) return;
         const prev = past[past.length - 1];
         // Undo takes the wheel: any sweep stops where history puts its input.
+        const runsBefore = get().runs;
         set({ params: prev, past: past.slice(0, -1), future: [params, ...future].slice(0, 100), runs: {} });
         persist({ params: prev });
+        emitStopped(runsBefore, {}, "undo");
+        emitChanges(params, prev, "undo");
       },
       redo: () => {
         const { past, params, future } = get();
         if (!future.length) return;
         const next = future[0];
+        const runsBefore = get().runs;
         set({ params: next, past: pushHistory(past, params), future: future.slice(1), runs: {} });
         persist({ params: next });
+        emitStopped(runsBefore, {}, "undo");
+        emitChanges(params, next, "redo");
       },
       resetParams: () => {
         const prev = get().params;
         persist({ params: defaults });
         set({ params: { ...defaults }, past: pushHistory(get().past, prev), future: [] });
+        emitChanges(prev, get().params, "reset");
       },
       setDataset: (kind, values) => {
         const datasets = cfg.datasets.sanitize({ ...get().datasets, [kind]: values });
         persist({ datasets });
         set({ datasets });
+        const list = (datasets as Record<string, unknown>)[kind];
+        emit("data:changed", { kind, count: Array.isArray(list) ? list.length : 0 });
       },
       setOverride: (id, patch) => {
         const prev = get().overrides[id] ?? {};
@@ -368,6 +417,7 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         const overrides = { ...get().overrides, [id]: merged };
         persist({ overrides });
         set({ overrides });
+        emit("chart:edited", { chartId: id });
       },
       applyStory: (id, story) => {
         const current = get().overrides[id];
@@ -385,17 +435,29 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         const prev = get().params;
         const storyPrev = { ...get().storyPrev };
         let params = prev;
+        // What to announce once the new state is set.
+        const cleared: KitEvents["story:cleared"][] = [];
+        let applied: KitEvents["story:applied"] | null = null;
         if (active) {
           // Turning a story off puts back the parameters it moved.
           const back = storyPrev[id];
+          const keys = Object.keys(back ?? {});
+          const on = valuesOf(params, keys);
           if (back) params = sanitizeParams({ ...params, ...back });
+          cleared.push({ chartId: id, storyId: story.id, before: on, after: valuesOf(params, keys) });
           delete storyPrev[id];
         } else if (story.params) {
+          if (current?.story) cleared.push({ chartId: id, storyId: current.story, before: {}, after: {} });
           // Only one deck-moving story is active at a time: turn the others off first and
           // restore what they moved, so the new snapshot is taken from clean parameters.
           for (const otherId of Object.keys(storyPrev)) {
             if (otherId === id) continue;
-            params = sanitizeParams({ ...params, ...storyPrev[otherId] });
+            const back = storyPrev[otherId];
+            const keys = Object.keys(back);
+            const on = valuesOf(params, keys);
+            params = sanitizeParams({ ...params, ...back });
+            const otherStory = get().overrides[otherId]?.story;
+            if (otherStory) cleared.push({ chartId: otherId, storyId: otherStory, before: on, after: valuesOf(params, keys) });
             delete storyPrev[otherId];
             delete overrides[otherId];
           }
@@ -404,16 +466,25 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
           for (const k of Object.keys(story.params)) if (!(k in snap)) (snap as Record<string, unknown>)[k] = valueOf(params, k);
           storyPrev[id] = snap;
           params = sanitizeParams({ ...params, ...story.params });
+          applied = { chartId: id, storyId: story.id, label: story.label, before: { ...snap }, after: valuesOf(params, Object.keys(snap)) };
         } else {
           // A story that only re-defines the chart replaces a deck-moving one on the same chart.
           const back = storyPrev[id];
+          const keys = Object.keys(back ?? {});
+          const on = valuesOf(params, keys);
           if (back) params = sanitizeParams({ ...params, ...back });
+          if (current?.story) cleared.push({ chartId: id, storyId: current.story, before: on, after: valuesOf(params, keys) });
           delete storyPrev[id];
+          applied = { chartId: id, storyId: story.id, label: story.label, before: {}, after: {} };
         }
         persist({ overrides, params, storyPrev });
         set({ overrides, params, storyPrev, ...(params !== prev ? { past: pushHistory(get().past, prev), future: [] } : {}) });
+        for (const c of cleared) emit("story:cleared", c);
+        if (applied) emit("story:applied", applied);
+        emitChanges(prev, params, "story");
       },
       clearOverride: (id) => {
+        const was = get().overrides[id];
         const overrides = { ...get().overrides };
         delete overrides[id];
         const storyPrev = { ...get().storyPrev };
@@ -423,24 +494,36 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         const params = back ? sanitizeParams({ ...prev, ...back }) : prev;
         persist({ overrides, params, storyPrev });
         set({ overrides, params, storyPrev, ...(params !== prev ? { past: pushHistory(get().past, prev), future: [] } : {}) });
+        if (was?.story) emit("story:cleared", { chartId: id, storyId: was.story, before: valuesOf(prev, Object.keys(back ?? {})), after: valuesOf(params, Object.keys(back ?? {})) });
+        if (was) emit("chart:edited", { chartId: id, reset: true });
+        emitChanges(prev, params, "story");
       },
       clearAllOverrides: () => {
         const prev = get().params;
+        const was = get().overrides;
+        const snaps = get().storyPrev;
         let params = prev;
-        for (const back of Object.values(get().storyPrev)) params = { ...params, ...back };
+        for (const back of Object.values(snaps)) params = { ...params, ...back };
         params = params === prev ? prev : sanitizeParams(params);
         persist({ overrides: {}, params, storyPrev: {} });
         set({ overrides: {}, params, storyPrev: {}, ...(params !== prev ? { past: pushHistory(get().past, prev), future: [] } : {}) });
+        for (const [chartId, o] of Object.entries(was)) {
+          if (o.story) emit("story:cleared", { chartId, storyId: o.story, before: valuesOf(prev, Object.keys(snaps[chartId] ?? {})), after: valuesOf(params, Object.keys(snaps[chartId] ?? {})) });
+          emit("chart:edited", { chartId, reset: true });
+        }
+        emitChanges(prev, params, "story");
       },
       setDefaultBackend: (b) => {
         persist({ defaultBackend: b });
         set({ defaultBackend: b });
+        emit("settings:changed", { what: "backend" });
       },
       setAuthoringOpen: (authoringOpen) => set({ authoringOpen }),
       setUi: (patch) => {
         const ui = sanitizeUi({ ...get().ui, ...patch });
         persist({ ui });
         set({ ui });
+        emit("settings:changed", { what: "ui" });
       },
       setActiveInput: (activeInput) => set({ activeInput }),
       upsertPreset: (p) => {
@@ -453,9 +536,11 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
       deletePreset: (id) => {
         const presets = get().presets.filter((p) => p.id !== id);
         const links = Object.fromEntries(Object.entries(get().links).filter(([, v]) => v !== id));
-        const runs = Object.fromEntries(Object.entries(get().runs).filter(([, r]) => r.presetId !== id));
+        const runsBefore = get().runs;
+        const runs = Object.fromEntries(Object.entries(runsBefore).filter(([, r]) => r.presetId !== id));
         persist({ presets, links });
         set({ presets, links, runs });
+        emitStopped(runsBefore, runs, "preset");
       },
       linkPreset: (key, presetId) => {
         const links = { ...get().links };
@@ -470,6 +555,7 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
             const runs = { ...get().runs };
             delete runs[key];
             set({ runs });
+            emit("sweep:stopped", { key, reason: "preset" });
           }
         }
         persist({ links });
@@ -499,6 +585,7 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         const history = existing ? {} : { past: [...s.past, s.params].slice(-100), future: [] as P[] };
         set({ links, runs, sweepOrigins, ...history });
         persist({ links });
+        emit("sweep:started", { key, presetId: id, resumed: false });
       },
       pauseSweep: (key) => {
         const r = get().runs[key];
@@ -506,12 +593,15 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         set({ runs: { ...get().runs, [key]: { ...r, startedAt: null } } });
         // While paused the value is on screen to inspect; save it (a reload still restores the pre-sweep value).
         persist({});
+        emit("sweep:paused", { key });
       },
       toggleSweep: (key) => {
         const r = get().runs[key];
         if (!r) get().startSweep(key);
-        else if (r.startedAt == null) set({ runs: { ...get().runs, [key]: { ...r, startedAt: now() } } });
-        else get().pauseSweep(key);
+        else if (r.startedAt == null) {
+          set({ runs: { ...get().runs, [key]: { ...r, startedAt: now() } } });
+          emit("sweep:started", { key, presetId: r.presetId, resumed: true });
+        } else get().pauseSweep(key);
       },
       stopSweep: (key) => {
         if (!get().runs[key]) return;
@@ -520,6 +610,7 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         set({ runs });
         // Stop keeps the value: save it now, since the ticks were not saved.
         persist({});
+        emit("sweep:stopped", { key, reason: "stop" });
       },
       restoreSweep: (key) => {
         const s = get();
@@ -540,6 +631,8 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         const moved = keys.some((k) => valueOf(params, k) !== valueOf(prev, k));
         set({ runs, sweepOrigins, params, ...(moved ? { past: [...s.past, prev].slice(-100), future: [] } : {}) });
         persist({ params });
+        emitStopped(s.runs, runs, "restore");
+        emitChanges(prev, params, "sweep");
       },
       setRunIndex: (key, index) => {
         const r = get().runs[key];
@@ -547,7 +640,8 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         set({ runs: { ...get().runs, [key]: { ...r, index } } });
       },
       pauseAll: () => {
-        const runs = { ...get().runs };
+        const was = get().runs;
+        const runs = { ...was };
         const anyRunning = Object.values(runs).some((r) => r.startedAt != null);
         for (const k of Object.keys(runs)) {
           const r = runs[k];
@@ -555,21 +649,29 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         }
         set({ runs });
         if (anyRunning) persist({});
+        for (const k of Object.keys(runs)) {
+          if (anyRunning && was[k].startedAt != null) emit("sweep:paused", { key: k });
+          else if (!anyRunning) emit("sweep:started", { key: k, presetId: runs[k].presetId, resumed: true });
+        }
       },
       exportState: () => {
         const s = get();
         return { version: cfg.version, exportedAt: new Date().toISOString(), params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui, storyPrev: s.storyPrev, paramSettings: s.paramSettings };
       },
       importState: (text) => {
+        const refuse = (error: string) => {
+          emit("state:imported", { ok: false, error });
+          return { ok: false as const, error };
+        };
         let parsed: unknown;
         try {
           parsed = JSON.parse(text);
         } catch (e) {
-          return { ok: false, error: `Not valid JSON: ${(e as Error).message}` };
+          return refuse(`Not valid JSON: ${(e as Error).message}`);
         }
-        if (!parsed || typeof parsed !== "object") return { ok: false, error: "Expected a JSON object." };
+        if (!parsed || typeof parsed !== "object") return refuse("Expected a JSON object.");
         const obj = parsed as Partial<ExportedState<P, D>>;
-        if (!obj.params || typeof obj.params !== "object") return { ok: false, error: 'Missing a "params" object.' };
+        if (!obj.params || typeof obj.params !== "object") return refuse('Missing a "params" object.');
         const params = sanitizeParams(obj.params);
         const overrides = sanitizeOverrides(obj.overrides);
         const datasets = cfg.datasets.sanitize(obj.datasets ?? get().datasets);
@@ -580,8 +682,13 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         const storyPrev = sanitizeStoryPrev(obj.storyPrev, overrides);
         // An export from before parameter settings existed keeps the current ones.
         const paramSettings = obj.paramSettings !== undefined ? sanitizeParamSettings(obj.paramSettings, schema) : get().paramSettings;
+        const prev = get().params;
+        const runsBefore = get().runs;
         set({ params, overrides, defaultBackend: backend, datasets, presets, links, ui, storyPrev, paramSettings, runs: {}, sweepOrigins: {} });
         save({ params, overrides, defaultBackend: backend, datasets, presets, links, ui, storyPrev, paramSettings, runs: [] });
+        emitStopped(runsBefore, {}, "import");
+        emitChanges(prev, params, "import");
+        emit("state:imported", { ok: true });
         return { ok: true };
       },
       resetEverything: () => {
@@ -590,7 +697,12 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         } catch {
           /* ignore */
         }
+        const prev = get().params;
+        const runsBefore = get().runs;
         set({ params: { ...defaults }, overrides: {}, defaultBackend, datasets: cfg.datasets.empty, presets: defaultPresets(), links: {}, runs: {}, sweepOrigins: {}, storyPrev: {}, ui: { ...defaultUi }, paramSettings: {} });
+        emitStopped(runsBefore, {}, "reset");
+        emitChanges(prev, get().params, "reset");
+        emit("state:reset", {});
       },
 
       // ---- parameter settings (kit/inputs/paramSettings.ts): the manual feel, not the replayer's ----
@@ -603,13 +715,21 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         else delete paramSettings[key];
         persist({ paramSettings });
         set({ paramSettings });
+        emit("settings:changed", { what: "param", key });
       },
       resetParamSettings: (key) => {
         const paramSettings = key ? { ...get().paramSettings } : {};
         if (key) delete paramSettings[key];
         persist({ paramSettings });
         set({ paramSettings });
+        emit("settings:changed", key ? { what: "param", key } : { what: "param" });
       },
+
+      // ---- the event bus ----
+      connectBus: (next) => {
+        bus = next;
+      },
+      getBus: () => bus,
     };
   });
 }

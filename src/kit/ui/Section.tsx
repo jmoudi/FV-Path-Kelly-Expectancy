@@ -61,7 +61,7 @@ export function ActionButton({ a }: { a: Action }) {
           type="button"
           className="btn small"
           onClick={() => {
-            setParams(a.patch);
+            setParams(a.patch, { source: "action" });
             setConfirm(false);
           }}
         >
@@ -75,7 +75,7 @@ export function ActionButton({ a }: { a: Action }) {
   }
   return (
     <span className="actions">
-      <button type="button" className="action-link" onClick={() => (a.warning ? setConfirm(true) : setParams(a.patch))}>
+      <button type="button" className="action-link" onClick={() => (a.warning ? setConfirm(true) : setParams(a.patch, { source: "action" }))}>
         {a.label}
       </button>
       {a.hint && <span className="hint">{a.hint}</span>}

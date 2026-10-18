@@ -1,10 +1,10 @@
 import { f, table, tableSpec, type ChartSpec, type Row, type SeriesSpec, type Story } from "@kit/charts/spec";
 import { seasonLogGrowth, seasonRuin } from "@app/model/kelly";
-import type { Datasets } from "@app/params/datasets";
-import type { Params } from "@app/params/params";
+import type { Datasets } from "@app/model/datasets";
+import type { Params } from "@app/model/params";
 import { POLICY_IDS, type PolicyId } from "@app/model/policies";
 import { samplePaths, scheduleDistribution, summarize, type Distribution } from "@app/model/season";
-import { fig } from "./discussion";
+import { fig } from "@app/data/discussion";
 import type { Derived } from "./derived";
 import { movesDeck, near } from "@kit/charts/scenario";
 import { pct, pct1, signedPct1, smallPct, x2 } from "@kit/charts/numbers";

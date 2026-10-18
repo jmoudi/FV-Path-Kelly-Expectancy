@@ -1,7 +1,7 @@
 /**
  * Generic pieces of the app shell, lifted out of App.tsx: the sections page's scroll spy,
  * the [ / ] keys between views (when the app has them) and the crash screen. The app
- * keeps its own top bar and page switch (src/app/App.tsx) and composes these.
+ * keeps its own top bar and page switch (src/app/view/App.tsx) and composes these.
  */
 import { useEffect, useState } from "react";
 import { useKit } from "@kit/state/context";
@@ -28,22 +28,23 @@ export function useScrollSpy(ids: string[], enabled: boolean, prefix = "s-"): st
 }
 
 /**
- * Plain [ and ] step to the previous or next view, in reading order, from any page.
- * Not while focus is in an editable field or a select (typing wins there), not with
- * Ctrl or ⌘ (those cycle sweep presets), and not while a dialog is open.
+ * Plain [ and ] step to the previous or next view of `order` (the views' reading order,
+ * from the view-model), from any page. Not while focus is in an editable field or a
+ * select (typing wins there), not with Ctrl or ⌘ (those cycle sweep presets), and not
+ * while a dialog is open.
  */
-export function useViewKeys(blocked: boolean) {
+export function useViewKeys(blocked: boolean, order: readonly string[]) {
   useEffect(() => {
     if (blocked) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.ctrlKey || e.metaKey || (e.key !== "[" && e.key !== "]")) return;
       const el = document.activeElement;
       if (isEditableTarget(el) || el?.tagName === "SELECT") return;
-      if (stepView(e.key === "]" ? 1 : -1)) e.preventDefault();
+      if (stepView(order, e.key === "]" ? 1 : -1)) e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [blocked]);
+  }, [blocked, order]);
 }
 
 /** What the whole app shows when rendering throws: the error, a retry, and a reset of the saved state. */

@@ -5,38 +5,31 @@ import { useKit, useKitApi, useKitSweeps } from "@kit/state/context";
 import { nextIndex } from "./engine";
 import { planWith } from "./adapter";
 import type { SweepPlan } from "./types";
+import { IS_MAC as mac } from "./hotkeys";
+import { useBus } from "@kit/events/react";
 
-const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
-const mod = mac ? "⌘" : "Ctrl";
-
-export const HOTKEY_HINTS = {
-  toggle: `${mod}+Enter`,
-  stop: `${mod}+.`,
-  prev: `${mod}+[`,
-  next: `${mod}+]`,
-  all: `${mod}+Shift+Enter`,
-  undo: `${mod}+Z`,
-  redo: `${mod}+Shift+Z`,
-};
+// The key names live in a React-free module so copy can import them; re-exported here for the frames.
+export { HOTKEY_HINTS } from "./hotkeys";
 
 function holdOf(plan: SweepPlan, index: number): number {
   return plan.holds[Math.max(0, index)] ?? plan.holds[0] ?? 400;
 }
 
-/** One cursor per running run, keyed by input; a new start or a resume gets a fresh one. */
-const cursors = new Map<string, { cursor: Cursor; startedAt: number }>();
-
 /**
  * Drives every running sweep, locked to the page's frames: the next value is
  * committed only after the build for the previous one has rendered (useBuild's
  * `buildSettled`), and each value stays on screen at least its hold time, divided by
- * the sweep rate in Settings.
+ * the sweep rate in Settings. Each committed value is announced as sweep:stepped on the
+ * bus (the parameter itself as param:changed with source "sweep", by the store).
  */
 export function useSweepEngine() {
   const api = useKitApi();
   const sweeps = useKitSweeps();
+  const bus = useBus();
   useEffect(() => {
     let raf = 0;
+    /** One cursor per running run, keyed by input; a new start or a resume gets a fresh one. */
+    const cursors = new Map<string, { cursor: Cursor; startedAt: number }>();
     const settledSince = (t: number) => sweeps.settledSince(t);
     const tick = () => {
       raf = requestAnimationFrame(tick);
@@ -51,7 +44,7 @@ export function useSweepEngine() {
       const speed = Math.max(0.05, s.ui.sweepSpeed || 1);
       const opts = { ...RUNNER_DEFAULTS, minSpacingMs: 1000 / Math.max(1, s.ui.sweepHz) };
       const patch: Record<string, number> = {};
-      const moves: [string, number][] = [];
+      const moves: [string, number, number][] = [];
       for (const r of running) {
         const plan = r.plan as SweepPlan;
         const current = s.params[r.key];
@@ -69,7 +62,7 @@ export function useSweepEngine() {
         if (!due(entry.cursor, now, holdOf(plan, r.index) / speed, settledSince, opts)) continue;
         const next = nextIndex(plan, r.index);
         const v = plan.values[next];
-        moves.push([r.key, next]);
+        moves.push([r.key, next, v]);
         if (v !== current) {
           patch[r.key] = v;
           committed(entry.cursor, now);
@@ -77,10 +70,11 @@ export function useSweepEngine() {
       }
       for (const [k, i] of moves) s.setRunIndex(k, i);
       if (Object.keys(patch).length) s.setParams(patch, { sweep: true });
+      for (const [key, index, value] of moves) bus.emit("sweep:stepped", { key, index, value });
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [api, sweeps]);
+  }, [api, sweeps, bus]);
 }
 
 /** Focus is in a field where the browser's own undo and typing belong. */

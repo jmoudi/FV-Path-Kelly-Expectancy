@@ -1,11 +1,11 @@
 import { f, table, tableSpec, type Annotation, type ChartSpec, type Row, type Story } from "@kit/charts/spec";
 import { eventsForTest, eventsToResolve, eventsUntilUpperBelow, observedRatePmf, wilsonInterval } from "@app/model/calibration";
-import type { Datasets } from "@app/params/datasets";
-import type { Params } from "@app/params/params";
+import type { Datasets } from "@app/model/datasets";
+import type { Params } from "@app/model/params";
 import { summarize, type Distribution } from "@app/model/season";
 import { linspace, logspace, normalQuantile } from "@kit/math/stats";
 import { evMatchingStake, symmetricKelly, symmetricSeasonDistribution } from "@app/model/symmetric";
-import { fig } from "./discussion";
+import { fig } from "@app/data/discussion";
 import { fmtInt, pct, pct1, pct2, x2, years } from "@kit/charts/numbers";
 import { movesDeck, near } from "@kit/charts/scenario";
 import type { Derived } from "./derived";

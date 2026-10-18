@@ -5,7 +5,7 @@ import { buildAll, type BuildInput, type BuildResult } from "@app/scenarios";
 
 /**
  * The rendered signal a frame-locked sweep waits on, holding the last result (the
- * sweep anchors read its deck figures). Was `buildSettled` in src/ui/useBuild.ts.
+ * sweep anchors read its deck figures). Was `buildSettled` in the old useBuild.
  */
 export const BUILD_SETTLED = new SettleTracker<BuildResult>();
 

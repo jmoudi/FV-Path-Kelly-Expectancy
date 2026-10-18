@@ -43,13 +43,13 @@ inputs), `Segmented` (a radio-group switch with an optional hint line per option
 
 The frame's classes are `dkb-*`, `lv-*` and `seg-*`; they live in `deck.css` beside
 these files, imported by the module that mounts the deck (in this app
-`src/app/deck/DeckBar.tsx`). Sizes come from the
+`src/app/view/deck/DeckBar.tsx`). Sizes come from the
 theme's type tokens (`--fs-label`, `--fs-ui`, `--fs-body`, `--fs-h`, `--fs-kpi`) and
 colours from its colour tokens.
 
 ## Using it in another explainer
 
 Write a provider that turns your parameter schema and your view-model's deck figures
-into these props (this app's is `src/app/deck/useDeckProps.tsx`, with the pure parts
+into these props (this app's is `src/app/view/deck/useDeckProps.tsx`, with the pure parts
 in `layout.ts` and `status.ts`), and mount `<Deck {...props} expanded … />` under the
 top bar.

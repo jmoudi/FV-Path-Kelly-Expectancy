@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useBus } from "@kit/events/react";
 
 /**
  * Hash routes. Two shapes are built in, because kit frames link to them: a view page
@@ -6,6 +7,9 @@ import { useEffect, useState } from "react";
  * pages, its landing page (also the default for an empty or unknown hash) and any
  * aliases in a RouteConfig, a module constant it passes to useRoute. A page's part is
  * #<page>/<part> (a section of the guide page: #guide/keys).
+ *
+ * The shell calls useRoute once; every move to another route is announced as
+ * route:changed on the event bus, so nothing else needs its own hashchange listener.
  */
 export interface Route {
   page: string;
@@ -49,24 +53,25 @@ export function hrefFor(r: Route, cfg: RouteConfig): string {
   return `#${r.page}`;
 }
 
+const sameRoute = (a: Route, b: Route) => a.page === b.page && a.id === b.id && a.section === b.section;
+
+/** The route in the address, kept current; call it once, in the shell (route:changed tells everyone else). */
 export function useRoute(cfg: RouteConfig): Route {
+  const bus = useBus();
   const [route, setRoute] = useState<Route>(() => parseHash(typeof location !== "undefined" ? location.hash : "", cfg));
+  const current = useRef(route);
   useEffect(() => {
-    const on = () => setRoute(parseHash(location.hash, cfg));
+    const on = () => {
+      const from = current.current;
+      const to = parseHash(location.hash, cfg);
+      current.current = to;
+      setRoute(to);
+      if (!sameRoute(from, to)) bus.emit("route:changed", { from, to });
+    };
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
-  }, [cfg]);
+  }, [cfg, bus]);
   return route;
-}
-
-/*
- * The reading order of the views, registered by the app once the view-model exists,
- * so a key handler can step through them without knowing the view-model.
- */
-let viewOrder: string[] = [];
-
-export function setViewOrder(ids: string[]): void {
-  viewOrder = ids.slice();
 }
 
 /** The view open now, from the hash, or null on any other page. */
@@ -75,17 +80,20 @@ function currentViewId(): string | null {
   return m ? m[1] : null;
 }
 
-/** The view one step before or after the current page (from a non-view page: the first or the last). */
-export function neighbourView(dir: 1 | -1, current: string | null = currentViewId()): string | null {
-  if (!viewOrder.length) return null;
-  const i = current != null ? viewOrder.indexOf(current) : -1;
-  if (i < 0) return dir === 1 ? viewOrder[0] : viewOrder[viewOrder.length - 1];
-  return viewOrder[(i + dir + viewOrder.length) % viewOrder.length];
+/**
+ * The view one step before or after the current page in `order` (the views' reading
+ * order, from the view-model), or from a non-view page the first or the last.
+ */
+export function neighbourView(order: readonly string[], dir: 1 | -1, current: string | null = currentViewId()): string | null {
+  if (!order.length) return null;
+  const i = current != null ? order.indexOf(current) : -1;
+  if (i < 0) return dir === 1 ? order[0] : order[order.length - 1];
+  return order[(i + dir + order.length) % order.length];
 }
 
-/** Go to the neighbouring view. Returns false when there is none. */
-export function stepView(dir: 1 | -1): boolean {
-  const id = neighbourView(dir);
+/** Go to the neighbouring view in `order`. Returns false when there is none. */
+export function stepView(order: readonly string[], dir: 1 | -1): boolean {
+  const id = neighbourView(order, dir);
   if (!id) return false;
   location.hash = viewHref(id);
   return true;

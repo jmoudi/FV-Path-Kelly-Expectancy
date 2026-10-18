@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { deckLayout } from "@app/deck/layout";
-import { deckDefinitions, deckFigureRows, deckLegend, deckStatus } from "@app/deck/status";
-import { DEFAULT_PARAMS } from "@app/params/params";
+import { deckLayout } from "@app/view/deck/layout";
+import { deckDefinitions, deckFigureRows, deckLegend, deckStatus } from "@app/view/deck/status";
+import { DEFAULT_PARAMS } from "@app/data/params";
 import { inputConfig } from "@kit/inputs/schema";
-import { PARAM_BY_KEY, PARAM_DEFS } from "@app/params/schema";
+import { PARAM_BY_KEY, PARAM_DEFS } from "@app/data/schema";
 import { buildAll } from "@app/scenarios";
 
 describe("deck layout from the schema", () => {
