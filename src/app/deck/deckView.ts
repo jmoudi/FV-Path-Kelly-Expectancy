@@ -3,14 +3,14 @@ import { medianGrowthPerSeason } from "@app/model/growth";
 import type { Params } from "@app/params/params";
 import { POLICY_IDS, POLICY_LEGEND, type PolicyId, type PolicyMeta } from "@app/model/policies";
 import type { Distribution, Summary } from "@app/model/season";
-import { pct, pct1, pct2, x2, signedPct1, signedPp, smallPct } from "@kit/charts/numbers";
+import { pct, pct1, pct2, probPct, x2, signedPct1, signedPp, smallPct } from "@kit/charts/numbers";
 import type { MarketState, Derived } from "@app/scenarios/derived";
 
 // ---------------------------------------------------------------------------
 // What the control deck shows.
 // ---------------------------------------------------------------------------
 
-/** One figure in the deck's figure table: label, basis, a formatted value, a policy colour. */
+/** One figure in the deck's figure table: label, basis, a formatted value, and the policy it belongs to (if one) as a colour role. */
 export interface DeckFigure {
   id: string;
   label: string;
@@ -103,7 +103,7 @@ export function deckView(d: Derived, p: Params): DeckView {
     logGrowth: d.growthYours,
     ruinPerSeason: d.ruinYours,
     medianGrowthPerSeason: medianGrowth,
-    text: { ev: signedPct1(s1.mean - 1), median: x2(sN.median), pBelow: pct(sN.pBelow), ruin: smallPct(sN.pRuin), logGrowth: signedPct1(d.growthYours), medianGrowth: signedPct1(medianGrowth) },
+    text: { ev: signedPct1(s1.mean - 1), median: x2(sN.median), pBelow: probPct(sN.pBelow), ruin: probPct(sN.pRuin), logGrowth: signedPct1(d.growthYours), medianGrowth: signedPct1(medianGrowth) },
   };
   const coinRuin = 1 - d.pClean;
   const seasonsWord = `${N} season${N === 1 ? "" : "s"}`;
@@ -116,7 +116,7 @@ export function deckView(d: Derived, p: Params): DeckView {
     { id: "median-spread", label: `Median, ${spreadName}`, basis: `${d.byId.spread.detail} · ruin ${smallPct(spread1.pRuin)}`, value: x2(spread1.median), color: "b", help: "Typical season end with the names split over the whole tranche, no reserve." },
     { id: "growth", label: `Log growth of surviving paths, ${yoursDef.name}`, basis: `${yoursDef.detail} · ruin ${smallPct(d.ruinYours)} a season`, value: signedPct1(d.growthYours), color: "c", help: "E[log end | the tranche survives] per season under your policy. Always read next to the ruin probability." },
     { id: "median-growth", label: `Median growth per season, ${yoursDef.name}`, basis: `median after ${seasonsWord} ${x2(sN.median)} → ^(1/${N}) − 1`, value: signedPct1(medianGrowth), color: "c", help: "The rate the middle path compounds at: median_N^(1/N) − 1." },
-    { id: "robust", label: "Robust risk a night", basis: `you risk ${pct(p.riskPerNight)} · growth-optimal at the deck's rate ${pct(d.nightKelly.risk)} · Kelly per name ${pct1(d.kelly)}`, value: pct(d.robust.risk), color: "c", help: `Risk per night that maximises growth averaged over a loss rate drawn ${d.bandLabel}.` },
+    { id: "robust", label: "Robust risk a night", basis: `you risk ${pct(p.riskPerNight)} · growth-optimal at the deck's rate ${pct(d.nightKelly.risk)} · Kelly per name ${pct1(d.kelly)}`, value: pct(d.robust.risk), help: `Risk per night that maximises growth averaged over a loss rate drawn ${d.bandLabel}.` },
     { id: "median-N", label: `Median after ${seasonsWord}, ${yoursDef.name}`, basis: `P(below ${x2(p.thresholdBelow)}) ${pct(sN.pBelow)} · ruin ${smallPct(sN.pRuin)}`, value: x2(sN.median), color: "c", help: "Where the middle path of your policy stands after the seasons chained in the deck." },
   ];
   const definitions = [

@@ -1,14 +1,14 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import type { FigureItem } from "./types";
 
-/** One figure: the value large and tabular, the label small underneath, the basis muted. */
+/** One figure: the value large, tabular and in ink, the label small underneath (after a policy dot when it has one), the basis muted. */
 export function Figure({ item, hero }: { item: FigureItem; hero?: boolean }) {
   return (
     <div className={`k-fig${hero ? " hero" : ""}`} role="group" aria-label={item.label}>
-      <div className="k-fig-v" style={item.tone ? { color: item.tone } : undefined} title={item.value}>
+      <div className="k-fig-v" title={item.value}>
         {item.value}
       </div>
-      <div className="k-fig-l">
+      <div className={`k-fig-l${item.dot ? " dot" : ""}`} style={item.dot ? ({ "--tone": item.dot } as CSSProperties) : undefined}>
         <span>{item.label}</span>
         {item.help}
       </div>

@@ -36,10 +36,10 @@ export function deckStatus(deck: DeckView | null, p: Params): DeckStatus {
     tooltip: "Your policy: the figures beside it describe it. The other two policies are in the legend and in the full deck.",
   };
   const status: Figure[] = [
-    { id: "ev", label: "EV per season", value: y?.text.ev ?? "", color, title: "Expected value per season: mean season end − 1. The average over a pool of replays, not what one tranche earns." },
-    { id: "median", label: `median after ${seasons}`, value: y?.text.median ?? "", color, title: `The season end that half of the paths beat after ${seasons} chained without refilling.` },
-    { id: "below", label: below, value: y?.text.pBelow ?? "", color, title: `Probability of ending below ${x2(threshold)} of the starting tranche after ${seasons}.` },
-    { id: "ruin", label: "ruin", value: y?.text.ruin ?? "", color, title: `Probability that the tranche is wiped out within ${seasons}.` },
+    { id: "ev", label: "EV per season", value: y?.text.ev ?? "", title: "Expected value per season: mean season end − 1. The average over a pool of replays, not what one tranche earns." },
+    { id: "median", label: `median after ${seasons}`, value: y?.text.median ?? "", title: `The season end that half of the paths beat after ${seasons} chained without refilling.` },
+    { id: "below", label: below, value: y?.text.pBelow ?? "", title: `Probability of ending below ${x2(threshold)} of the starting tranche after ${seasons}.` },
+    { id: "ruin", label: "ruin", value: y?.text.ruin ?? "", title: `Probability that the tranche is wiped out within ${seasons}.` },
   ];
   const note = deck?.coin.text ?? `${POLICY_META.coin.name}: clean season … · ruin …`;
   return { lead, status, note };

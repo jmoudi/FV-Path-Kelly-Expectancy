@@ -68,11 +68,14 @@ export interface SeriesSpec {
   color: ColorRole;
   mark?: MarkType;
   emphasis?: Emphasis;
-  dash?: boolean;
+  /** true: dashed; "dot": dotted. Ordered scenarios of one policy share its colour and differ by dash. */
+  dash?: boolean | "dot";
   /** Optional separate x column for this series. */
   xField?: string;
   /** Hide from legend (e.g. the 40 paths of a fan). */
   legend?: boolean;
+  /** false: no hover readout for this series (the 40 paths of a fan would list as forty alike rows). */
+  tooltip?: boolean;
   /** Line width hint in px. */
   width?: number;
   /** Per-row colours for bar marks on a categorical axis (one per category). */

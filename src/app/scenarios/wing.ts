@@ -73,7 +73,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
   const density: ChartSpec = {
     id: "wing-density",
     title: "The realized move against the short wing",
-    subtitle: `x move toward the short strike, priced sigmas · y density (log) · ${dist} realized at ${ratio(p.realizedRatio)} the priced sigma · red band = wing${empiricalWanted && !haveMoves ? " · no moves imported yet, showing the Normal" : ""}`,
+    subtitle: `x move toward the short strike, priced sigmas · y density (log) · ${dist} realized at ${ratio(p.realizedRatio)} the priced sigma${empiricalWanted && !haveMoves ? " · no moves imported yet, showing the Normal" : ""}`,
     kind: "xy",
     data: table([f("x", "Move toward the short strike, priced sigmas", "x2"), f("density", "Density", "num"), f("payout", "Payout per unit width", "pct")], densRows),
     mark: "area",
@@ -83,8 +83,8 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
     height: 280,
     annotations: [
       { kind: "xband", x: p.strikeDistance, x2: dEnd, text: "wing: partial loss inside, full loss beyond", color: "loss" },
-      { kind: "vline", x: p.strikeDistance, text: "short strike", color: "loss", at: "start" },
-      { kind: "vline", x: dEnd, text: "long strike", color: "loss", at: "start" },
+      { kind: "vline", x: p.strikeDistance, text: "short strike", color: "muted", at: "start" },
+      { kind: "vline", x: dEnd, text: "long strike", color: "muted", at: "start" },
     ],
     stories: densityStories,
   };
@@ -96,7 +96,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
   const payout: ChartSpec = {
     id: "wing-payout",
     title: "Payout per unit width",
-    subtitle: "x move toward the short strike, priced sigmas · y payout per unit width · green line = credit · 100% = the full loss the binary model assumes",
+    subtitle: "x move toward the short strike, priced sigmas · y payout per unit width · 100% = the full loss the binary model assumes",
     kind: "xy",
     data: table([f("x", "Move toward the short strike, priced sigmas", "x2"), f("payout", "Payout per unit width", "pct")], rampRows),
     mark: "line",
@@ -119,16 +119,16 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
   const sweep: ChartSpec = {
     id: "wing-sweep",
     title: "Three candidate rates against the short-strike distance",
-    subtitle: "x short strike distance, priced sigmas · y rate per event (log) · breach, effective, full gap · red = fair c ÷ W · white = deck q · line = your strike",
+    subtitle: "x short strike distance, priced sigmas · y rate per event (log)",
     kind: "xy",
     data: table([f("d", "Short strike distance, priced sigmas", "x2"), f("breach", "Breach rate", "pct2"), f("effective", "Effective rate", "pct2"), f("fullGap", "Full-gap rate", "pct2")], sweepRows),
     mark: "line",
     x: { field: "d", format: "x2", domain: [1, 3.5] },
     y: { field: "effective", label: "Rate per event", scale: "log", format: "pct1", domain: [1e-5, 1] },
     series: [
-      { field: "breach", color: "ramp1", label: "Breach: P(move > short strike)" },
+      { field: "breach", color: "ramp3", label: "Breach: P(move > short strike)" },
       { field: "effective", color: "ink", label: "Effective: E[payout] ÷ width", emphasis: "strong" },
-      { field: "fullGap", color: "ramp3", label: "Full gap: P(move > long strike)" },
+      { field: "fullGap", color: "ramp4", label: "Full gap: P(move > long strike)" },
     ],
     height: 300,
     annotations: [
@@ -141,7 +141,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
   const bars: ChartSpec = {
     id: "wing-bars",
     title: "The three rates at your strikes",
-    subtitle: "x candidate rate · y rate per event · red = fair c ÷ W · white = deck q",
+    subtitle: "x candidate rate · y rate per event",
     kind: "xy",
     data: table(
       [f("rate", "Rate"), f("value", "Rate per event", "pct2")],
@@ -154,12 +154,13 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
     mark: "bar",
     x: { field: "rate", categorical: true },
     y: { field: "value", label: "Rate per event", format: "pct1" },
-    series: [{ field: "value", color: "ink", label: "Rate per event", colors: ["ramp1", "ink", "ramp3"] }],
+    series: [{ field: "value", color: "ink", label: "Rate per event", colors: ["ramp3", "ink", "ramp4"] }],
     legend: false,
     height: 240,
     annotations: [
       { kind: "hline", y: r.fairRate, text: `fair c ÷ W ${pct2(r.fairRate)}`, color: "loss", at: "end" },
-      { kind: "hline", y: q, text: `deck q ${pct2(q)}`, color: "ink", at: "start" },
+      // At the end, clear of the tall breach bar on the left.
+      { kind: "hline", y: q, text: `deck q ${pct2(q)}`, color: "ink", at: "end" },
     ],
   };
 
@@ -213,11 +214,12 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
     });
     return row;
   });
-  const widthColors: ColorRole[] = ["ramp1", "ramp2", "ramp3"];
+  // Your wing is the deck's, so it is the ink line; the alternatives are grey, lighter for narrower.
+  const widthColors: ColorRole[] = ["ramp2", "ramp3", "ramp4"];
   const seasonSeries: SeriesSpec[] = seasonByWidth.map((s, i) => {
     const std = standardWidths.indexOf(s.width);
     const isYours = s.width === yourWidth;
-    return { field: `w${i}`, color: std >= 0 ? widthColors[std] : "ink", label: `${sigma(s.width)} wide${isYours ? " (your wing)" : ""}`, emphasis: isYours ? "strong" : "normal" };
+    return { field: `w${i}`, color: isYours || std < 0 ? "ink" : widthColors[std], label: `${sigma(s.width)} wide${isYours ? " (your wing)" : ""}`, emphasis: isYours ? "strong" : "normal" };
   });
   const partialText = (s: (typeof seasonByWidth)[number]) => (s.partial == null ? "no bad seasons" : pct(s.partial));
   const seasonStories: Story[] = [];
@@ -242,7 +244,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
   const wingSeason: ChartSpec = {
     id: "wing-season",
     title: "Where a season ends when the wing pays out in part",
-    subtitle: `x season end, tranche units · y share of seasons ending at or below · one step per wing width, whole tranche on each of ${p.nights} events · realized ÷ priced solved per width so every wing has the deck's effective rate ${pct2(q)} · red line = the start · ${methodLabel(yoursW.dist.method)}`,
+    subtitle: `x season end, tranche units · y share of seasons ending at or below · whole tranche on each of ${p.nights} events · realized ÷ priced solved per width so every wing has the deck's effective rate ${pct2(q)} · ${methodLabel(yoursW.dist.method)}`,
     kind: "xy",
     data: table([f("end", "Season end, tranche units", "x"), ...seasonByWidth.map((s, i) => f(`w${i}`, `${sigma(s.width)} wide`, "pct1"))], seasonRows),
     mark: "step",
@@ -251,7 +253,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
     series: seasonSeries,
     height: 300,
     annotations: [
-      { kind: "vline", x: 1, text: "start: a bad season ends below", color: "loss", at: "start" },
+      { kind: "vline", x: 1, text: "start: a bad season ends below", color: "muted", at: "start" },
       { kind: "hline", y: 0.5, text: "median line", color: "muted", at: "end" },
     ],
     stories: seasonStories,
@@ -316,7 +318,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
     kpis: [
       { label: "Effective rate", value: pct2(r.effective), sub: matchesDeck ? `= deck q ${pct2(q)} · E[payout] ÷ width` : `deck q ${pct2(q)} · gap ${signedPp(r.effective - q)} · E[payout] ÷ width`, color: "ink", help: "The EV-matching full-loss rate for these inputs. The default realized ÷ priced sigma is solved so that it equals the deck's q." },
       { label: "Premium over fair per event", value: signedPp(r.premiumRate), sub: `c ÷ W ${pct2(r.fairRate)} − effective ${pct2(r.effective)} · EV ${signedPct(r.expectedPnlPerMaxLoss, 2)} of max loss`, help: "How far below the chain's fair rate the effective rate sits. Positive means these inputs assume the chain pays a premium for tail insurance, which is not an information edge; zero means fair pricing." },
-      { label: "Fair rate c ÷ W", value: pct2(r.fairRate), sub: "= b ÷ (1 + b), break-even", color: "loss", help: "The effective rate at which credit equals expected payout. Identical to the break-even loss rate in section 01." },
+      { label: "Fair rate c ÷ W", value: pct2(r.fairRate), sub: "= b ÷ (1 + b), break-even", help: "The effective rate at which credit equals expected payout. Identical to the break-even loss rate in section 01." },
       { label: "Breach / full gap", value: `${pct2(r.breach)} / ${pct2(r.fullGap)}`, sub: `beyond ${sigma(p.strikeDistance)} / ${sigma(dEnd)}` },
       {
         label: "Bad seasons that are partial",

@@ -57,7 +57,9 @@ describe("deck status from the view-model", () => {
     expect(s.lead.detail).toBe("3 names, 50% a night");
     expect(s.status.map((f) => f.label)).toEqual(["EV per season", "median after 4 seasons", "P(below 0.50×)", "ruin"]);
     expect(s.status.map((f) => f.value)).toEqual([deck.yours.text.ev, deck.yours.text.median, deck.yours.text.pBelow, deck.yours.text.ruin]);
-    expect(s.status.every((f) => f.color === "var(--c)")).toBe(true);
+    // The figures are ink; the policy's colour is only the identity dot before the lead.
+    expect(s.status.every((f) => !("color" in f))).toBe(true);
+    expect(s.lead.color).toBe("var(--c)");
     expect(s.note).toBe(deck.coin.text);
     expect(s.note).toMatch(/^Coin: clean season 55% · ruin 45%$/);
   });
@@ -79,7 +81,9 @@ describe("deck status from the view-model", () => {
   it("fills the drawer's figure table and definitions", () => {
     const rows = deckFigureRows(deck);
     expect(rows.length).toBe(deck.figures.length);
+    // A row that belongs to one policy carries its colour (a dot before the label); robust risk belongs to none.
     expect(rows.find((r) => r.id === "clean")?.color).toBe("var(--a)");
+    expect(rows.find((r) => r.id === "robust")?.color).toBeUndefined();
     expect(rows.some((r) => /edge/i.test(r.label))).toBe(false);
     const defs = deckDefinitions(deck, PARAM_DEFS);
     expect(defs.map((d) => d.term)).toContain("Loss rate per name q");

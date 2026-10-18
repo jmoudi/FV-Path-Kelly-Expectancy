@@ -7,7 +7,7 @@ import { eventsToResolve } from "@app/model/calibration";
 import type { Params } from "@app/params/params";
 import { POLICY_IDS, type PolicyId, type PolicyMeta } from "@app/model/policies";
 import type { Summary } from "@app/model/season";
-import { fmtInt, pct, pct1, pct2, smallPct, x2, years } from "@kit/charts/numbers";
+import { fmtInt, pct, pct1, pct2, probPct, x2, years } from "@kit/charts/numbers";
 import type { Derived, MarketState } from "@app/scenarios/derived";
 
 export type DeskRowId = "mean" | "median" | "p10" | "pBelow" | "ruin";
@@ -91,10 +91,11 @@ function cell(id: DeskRowId, s: Summary): DeskCell {
       return { value: s.median, text: x2(s.median) };
     case "p10":
       return { value: s.p10, text: x2(s.p10) };
+    // The two probability rows follow one rule (whole percent, two figures below 1%).
     case "pBelow":
-      return { value: s.pBelow, text: pct(s.pBelow) };
+      return { value: s.pBelow, text: probPct(s.pBelow) };
     case "ruin":
-      return { value: s.pRuin, text: smallPct(s.pRuin) };
+      return { value: s.pRuin, text: probPct(s.pRuin) };
   }
 }
 

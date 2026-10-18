@@ -33,7 +33,7 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
   const quantiles: ChartSpec = {
     id: "mm-quantiles",
     title: "Every replay sorted from worst to best",
-    subtitle: "x share of replays ending at or below · y season end, tranche units · one step per policy · lines = means",
+    subtitle: "x share of replays ending at or below · y season end, tranche units",
     kind: "xy",
     data: table([f("pctile", "Share of replays ending at or below", "pct"), ...ids.map((id) => f(id, P[id].label, "x"))], qRows),
     mark: "step",
@@ -43,7 +43,7 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
     height: 330,
     annotations: [
       { kind: "vline", x: 0.5, text: "median: the middle replay", color: "muted", at: "start" },
-      { kind: "hline", y: coin.mean, text: `mean, ${P.coin.name} and ${P.spread.name} ${x2(coin.mean)}`, color: "ink", at: "start" },
+      { kind: "hline", y: coin.mean, text: `mean, ${P.coin.name} and ${P.spread.name} ${x2(coin.mean)}`, color: "muted", at: "start" },
       { kind: "hline", y: reserve.mean, text: `mean, ${P.reserve.name} ${x2(reserve.mean)}`, color: "c", at: "end" },
     ],
   };
@@ -64,7 +64,7 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
   const running: ChartSpec = {
     id: "mm-running",
     title: `Pooling ${pool} independent tranches`,
-    subtitle: "x tranches pooled (log) · y running average of their season ends · one line per policy · line = mean",
+    subtitle: "x tranches pooled (log) · y running average of their season ends",
     kind: "xy",
     data: table([f("count", "Tranches pooled", "int"), ...ids.map((id) => f(id, P[id].label, "x"))], runRows),
     mark: "line",
@@ -72,7 +72,7 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
     y: { field: "coin", label: "Average end of the pool", format: "x", domain: [0, yTop] },
     series: ids.map((id) => ({ field: id, color: P[id].color, label: P[id].label })),
     height: 290,
-    annotations: [{ kind: "hline", y: coin.mean, text: `mean ${x2(coin.mean)}`, color: "ink", at: "end" }],
+    annotations: [{ kind: "hline", y: coin.mean, text: `mean ${x2(coin.mean)}`, color: "muted", at: "end" }],
   };
 
   // Stems at the exact outcomes of the Spread policy (Spread + reserve in the data for ⚙).
@@ -91,7 +91,7 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
   const stems: ChartSpec = {
     id: "mm-stems",
     title: `Exact outcomes, ${P.spread.name}`,
-    subtitle: `x season end, tranche units · y probability of that exact end · ${P.spread.label}, ${methodLabel(d.season.spread.dist.method)} · lines = mean, median`,
+    subtitle: `x season end, tranche units · y probability of that exact end · ${P.spread.label}, ${methodLabel(d.season.spread.dist.method)}`,
     kind: "xy",
     data: table([f("end", "Season end, tranche units", "x"), f("spread", P.spread.label, "pct1"), f("reserve", P.reserve.label, "pct1")], [...stemRows.values()].sort((a, b) => (a.end as number) - (b.end as number))),
     mark: "bar",
@@ -101,7 +101,7 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
     barWidthPx: 3,
     height: 290,
     annotations: [
-      { kind: "vline", x: spread.mean, text: `mean ${x2(spread.mean)}`, color: "ink" },
+      { kind: "vline", x: spread.mean, text: `mean ${x2(spread.mean)}`, color: "muted" },
       { kind: "vline", x: spread.median, text: `median ${x2(spread.median)}`, color: "b", dash: false, at: "start" },
     ],
   };
@@ -141,7 +141,7 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
     ],
     kpis: [
       { label: `Mean, ${P.coin.name} and ${P.spread.name}`, value: x2(coin.mean), sub: "the same for both", help: "Expected season end. Spreading the same risk over more names does not change it." },
-      { label: `Median, ${P.coin.name} → ${P.spread.name}`, value: `${x2(coin.median)} → ${x2(spread.median)}`, sub: `${pct(d.pClean)} vs ${pct1(spread.pMax)} clean seasons`, color: "b", help: "Half of replays end at or above this. For the Coin it is one of the two outcomes; for Spread it is a season with one or two partial hits." },
+      { label: `Median, ${P.coin.name} → ${P.spread.name}`, value: `${x2(coin.median)} → ${x2(spread.median)}`, sub: `${pct(d.pClean)} vs ${pct1(spread.pMax)} clean seasons`, help: "Half of replays end at or above this. For the Coin it is one of the two outcomes; for Spread it is a season with one or two partial hits." },
       { label: "Seasons at or above the mean", value: pct(spread.pAtOrAboveMean), sub: P.spread.name, help: "How often a single replay does at least as well as the average of all replays." },
       { label: "Log growth of surviving paths", value: signedPct1(spread.expLog), sub: `${P.spread.name} · one season · ruin ${smallPct(spread.pRuin)}`, help: "E[log end | the tranche survives]. Geometric growth is roughly the mean minus half the variance; diversification removes variance without touching the mean. It is not the rate the median compounds at; that is the next figure." },
       { label: "Median growth per season", value: signedPct1(medianGrowth), sub: `${P.spread.name} · median after ${seasonsWord} ${x2(spreadN.median)} → ^(1/${N}) − 1`, help: "median_N^(1/N) − 1: the rate the middle path compounds at over the seasons chained in the deck." },

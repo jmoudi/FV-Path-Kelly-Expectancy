@@ -70,13 +70,13 @@ function SectionBody({ s }: { s: DrawerSection }): ReactNode {
             {s.rows.map((r) => (
               <tr key={r.id}>
                 <th scope="row">
-                  <span className="dkb-flabel">
+                  <span className={`dkb-flabel${r.color ? " dot" : ""}`} style={tone(r.color)}>
                     <span>{r.label}</span>
                     {r.help}
                   </span>
                   {r.basis && <span className="dkb-fbasis">{r.basis}</span>}
                 </th>
-                <td style={tone(r.color)}>{r.value}</td>
+                <td>{r.value}</td>
               </tr>
             ))}
           </tbody>
@@ -103,10 +103,11 @@ function SectionBody({ s }: { s: DrawerSection }): ReactNode {
  *
  * Row 1 holds the input groups, set apart by distance and a hairline, each under a
  * caption; groups wrap whole when the row is too narrow. Row 2 is the status line:
- * the lead, the figures (value over label), a muted note over the mini-legend, the
- * reserved strip slot, and the toggle. The drawer is a right-hand panel from under
- * the top bar to the bottom of the viewport that scrolls on its own and leaves the
- * page live; on a phone it is a bottom sheet opened by "All inputs". Escape closes.
+ * the lead (its colour as a dot before the name), the figures (value over label, in
+ * ink), a muted note over the mini-legend, the reserved strip slot, and the toggle.
+ * The drawer is a right-hand panel from under the top bar to the bottom of the
+ * viewport that scrolls on its own and leaves the page live; on a phone it is a
+ * bottom sheet opened by "All inputs". Escape closes.
  */
 export function Deck(props: DeckProps) {
   const { groups, lead, status, note, legend, strip, stripIdle = false, drawer, drawerTop, expanded, onExpandedChange, hidden = false, pending = false, heightVar = "--deck-h", phoneQuery = "(max-width: 700px)" } = props;
@@ -165,14 +166,16 @@ export function Deck(props: DeckProps) {
         </div>
         <div className="dkb-row dkb-status">
           {lead && (
-            <div className="dkb-lead" title={lead.tooltip} style={tone(lead.color)}>
-              <span className="dkb-lead-title">{lead.title}</span>
+            <div className="dkb-lead" title={lead.tooltip}>
+              <span className={`dkb-lead-title${lead.color ? " dot" : ""}`} style={tone(lead.color)}>
+                {lead.title}
+              </span>
               {lead.detail && <span className="dkb-lead-detail">{lead.detail}</span>}
             </div>
           )}
           <dl className="dkb-figs">
             {status.map((f) => (
-              <div key={f.id} className="dkb-fig" title={f.title} style={tone(f.color)}>
+              <div key={f.id} className="dkb-fig" title={f.title}>
                 <dt>{f.label}</dt>
                 <dd>{f.value || t.computing}</dd>
               </div>

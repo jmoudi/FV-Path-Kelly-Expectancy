@@ -7,7 +7,7 @@ import { DEFAULT_PARAMS } from "@app/params/params";
 import { EMPTY_DATASETS } from "@app/params/datasets";
 import { useStore } from "@app/store";
 import { buildAll } from "@app/scenarios";
-import { fmtMs, pct1, signedPct1, signedPp, smallPct, x2 } from "@kit/charts/numbers";
+import { fmtMs, pct1, probPct, signedPct1, signedPp, smallPct, x2 } from "@kit/charts/numbers";
 import { formatNumber, MINUS } from "@kit/charts/format";
 import type { ScenarioView } from "@app/scenarios/types";
 
@@ -62,6 +62,8 @@ describe("the one number formatter", () => {
     expect(formatNumber(-Infinity)).toBe("−∞");
     expect(smallPct(0.00051)).toBe("0.051%");
     expect(smallPct(1e-8)).toBe("< 0.0001%");
+    // One rule for a row of probabilities: whole percent at 1% and up, two figures below, zero as 0%.
+    expect([0.45, 0.0703, 0.0137, 0.0051, 0.00051, 0.00204, 0].map(probPct)).toEqual(["45%", "7%", "1%", "0.51%", "0.051%", "0.20%", "0%"]);
     for (const s of [signedPct1(-0.1), pct1(-0.1), x2(-1), formatNumber(-3, "num"), formatNumber(-3), smallPct(-0.002)]) expect(s).not.toMatch(/-/);
   });
   it("prints sub-second intervals in milliseconds", () => {
@@ -471,9 +473,13 @@ import { bandPoints, barPoints, linePoints } from "@kit/charts/backends/types";
 import { buildVegaSpec } from "@kit/charts/backends/vegaSpec";
 import { formatNumber as chartFormat, tickMultiple as tickX, tickPercent as tickPct, tickPlain } from "@kit/charts/format";
 import { legendLayout, resolveChart } from "@kit/charts/resolve";
-import { THEME } from "@kit/charts/theme";
+import { THEME, barFill } from "@kit/charts/theme";
 import { formatNumber as appFormat } from "@kit/charts/format";
 import { TableView } from "@kit/ui/TableView";
+import { Figure } from "@kit/ui/AnswerStrip";
+import { DeskGrid } from "@kit/ui/DeskGrid";
+import { kpiItem } from "@kit/ui/scenarioProps";
+import { readFileSync } from "node:fs";
 
 describe("chart rendering", () => {
   const { scenarios } = buildAll(DEFAULT_PARAMS, EMPTY_DATASETS);
@@ -729,6 +735,81 @@ describe("chart rendering", () => {
     expect(THEME.roles.ink2).not.toBe(THEME.roles.c);
   });
 
+  it("holds the colour-role policy: policy trio, status pair, neutral ramps, a cream accent outside the charts", () => {
+    // The decided values (the review's colour-role policy, section C).
+    expect(THEME.roles).toMatchObject({ a: "#dfa54d", b: "#63cfe9", c: "#8976cd", loss: "#df6768", good: "#5cb572", ink2: "#b4bac1", ramp1: "#e4e8ed", ramp2: "#babec3", ramp3: "#8f9397", ramp4: "#66696d" });
+    expect([THEME.surface, THEME.raised, THEME.raised2, THEME.hairline, THEME.grid, THEME.ink2]).toEqual(["#1a1d21", "#22262b", "#2a2f35", "#30363d", "#1f2226", "#b4bac1"]);
+    expect(THEME.diverging).toEqual(["#ad4b4b", "#733a39", "#27292c", "#2f5838", "#38804b"]);
+    expect(THEME.sequential).toEqual(["#202429", "#393e42", "#54595e", "#767b80", "#9a9fa5", "#bfc5ca"]);
+    expect(THEME.binary).toEqual(["#2a2f35", "#df6768"]);
+    expect(THEME.accent).toBe("#e8e1a3");
+    // The accent is chrome only: no chart role carries it, and the ramps are grey (no policy hue).
+    expect(Object.values(THEME.roles).map((h) => h.toLowerCase())).not.toContain(THEME.accent);
+    const chroma = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      return (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
+    };
+    for (const h of [THEME.roles.ramp1, THEME.roles.ramp2, THEME.roles.ramp3, THEME.roles.ramp4, ...THEME.sequential]) expect(chroma(h), h).toBeLessThan(0.06);
+    // Status bars fill at most 0.6; an ink bar is drawn in secondary ink, never as a white slab.
+    expect(barFill("loss", 1)).toBe("rgba(223,103,104,0.6)");
+    expect(barFill("good", 0.5)).toBe("rgba(92,181,114,0.3)");
+    expect(barFill("ink", 1)).toBe("rgba(180,186,193,1)");
+    // Hero figures are never painted: a KPI's colour may only name the policy it belongs to.
+    for (const sc of scenarios) for (const k of sc.kpis) expect(["a", "b", "c", "ink", undefined], `${sc.id}: ${k.label}`).toContain(k.color);
+    // A transition between two policies ("Coin → Spread") belongs to neither.
+    for (const sc of scenarios) for (const k of sc.kpis) if (/→/.test(k.value)) expect(k.color, `${sc.id}: ${k.label}`).toBeUndefined();
+    // The heat map: square cells on a 1px page seam, your cell outlined in ink.
+    const heat = buildOption(chart("chain-heat"), 900) as { series: { id: string; itemStyle: { borderColor: string; borderWidth: number; borderRadius: number } }[] };
+    expect(heat.series[0].itemStyle).toMatchObject({ borderColor: THEME.page, borderWidth: 1, borderRadius: 0 });
+    expect(heat.series[1].itemStyle).toMatchObject({ borderColor: THEME.ink, borderRadius: 0 });
+    // No plaid: grid lines across the value axis only.
+    const line = buildOption(chart("binary-curve"), 900) as { xAxis: { splitLine: { show: boolean } }; yAxis: { splitLine: { show: boolean } } };
+    expect([line.xAxis.splitLine.show, line.yAxis.splitLine.show]).toEqual([false, true]);
+    // A fan's sampled paths give no hover readout.
+    expect(chart("binary-fan").series.every((x) => x.tooltip === false)).toBe(true);
+    // Subtitles say the encoding: a chart with a legend repeats no colour key in prose.
+    for (const c of xy) if (resolveChart(c, 900).legend) expect(c.subtitle ?? "", c.id).not.toMatch(/\b(red|green|white|violet|amber|cyan|grey|blue)\b/);
+  });
+
+  it("keeps policy colours off figures and grid cells: values are ink, a policy shows as a dot", () => {
+    // Markup: no inline colour on a figure value or a grid cell, the identity colour on the dot only.
+    const fig = renderToStaticMarkup(createElement(Figure, { item: { value: "55%", label: "Clean season (Coin)", dot: "var(--a)" }, hero: true }));
+    expect(fig).toMatch(/<div class="k-fig-v"[^>]*>55%<\/div>/);
+    expect(fig).not.toMatch(/class="k-fig-v"[^>]*style=/);
+    expect(fig).toMatch(/class="k-fig-l dot" style="--tone:var\(--a\)"/);
+    expect(kpiItem({ label: "Break-even", value: "3.38%", color: "loss" }).dot).toBeUndefined();
+    expect(kpiItem({ label: "Clean season (Coin)", value: "55%", color: "a" }).dot).toBe("var(--a)");
+    const grid = renderToStaticMarkup(
+      createElement(DeskGrid, {
+        columns: [
+          { id: "coin", label: "Coin", tone: "var(--a)" },
+          { id: "reserve", label: "Spread + reserve", tone: "var(--c)", highlight: true, tag: "your policy" },
+        ],
+        groups: [{ id: "g", title: "One season", hero: { row: "median" }, rows: [{ id: "median", label: "Median", cells: { coin: { text: "1.99×" }, reserve: { text: "0.98×" } } }] }],
+      }),
+    );
+    expect(grid).not.toMatch(/<td[^>]*style=/);
+    expect([...grid.matchAll(/class="k-grid-cell hero[^"]*"/g)]).toHaveLength(2);
+    expect([...grid.matchAll(/class="k-grid-tag"/g)]).toHaveLength(2);
+    // Stylesheets: the value rules read ink tokens only, and the policy-tied accent alias is gone.
+    // Read as text (the test runner turns imported CSS into empty modules).
+    const css = ["../src/kit/ui/theme.css", "../src/kit/ui/kit.css", "../src/kit/ui/deck/deck.css", "../src/kit/inputs/number-field.css"].map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("\n");
+    // Every block whose selector list ends in this selector, bodies joined.
+    const rule = (sel: string) => {
+      const bodies = [...css.matchAll(new RegExp(`(^|\\n)${sel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\{([^}]*)\\}`, "g"))].map((m) => m[2]);
+      expect(bodies.length, sel).toBeGreaterThan(0);
+      return bodies.join("\n");
+    };
+    for (const sel of [".k-fig-v", ".dkb-fig dd", ".dkb-ftable td", ".k-grid-cell", ".k-grid-cell.hl", ".dkb-lead-title", ".k-grid-name", ".lv-value"]) {
+      const body = rule(sel);
+      expect(body, sel).toMatch(/\bcolor: var\(--(ink|ink-2)\);/);
+      expect(body, sel).not.toMatch(/var\(--(a|b|c|loss|good|tone)\b/);
+    }
+    for (const sel of [".dkb-fig dd", ".dkb-ftable td"]) expect(rule(sel), sel).toMatch(/font-family: var\(--font-ui\)/);
+    expect(css).not.toMatch(/--accent-2/);
+    expect(css).not.toMatch(/rgba\(18, 20, 22/);
+  });
+
   it("shows a horizontal bar chart's numbers in the table by position", () => {
     const html = renderToStaticMarkup(createElement(TableView, { spec: chart("binary-outcomes") }));
     const heads = [...html.matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]);
@@ -833,7 +914,7 @@ describe("copy and figures the verification flagged", () => {
   it("keeps the names-per-night subtitle to the encoding and states where the cap binds in the caption", () => {
     const c = chartOf("axes-breadth");
     expect(c.title).toBe("Log growth per season by names per night");
-    expect(c.subtitle).toMatch(/green = optimistic q$/);
+    expect(c.subtitle).toMatch(/capped once k·f\* passes 100%$/);
     expect(c.subtitle).not.toMatch(/binds|does not bind/);
     expect(c.caption).toBe("The cap does not bind at the deck's rate; it binds from 4 names at the optimistic rate.");
     const view = scen("chaining").views.find((v) => v.id === "sizing-grid")!;
@@ -869,11 +950,14 @@ describe("copy and figures the verification flagged", () => {
     expect(moved.why).toMatch(/q 2\.52%/);
   });
 
-  it("draws the three coin lines on the NAV chart in three distinct colours", () => {
+  it("draws the three coin lines on the NAV chart in the Coin's colour, told apart by dash", () => {
     const nav = chartOf("chain-nav");
-    const coins = nav.series.filter((s) => /^coin\d$/.test(s.field)).map((s) => s.color);
-    expect(coins).toEqual(["muted", "ink", "good"]);
-    expect(nav.subtitle).toMatch(/grey = p 50% · white = p 55% · green = p 60%/);
+    const coins = nav.series.filter((s) => /^coin\d$/.test(s.field));
+    // Ordered scenarios of one policy: the policy's colour, dotted · solid · dashed (p 50% · 55% · 60%).
+    expect(coins.map((s) => s.color)).toEqual(["a", "a", "a"]);
+    expect(coins.map((s) => s.dash ?? false)).toEqual(["dot", false, true]);
+    expect(nav.series.find((s) => s.field === "yours")!.color).toBe("c");
+    expect(nav.subtitle).toMatch(/Coin at p 50%, 55%, 60%/);
   });
 
   it("slides a long point label inside a narrow plot instead of over the axis labels", () => {

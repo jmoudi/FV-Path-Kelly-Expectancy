@@ -47,6 +47,20 @@ export function smallPct(v: number): string {
   return typographic(`${(v * 100).toFixed(1)}%`);
 }
 
+/**
+ * A probability by one rule, so a row or column of them reads alike: whole percent at
+ * 1% and above (45%, 7%), two significant figures below (0.051%, 0.20%), exactly zero
+ * as 0%.
+ */
+export function probPct(v: number): string {
+  if (!Number.isFinite(v)) return formatNumber(v);
+  if (v === 0) return "0%";
+  const p = Math.abs(v) * 100;
+  if (p >= 1) return pct(v);
+  if (p < 1e-4) return `${v < 0 ? MINUS : ""}< 0.0001%`;
+  return pct(v, 1 - Math.floor(Math.log10(p)));
+}
+
 /** A time interval: sub-second in milliseconds, seconds otherwise. */
 export function fmtMs(ms: number): string {
   if (!Number.isFinite(ms)) return formatNumber(ms);

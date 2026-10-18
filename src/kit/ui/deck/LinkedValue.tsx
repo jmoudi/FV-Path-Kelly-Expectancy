@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 export interface LinkedValueProps {
   /** id of the box (box mode, or text mode while editing). */
@@ -20,8 +20,6 @@ export interface LinkedValueProps {
   unit?: string;
   /** Takes the typed text; returns false to reject it (the box then shows the old value). */
   onCommit: (text: string) => boolean;
-  /** CSS colour of the value in text mode. */
-  color?: string;
   title?: string;
   ariaLabel: string;
   /** Extra class on the box (box mode), to match the app's input boxes. */
@@ -90,7 +88,7 @@ export function LinkedValue(p: LinkedValueProps) {
 
   if (mode === "box") return box;
   return (
-    <span className="lv" style={p.color ? ({ "--tone": p.color } as CSSProperties) : undefined}>
+    <span className="lv">
       {p.prefix != null && <span className="lv-prefix">{p.prefix}</span>}
       {editing ? (
         <span className="lv-editing">

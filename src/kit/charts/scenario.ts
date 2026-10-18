@@ -17,6 +17,7 @@ export interface KPI {
   label: string;
   value: string;
   sub?: string;
+  /** The policy the figure belongs to, when it belongs to one: its colour role becomes a dot before the label. The value is always ink. */
   color?: ColorRole;
   help?: string;
 }

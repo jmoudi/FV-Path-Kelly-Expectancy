@@ -13,8 +13,11 @@ export interface FigureItem {
   label: string;
   /** One muted line under the label: the basis of the number. */
   sub?: string;
-  /** A CSS colour for the value (e.g. "var(--a)"); ink when absent. */
-  tone?: string;
+  /**
+   * The identity colour of the one policy (series, alternative) the figure belongs to,
+   * e.g. "var(--a)": drawn as an 8px dot before the label. The value is always ink.
+   */
+  dot?: string;
   /** Rendered after the label, e.g. a "?" help button. */
   help?: ReactNode;
 }

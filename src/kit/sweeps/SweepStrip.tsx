@@ -1,5 +1,6 @@
 import { isSweepable } from "@kit/inputs/schema";
 import { useKit, useKitCopy, useKitSweeps, useSchema } from "@kit/state/context";
+import { Icon } from "@kit/ui/Icon";
 import { describeWith } from "./adapter";
 import { HOTKEY_HINTS } from "./useSweeps";
 
@@ -64,7 +65,7 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
         {name} <span className="sw-label">not swept</span>{" "}
         {value !== dflt && (
           <button type="button" className="chip tiny" onClick={() => setParam(key, dflt)} title={copy.resetToDefaultTitle}>
-            ↺ default
+            <Icon name="restore" size={10} /> default
           </button>
         )}
       </div>
@@ -85,7 +86,7 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
     return (
       <div className={`${cls} sweeping named`} role="status" aria-live="off">
         <button type="button" className="sw-icon" onClick={() => toggleSweep(key)} title={`Pause (${HOTKEY_HINTS.toggle})`} aria-label="Pause the sweep">
-          ❚❚
+          <Icon name="pause" size={10} />
         </button>{" "}
         <span className="sw-label sw-wide">sweeping</span> {name} <span className="sw-value">{fmt(value)}</span>{" "}
         {position && (
@@ -124,7 +125,14 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
           title={linked ? `${describeWith(sweeps, key, linked, params)}. Click for the next preset (${HOTKEY_HINTS.next}).` : "Link a preset to this input"}
           disabled={!presets.length}
         >
-          {linked ? `${linked.name} ▸` : "link a preset"}
+          {linked ? (
+            <>
+              {linked.name}
+              <Icon name="next" size={9} className="sw-next" />
+            </>
+          ) : (
+            "link a preset"
+          )}
         </button>
       ) : (
         presets.map((p) => (
@@ -134,19 +142,22 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
         ))
       )}{" "}
       <button type="button" className="chip tiny play" onClick={() => toggleSweep(key)} title={`${paused ? "Resume" : "Run"} (${HOTKEY_HINTS.toggle})`} aria-label={paused ? "Resume the sweep" : "Run the sweep"} disabled={!linked && !presets.length}>
-        ▶<span className="sw-wide"> {paused ? "resume" : "run"}</span>
+        <Icon name="play" size={9} />
+        <span className="sw-wide"> {paused ? "resume" : "run"}</span>
       </button>{" "}
       {paused && (
         <>
           {position && !compact && <span className="sw-paused">paused · {position}</span>}{" "}
           <button type="button" className="chip tiny" onClick={() => stopSweep(key)} title={`Stop and keep the value (${HOTKEY_HINTS.stop})`} aria-label="Stop the sweep">
-            ■{!compact && <span className="sw-wide"> stop</span>}
+            <Icon name="stop" size={9} />
+            {!compact && <span className="sw-wide"> stop</span>}
           </button>{" "}
         </>
       )}
       {showRestore && (
         <button type="button" className="chip tiny" onClick={() => restoreSweep(key)} title={`Put back ${fmt(origin)}, the value before the sweep (${HOTKEY_HINTS.undo})`} aria-label="Back to the value before the sweep">
-          ↺<span className="sw-wide"> before sweep</span>
+          <Icon name="restore" size={10} />
+          <span className="sw-wide"> before sweep</span>
         </button>
       )}
       {!compact && (

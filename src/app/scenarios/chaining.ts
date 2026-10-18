@@ -1,4 +1,4 @@
-import { f, table, tableSpec, type ChartSpec, type ColorRole, type Row, type SeriesSpec, type Story } from "@kit/charts/spec";
+import { f, table, tableSpec, type ChartSpec, type Row, type SeriesSpec, type Story } from "@kit/charts/spec";
 import { medianGrowthPerSeason } from "@app/model/growth";
 import { robustSeasonLogGrowth, seasonLogGrowth, seasonRuin } from "@app/model/kelly";
 import { coinOutcomes, doubleOrNothingShare, navKellyShare, navLogGrowth } from "@app/model/nav";
@@ -98,7 +98,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const sweep: ChartSpec = {
     id: "chain-sweep",
     title: "Growth averaged over the loss-rate band",
-    subtitle: `x tranche at risk a night · y log growth per season of surviving paths · green = optimistic q · white = deck q · red = break-even q · thick = averaged over a loss rate drawn ${d.bandLabel} · violet line = your risk`,
+    subtitle: `x tranche at risk a night · y log growth per season of surviving paths · thick = averaged over a loss rate drawn ${d.bandLabel}`,
     kind: "xy",
     data: table(
       [f("risk", "Tranche at risk a night", "pct"), ...sweepRates.map((qq, i) => f(`g${i}`, `q = ${pct2(qq)}`, "pct1")), f("robust", "averaged over the band", "pct1")],
@@ -165,7 +165,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const growthChart: ChartSpec = {
     id: "chain-curve",
     title: "Mean and median as seasons are chained",
-    subtitle: `x seasons chained · y tranche after that many seasons · solid steps = median · dashed = mean · band = 25th to 75th percentile of ${P.reserve.name} · line = the deck's ${N} season${N === 1 ? "" : "s"}`,
+    subtitle: `x seasons chained · y tranche after that many seasons · steps = one per season`,
     kind: "xy",
     data: table(
       [
@@ -213,7 +213,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const endDist: ChartSpec = {
     id: "chain-dist",
     title: `Where the tranche stands after ${N} season${N === 1 ? "" : "s"}`,
-    subtitle: `x tranche after ${N} season${N === 1 ? "" : "s"} (log) · y probability per log bin · one bar series per policy · ${methodLabel(d.chained[d.yours].dist.method)} · ruin mass off the chart: ${P.coin.name} ${smallPct(hists.coin.zeroMass)}, ${P.spread.name} ${smallPct(hists.spread.zeroMass)}, ${P.reserve.name} ${smallPct(hists.reserve.zeroMass)} · red line = threshold`,
+    subtitle: `x tranche after ${N} season${N === 1 ? "" : "s"} (log) · y probability per log bin · ${methodLabel(d.chained[d.yours].dist.method)} · ruin mass off the chart: ${P.coin.name} ${smallPct(hists.coin.zeroMass)}, ${P.spread.name} ${smallPct(hists.spread.zeroMass)}, ${P.reserve.name} ${smallPct(hists.reserve.zeroMass)}`,
     kind: "xy",
     data: table([f("mid", "Tranche after N seasons", "x"), ...ids.map((id) => f(id, P[id].label, "pct1"))], histRows),
     mark: "bar",
@@ -228,7 +228,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
     height: 300,
     annotations: [
       { kind: "vline", x: 1, text: "start", color: "muted", at: "start" },
-      { kind: "vline", x: p.thresholdBelow, text: `below ${x2(p.thresholdBelow)}`, color: "loss", at: "start" },
+      { kind: "vline", x: p.thresholdBelow, text: `below ${x2(p.thresholdBelow)}`, color: "muted", at: "start" },
       { kind: "vline", x: sYours.median, text: `median, ${yours.name} ${x2(sYours.median)}`, color: "c", dash: false },
     ],
   };
@@ -240,11 +240,11 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
     paths.forEach((path, i) => (r[`p${i}`] = path[t]));
     fanRows.push(r);
   }
-  const fanSeries: SeriesSpec[] = paths.map((_, i) => ({ field: `p${i}`, label: `path ${i + 1}`, color: "c", emphasis: "muted", legend: false, width: 1.2 }));
+  const fanSeries: SeriesSpec[] = paths.map((_, i) => ({ field: `p${i}`, label: `path ${i + 1}`, color: "c", emphasis: "muted", legend: false, tooltip: false, width: 1.2 }));
   const fan: ChartSpec = {
     id: "chain-fan",
     title: `Railroad over ${N} season${N === 1 ? "" : "s"}, ${yours.label}`,
-    subtitle: `x night · y tranche, start = 1 · ${p.fanPaths} sampled paths · vertical lines = season boundaries · line = median after ${N} season${N === 1 ? "" : "s"}`,
+    subtitle: `x night · y tranche, start = 1 · ${p.fanPaths} sampled paths`,
     kind: "xy",
     data: table([f("night", "Night", "int"), ...paths.map((_, i) => f(`p${i}`, `Path ${i + 1}`, "x"))], fanRows),
     mark: "step",
@@ -277,18 +277,17 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const fYours = navKellyShare(yoursOutcomes);
   const fCoin = navKellyShare(coinAtDeck);
   const twoP = doubleOrNothingShare(d.pClean);
-  // Three distinct colours for p = 50% / 55% / 60%: the fair coin grey, the discussion's case white, the better coin green.
-  const navColors: ColorRole[] = ["muted", "ink", "good"];
-  const navWords = ["grey", "white", "green"];
+  // Three ordered scenarios of one policy: the Coin's colour, told apart by dash (p = 50% dotted, the discussion's 55% solid, 60% dashed).
+  const navDash: SeriesSpec["dash"][] = ["dot", false, true];
   const navSeries: SeriesSpec[] = [
-    ...navPs.map((pp, i): SeriesSpec => ({ field: `coin${i}`, color: navColors[i], label: `${P.coin.name}, p = ${pct(pp)}` })),
-    ...(deckPShown ? [] : [{ field: "coinDeck", color: "ink", label: `${P.coin.name} at the deck's p = ${pct(d.pClean)}`, dash: true } as SeriesSpec]),
+    ...navPs.map((pp, i): SeriesSpec => ({ field: `coin${i}`, color: P.coin.color, label: `${P.coin.name}, p = ${pct(pp)}`, dash: navDash[i] || undefined, width: 1.5 })),
+    ...(deckPShown ? [] : [{ field: "coinDeck", color: "ink", label: `${P.coin.name} at the deck's p = ${pct(d.pClean)}`, width: 1.5 } as SeriesSpec]),
     { field: "yours", color: "c", label: yours.label, emphasis: "strong" },
   ];
   const nav: ChartSpec = {
     id: "chain-nav",
     title: "Refilling the tranche from NAV each season",
-    subtitle: `x share of NAV allocated to the tranche per season · y NAV log growth per season, E[log(1 − f + f·X)] with X the season-end multiple · ${P.coin.name} at three clean-season probabilities: ${navPs.map((pp, i) => `${navWords[i]} = p ${pct(pp)}`).join(" · ")}${deckPShown ? "" : ` · dashed white = the deck's p ${pct(d.pClean)}`} · violet = ${yours.label} · dots = growth-optimal share · double-or-nothing: f* ≈ 2p − 1 · curves below ${signedPct1(navFloor)} are cut`,
+    subtitle: `x share of NAV allocated to the tranche per season · y NAV log growth per season, E[log(1 − f + f·X)] with X the season-end multiple · ${P.coin.name} at p ${navPs.map((pp) => pct(pp)).join(", ")} · dots = growth-optimal share, f* ≈ 2p − 1 for a double-or-nothing · curves below ${signedPct1(navFloor)} are cut`,
     kind: "xy",
     data: table(
       [f("share", "Share of NAV allocated per season", "pct"), ...navPs.map((pp, i) => f(`coin${i}`, `${P.coin.name}, p = ${pct(pp)}`, "pct1")), f("coinDeck", `${P.coin.name} at the deck's p = ${pct(d.pClean)}`, "pct1"), f("yours", yours.label, "pct1")],
@@ -400,9 +399,9 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
       zero
         ? { label: "Robust risk a night", value: pct(d.robust.risk), sub: `peak of the averaged curve · at the deck's rate (premium over fair ${signedPp(d.market.premium)}) the growth-optimal risk is 0`, help: `Risk a night that maximises growth averaged over a loss rate drawn ${d.bandLabel}; the band still reaches the optimistic rate. ${d.market.sizingNote}` }
         : { label: "Robust risk a night", value: pct(d.robust.risk), sub: `peak of the averaged curve · growth-optimal at the deck's rate ${pct(d.nightKelly.risk)}`, help: `Risk a night that maximises growth averaged over a loss rate drawn ${d.bandLabel}. The deck's ${pct(p.riskPerNight)} is ${Number.isFinite(halfVsKelly) ? `${typographic(halfVsKelly.toFixed(2))}× the single-rate optimum` : "beyond any positive optimum"}.` },
-      { label: `Median after ${seasonsWord}`, value: `${x2(sSpread.median)} → ${x2(sYours.median)}`, sub: `${P.spread.name} → ${yours.name}`, color: "c" },
+      { label: `Median after ${seasonsWord}`, value: `${x2(sSpread.median)} → ${x2(sYours.median)}`, sub: `${P.spread.name} → ${yours.name}` },
       { label: `Mean after ${seasonsWord}`, value: `${x2(sSpread.mean)} → ${x2(sYours.mean)}`, sub: `${P.spread.name} → ${yours.name}` },
-      { label: `P(below ${x2(p.thresholdBelow)})`, value: `${pct(sSpread.pBelow)} → ${pct(sYours.pBelow)}`, sub: `${P.spread.name} → ${yours.name}`, color: "loss" },
+      { label: `P(below ${x2(p.thresholdBelow)})`, value: `${pct(sSpread.pBelow)} → ${pct(sYours.pBelow)}`, sub: `${P.spread.name} → ${yours.name}` },
       { label: `Log growth of surviving paths, ${yours.name}`, value: signedPct1(d.growthYours), sub: `${pct(p.riskPerNight)} a night at the deck's q · ruin ${smallPct(d.ruinYours)} a season`, color: "c", help: "E[log end | the tranche survives] per season at the deck's loss rate and your risk a night. Read it next to the ruin probability." },
       { label: `Median growth per season, ${yours.name}`, value: signedPct1(medianGrowth), sub: `median after ${seasonsWord} ${x2(sYours.median)} → ^(1/${N}) − 1`, color: "c", help: "The rate the middle path compounds at: median_N^(1/N) − 1." },
       {

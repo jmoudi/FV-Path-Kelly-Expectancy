@@ -19,7 +19,7 @@
 }
 .k-textlink:hover {
   color: var(--ink);
-  text-decoration-color: var(--muted);
+  text-decoration-color: var(--accent);
 }
 .k-caption {
   font-size: var(--fs-label);
@@ -45,13 +45,21 @@
   padding: 0;
   text-decoration: none;
 }
+/* A drawn icon sits on the text's centre line and never shrinks in a flex row. */
+.k-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+  position: relative;
+  top: -0.06em;
+}
 .icon-btn:hover {
   color: var(--ink);
-  background: var(--surface);
+  background: var(--raised);
 }
 .icon-btn.on {
   color: var(--ink);
-  background: var(--raised);
+  background: var(--raised-2);
 }
 
 .sr-only {
@@ -115,8 +123,8 @@ kbd {
   color: var(--muted);
 }
 .k-eyebrow-text {
-  font-family: var(--font-mono);
-  letter-spacing: 0.04em;
+  font-family: var(--font-ui);
+  letter-spacing: 0.02em;
 }
 .k-chips {
   display: inline-flex;
@@ -140,9 +148,11 @@ kbd {
   line-height: 1.15;
   letter-spacing: -0.01em;
 }
+/* The prose column spans the section; the lede keeps its 68ch measure and the claim
+   floats at the right, so the answer strip beside it gets the width in between. */
 .k-prose {
   margin-top: 14px;
-  max-width: calc(var(--prose-max) + var(--claim-w) + 48px);
+  max-width: none;
 }
 .k-prose::after {
   content: "";
@@ -153,7 +163,7 @@ kbd {
   margin: 0;
   max-width: var(--prose-max);
   font-size: var(--fs-body);
-  color: var(--ink-2);
+  color: var(--ink);
 }
 .k-claim {
   float: right;
@@ -163,7 +173,7 @@ kbd {
   border-left: 2px solid var(--ink-2);
   font-size: var(--fs-body);
   line-height: 1.5;
-  color: var(--ink);
+  color: var(--ink-2);
 }
 .k-claim.static {
   float: none;
@@ -219,7 +229,12 @@ kbd {
   min-width: 0;
   max-width: 34ch;
 }
+/* Every value box is a hero line tall with the digits on its floor, so the labels of a
+   28px hero and of 20px figures beside it sit on one line. Figures are always ink. */
 .k-fig-v {
+  min-height: calc(var(--fs-hero) * 1.2);
+  display: flex;
+  align-items: flex-end;
   font-size: var(--fs-kpi);
   font-weight: var(--fw-kpi);
   font-variant-numeric: tabular-nums;
@@ -254,7 +269,7 @@ kbd {
 .k-inputs-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 14px 36px;
 }
 .k-inputs-row > * {
@@ -292,6 +307,29 @@ kbd {
 .k-secondary > :last-child:nth-child(odd) {
   grid-column: 1 / -1;
 }
+/* Side by side, two charts share their rows (title block, stories, plot box, foot), so
+   their plot boxes start on one line whatever their subtitles wrap to. Spacing is the
+   items' own margin, so a row neither chart uses takes no room. */
+.k-secondary > .k-chart {
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  row-gap: 0;
+}
+.k-secondary > .k-chart > .k-chart-head {
+  grid-row: 1;
+}
+.k-secondary > .k-chart > .k-chart-stories {
+  grid-row: 2;
+  margin-top: 8px;
+}
+.k-secondary > .k-chart > .k-chart-box {
+  grid-row: 3;
+  margin-top: 8px;
+}
+.k-secondary > .k-chart > .k-chart-foot {
+  grid-row: 4;
+  margin-top: 8px;
+}
 @media (max-width: 900px) {
   .k-secondary {
     grid-template-columns: minmax(0, 1fr);
@@ -319,12 +357,13 @@ kbd {
   gap: 4px 28px;
   border-bottom: 1px solid var(--hairline);
 }
+/* Panel tabs are controls, set at the control size: below the chart titles above them. */
 .k-tab {
   border: 0;
   background: transparent;
   padding: 0 0 8px;
-  font-size: var(--fs-h);
-  font-weight: var(--fw-h);
+  font-size: var(--fs-ui);
+  font-weight: 500;
   color: var(--muted);
   cursor: pointer;
 }
@@ -333,14 +372,14 @@ kbd {
 }
 .k-tab.on {
   color: var(--ink);
-  box-shadow: inset 0 -2px 0 var(--ink);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 .k-tab-close {
   margin-left: auto;
   border: 0;
   background: transparent;
   color: var(--muted);
-  font-size: var(--fs-h);
+  font-size: var(--fs-body);
   line-height: 1;
   cursor: pointer;
   padding: 0 4px 8px;
@@ -434,6 +473,7 @@ kbd {
   flex-wrap: wrap;
   gap: 4px 20px;
   align-items: baseline;
+  min-width: 0;
 }
 .k-story {
   border: 0;
@@ -450,6 +490,7 @@ kbd {
 }
 .k-story:hover {
   color: var(--ink);
+  text-decoration-color: var(--accent);
 }
 .k-story.on {
   color: var(--ink);
@@ -462,6 +503,7 @@ kbd {
 /* One line: the answer shortens with an ellipsis (its full text is the hover title), the
    badge and undo stay whole, so a story never changes the chart's height. */
 .k-chart-note {
+  flex: 1 1 320px;
   min-height: 1.5em;
   display: flex;
   flex-wrap: nowrap;
@@ -533,7 +575,7 @@ kbd {
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(18, 20, 22, 0.86);
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
   padding: 16px;
 }
 .k-chart-error {
@@ -585,11 +627,11 @@ kbd {
   min-width: 0;
 }
 .k-crumb {
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: var(--fs-label);
   color: var(--muted);
   text-decoration: none;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 }
 .k-crumb:hover {
   color: var(--ink);
@@ -654,6 +696,8 @@ kbd {
 }
 
 /* ---------- desk grid ---------- */
+/* The highlighted column is the reader's: its values in ink against the others' ink-2,
+   an ink-2 rule over its header. Colour lives only in the 8px dot before each name. */
 .k-grid-wrap {
   overflow-x: auto;
   min-width: 0;
@@ -678,18 +722,26 @@ kbd {
 .k-grid td:first-child {
   padding-left: 0;
 }
+/* Every header has the same three lines (name, parameters, tag) and hangs from the top. */
 .k-grid-col {
   text-align: right;
-  vertical-align: bottom;
+  vertical-align: top;
   font-weight: 400;
   border-bottom: 1px solid var(--hairline);
-  padding-top: 0;
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
 .k-grid-name {
-  display: block;
   font-size: var(--fs-ui);
   font-weight: 600;
-  color: var(--tone, var(--ink));
+  color: var(--ink);
+}
+/* A name that wraps (a phone) keeps its dot on the first line. */
+.k-grid-name.dot {
+  align-items: flex-start;
+}
+.k-grid-name.dot::before {
+  margin-top: 4px;
 }
 .k-grid-sub {
   display: block;
@@ -698,12 +750,12 @@ kbd {
 }
 .k-grid-tag {
   display: block;
+  min-height: 1.25em;
   font-size: var(--fs-label);
-  color: var(--tone, var(--ink));
+  color: var(--muted);
 }
 .k-grid-col.hl {
-  box-shadow: inset 0 2px 0 var(--tone, var(--ink));
-  padding-top: 8px;
+  box-shadow: inset 0 2px 0 var(--ink-2);
 }
 .k-grid-group th {
   text-align: left;
@@ -712,8 +764,8 @@ kbd {
   color: var(--muted);
   padding-top: 18px;
   padding-bottom: 2px;
-  font-family: var(--font-mono);
-  letter-spacing: 0.04em;
+  font-family: var(--font-ui);
+  letter-spacing: 0.02em;
 }
 .k-grid-label {
   text-align: left;
@@ -725,12 +777,12 @@ kbd {
 .k-grid-label a {
   color: var(--ink-2);
   text-decoration: underline;
-  text-decoration-color: var(--hairline);
+  text-decoration-color: transparent;
   text-underline-offset: 3px;
 }
 .k-grid-label a:hover {
   color: var(--ink);
-  text-decoration-color: var(--muted);
+  text-decoration-color: var(--accent);
 }
 .k-grid-cell {
   text-align: right;
@@ -742,7 +794,7 @@ kbd {
   border-bottom: 1px solid var(--grid);
 }
 .k-grid-cell.hl {
-  color: var(--tone, var(--ink));
+  color: var(--ink);
 }
 .k-grid-cell.hero {
   font-size: var(--fs-hero);
@@ -791,8 +843,9 @@ kbd {
   align-content: start;
 }
 .k-link-group-title {
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: var(--fs-label);
+  letter-spacing: 0.02em;
   color: var(--muted);
   padding: 2px 6px 4px;
 }
@@ -806,7 +859,7 @@ kbd {
 }
 .k-link-group a:hover,
 .k-link-group a.on {
-  background: var(--surface);
+  background: var(--raised-2);
   color: var(--ink);
 }
 .k-menu-items {
@@ -826,7 +879,7 @@ kbd {
 }
 .k-menu-item:hover,
 .k-menu-item:focus-visible {
-  background: var(--surface);
+  background: var(--raised-2);
 }
 .k-menu-hint {
   font-size: var(--fs-label);

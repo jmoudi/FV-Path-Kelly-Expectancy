@@ -80,7 +80,7 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
   const shape: ChartSpec = {
     id: "div-shape",
     title: "Season end, cumulative",
-    subtitle: `x season end, tranche units · y share of seasons ending at or below · one step per policy · ${methodLabel(d.season.spread.dist.method)} · red line = drawdown threshold · white = mean`,
+    subtitle: `x season end, tranche units · y share of seasons ending at or below · ${methodLabel(d.season.spread.dist.method)}`,
     kind: "xy",
     data: table(
       [f("end", "Season end, tranche units", "x"), ...ids.map((id) => f(id, P[id].label, "pct1")), f("halfFull", "Half the nights one name, whole tranche on it", "pct1"), f("halfCapped", `Half the nights one name, capped at 1/${k}`, "pct1")],
@@ -97,8 +97,8 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
     height: 330,
     annotations: [
       { kind: "hline", y: 0.5, text: "median line", color: "muted", at: "end" },
-      { kind: "vline", x: coin.mean, text: `mean, ${P.coin.name} and ${P.spread.name} ${x2(coin.mean)}`, color: "ink" },
-      { kind: "vline", x: p.thresholdBelow, text: `below ${x2(p.thresholdBelow)}`, color: "loss", at: "start" },
+      { kind: "vline", x: coin.mean, text: `mean, ${P.coin.name} and ${P.spread.name} ${x2(coin.mean)}`, color: "muted" },
+      { kind: "vline", x: p.thresholdBelow, text: `below ${x2(p.thresholdBelow)}`, color: "muted", at: "start" },
     ],
     stories: shapeStories,
   };
@@ -112,12 +112,12 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
       paths.forEach((path, i) => (r[`p${i}`] = path[t]));
       rows.push(r);
     }
-    const series: SeriesSpec[] = paths.map((path, i) => ({ field: `p${i}`, label: `season ${i + 1}`, color: path[path.length - 1] > 0 ? pol.color : "loss", emphasis: "muted", legend: false, width: 1.2 }));
+    const series: SeriesSpec[] = paths.map((path, i) => ({ field: `p${i}`, label: `season ${i + 1}`, color: path[path.length - 1] > 0 ? pol.color : "loss", emphasis: "muted", legend: false, tooltip: false, width: 1.2 }));
     const s = d.season[id].summary;
     return {
       id: `div-fan-${id}`,
       title: `Railroad, ${pol.label}`,
-      subtitle: `x night · y tranche, start = 1 · ${p.fanPaths} sampled seasons · red = ruined · line = median ${x2(s.median)} (mean ${x2(s.mean)})`,
+      subtitle: `x night · y tranche, start = 1 · ${p.fanPaths} sampled seasons · red = ruined · mean ${x2(s.mean)}`,
       kind: "xy",
       data: table([f("night", "Night", "int"), ...paths.map((_, i) => f(`p${i}`, `Season ${i + 1}`, "x"))], rows),
       mark: "step",
@@ -165,7 +165,7 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
   const mix: ChartSpec = {
     id: "div-mix",
     title: "Ruin against single-name nights",
-    subtitle: `x share of single-name nights · y P(ruin) per season (log) · rule 1 = whole tranche on the lone name · rule 2 = capped at 1/${k} per name · line = your mix`,
+    subtitle: `x share of single-name nights · y P(ruin) per season (log)`,
     kind: "xy",
     data: table(
       [
@@ -244,7 +244,7 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
       { id: "single-name-mix", title: "What single-name nights cost", blurb: "Ruin and mean as single-name nights are mixed in, under two sizing rules.", charts: ["div-mix", "div-mix-table"], params: ["singleNameShare"] },
     ],
     kpis: [
-      { label: `Ruin, ${P.coin.name} → ${P.spread.name}`, value: `${pct(coin.pRuin)} → ${smallPct(spread.pRuin)}`, sub: "one season", color: "b" },
+      { label: `Ruin, ${P.coin.name} → ${P.spread.name}`, value: `${pct(coin.pRuin)} → ${smallPct(spread.pRuin)}`, sub: "one season" },
       { label: `Median, ${P.coin.name} → ${P.spread.name}`, value: `${x2(coin.median)} → ${x2(spread.median)}`, sub: "mean unchanged" },
       { label: "Log growth of surviving paths", value: signedPct1(growthSpread), sub: `${P.spread.name} · ruin ${smallPct(ruinSpread)} a season`, help: "Expected log of the season end given the tranche survives. Always read next to the ruin probability; it is not the rate the median compounds at." },
       { label: `Clean seasons, ${P.spread.name}`, value: pct1(spread.pMax), sub: `${k * n} name-events must all win` },

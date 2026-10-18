@@ -1,5 +1,5 @@
 import { linearTicks } from "@kit/charts/resolve";
-import { THEME, withAlpha } from "@kit/charts/theme";
+import { STATUS_BAR_ALPHA, THEME, withAlpha } from "@kit/charts/theme";
 import type { FigureProps } from "@kit/charts/figures/registry";
 import { FIGURE_FONT, TOKENS, figureNumber, numParam } from "@kit/charts/figures/tokens";
 
@@ -70,7 +70,8 @@ export function Calendar({ spec, width }: FigureProps) {
   const gFmt = (v: number) => figureNumber(v, "pct");
 
   const barColor = withAlpha(TOKENS.ink, 0.34);
-  const lossColor = withAlpha(THEME.roles.loss, 0.9);
+  // A status colour fills a bar at most at 0.6.
+  const lossColor = withAlpha(THEME.roles.loss, STATUS_BAR_ALPHA);
   const text = { fontFamily: FIGURE_FONT.family, fontSize: FIGURE_FONT.label } as const;
   const mono = { fontFamily: FIGURE_FONT.mono, fontSize: FIGURE_FONT.label } as const;
 
@@ -139,7 +140,7 @@ export function Calendar({ spec, width }: FigureProps) {
             <text x={(x0 + x1) / 2} y={top + plotH + 30} textAnchor="middle" fill={TOKENS.muted} style={text}>
               week {w + 1}
             </text>
-            {bw >= 16 && days.map((r) => <text key={r.day} x={xOf(r) + bw / 2} y={top + plotH + 14} textAnchor="middle" fill={withAlpha(TOKENS.muted, 0.8)} style={mono}>{WEEKDAYS[r.weekday]}</text>)}
+            {bw >= 16 && days.map((r) => <text key={r.day} x={xOf(r) + bw / 2} y={top + plotH + 14} textAnchor="middle" fill={TOKENS.muted} style={mono}>{WEEKDAYS[r.weekday]}</text>)}
             {empty && bw >= 7 && (
               <text x={(x0 + x1) / 2} y={yCap(0.5)} textAnchor="middle" fill={TOKENS.muted} style={text}>
                 empty week

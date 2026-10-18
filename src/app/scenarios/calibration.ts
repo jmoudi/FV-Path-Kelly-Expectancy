@@ -40,7 +40,7 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
   const need: ChartSpec = {
     id: "cal-events",
     title: "Events needed to tell two loss rates apart",
-    subtitle: `x gap between the two rates · y name-events needed (log) · ${z}σ separation around a ${pct2(qbar)} base rate · lines = one and ten years at your pace · dots = the deck's two questions`,
+    subtitle: `x gap between the two rates · y name-events needed (log) · ${z}σ separation around a ${pct2(qbar)} base rate`,
     kind: "xy",
     data: table([f("gap", "Gap between the two rates", "pct2"), f("events", "Name-events needed", "int")], needRows),
     mark: "line",
@@ -78,7 +78,7 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
     return {
       id,
       title,
-      subtitle: `x observed loss rate after ${fmtInt(n)} name-events · y probability · green = true rate optimistic ${pct2(qOpt)} · red = true rate break-even ${pct2(qBE)} · line = deck q`,
+      subtitle: `x observed loss rate after ${fmtInt(n)} name-events · y probability`,
       kind: "xy",
       data: table([f("rate", "Observed loss rate", "pct2"), f("opt", `true rate ${pct2(qOpt)}`, "pct2"), f("be", `true rate ${pct2(qBE)}`, "pct2")], rows),
       mark: "bar",
@@ -115,7 +115,7 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
   const band: ChartSpec = {
     id: "cal-band",
     title: "Confidence band as the record grows",
-    subtitle: `x name-events observed (log) · y loss rate · band = Wilson interval at ${z}σ around an observed rate equal to the deck's · green = optimistic · red = break-even`,
+    subtitle: `x name-events observed (log) · y loss rate · band = Wilson interval at ${z}σ around an observed rate equal to the deck's`,
     kind: "xy",
     data: table([f("n", "Name-events observed", "int"), f("lo", "Lower bound", "pct2"), f("hat", "Observed rate", "pct2"), f("hi", "Upper bound", "pct2")], bandRows),
     mark: "line",
@@ -192,7 +192,7 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
   const symChart: ChartSpec = {
     id: "cal-symmetric",
     title: `The ${pct(symP)} symmetric system's season next to the ${coin.name}'s`,
-    subtitle: `x season end, units of the starting stake · y share of seasons ending at or below · ${p.nights} events each · amber = ${coin.label} · white = symmetric payoff, ${pct(symP)} win rate, ${pct1(symS)} staked a trade · red line = the start`,
+    subtitle: `x season end, units of the starting stake · y share of seasons ending at or below · ${p.nights} events each`,
     kind: "xy",
     data: table([f("end", "Season end", "x"), f("coin", coin.label, "pct1"), f("sym", symLabel, "pct1")], symRows),
     mark: "step",
@@ -204,7 +204,7 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
     ],
     height: 300,
     annotations: [
-      { kind: "vline", x: 1, text: "start", color: "loss", at: "start" },
+      { kind: "vline", x: 1, text: "start", color: "muted", at: "start" },
       { kind: "hline", y: 0.5, text: "median line", color: "muted", at: "end" },
     ],
     stories: symStories,

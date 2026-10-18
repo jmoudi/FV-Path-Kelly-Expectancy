@@ -23,7 +23,7 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
   const outcomes: ChartSpec = {
     id: "binary-outcomes",
     title: `Where a single-name season can end (${coin.name})`,
-    subtitle: "x probability · y season end, tranche units · red = ruin, green = clean · line = mean",
+    subtitle: "x probability · y season end, tranche units",
     kind: "xy",
     data: table(
       [f("end", "Season end, tranche units", "x"), f("ruin", "Ruin", "pct1"), f("clean", "Clean season", "pct1")],
@@ -46,7 +46,7 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
     barWidthPx: 22,
     height: 140,
     annotations: [
-      { kind: "vline", x: mean, text: `mean ${x2(mean)}: no season ends here`, color: "ink" },
+      { kind: "vline", x: mean, text: `mean ${x2(mean)}: no season ends here`, color: "muted" },
       { kind: "label", x: 0, y: 1 - d.pClean, text: `ruin ${pct(1 - d.pClean)} → 0×`, color: "loss", at: "end" },
       { kind: "label", x: end, y: d.pClean, text: `clean ${pct(d.pClean)} → ${x2(end)}`, color: "good", at: "end" },
     ],
@@ -74,7 +74,7 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
   const curve: ChartSpec = {
     id: "binary-curve",
     title: "A clean season against the per-event loss rate",
-    subtitle: `x loss rate per event · y P(clean season) = (1 − q)^${n} · red = break-even · dot = deck`,
+    subtitle: `x loss rate per event · y P(clean season) = (1 − q)^${n}`,
     kind: "xy",
     data: table([f("q", "Loss rate per event, q", "pct2"), f("pClean", "P(clean season)", "pct1"), f("mean", "Mean season end, tranche units", "x")], curveRows),
     mark: "line",
@@ -119,6 +119,7 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
     color: path[path.length - 1] > 0 ? "a" : "loss",
     emphasis: "muted",
     legend: false,
+    tooltip: false,
     width: 1.2,
   }));
   const ruined = paths.filter((x) => x[x.length - 1] === 0).length;
@@ -136,7 +137,7 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
     height: 280,
     annotations: [
       { kind: "hline", y: end, text: `clean end ${x2(end)}`, color: "good", at: "start" },
-      { kind: "hline", y: mean, text: `mean ${x2(mean)}`, color: "ink", at: "start" },
+      { kind: "hline", y: mean, text: `mean ${x2(mean)}`, color: "muted", at: "start" },
     ],
   };
 
@@ -183,7 +184,7 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
       { id: "clean-season-curve", title: "The one curve the coin reduces to", blurb: "P(clean season) against the per-event loss rate, with break-even and the deck marked.", charts: ["binary-curve", "binary-table"], kpis: [0, 4, 2] },
     ],
     kpis: [
-      { label: "Break-even loss rate", value: pct2(be), sub: "b ÷ (1 + b) · the chain's fair rate c ÷ W", color: "loss", help: "Above this per-event loss rate the season has negative expectation. It is also c/W, the rate at which the wing is fairly priced." },
+      { label: "Break-even loss rate", value: pct2(be), sub: "b ÷ (1 + b) · the chain's fair rate c ÷ W", help: "Above this per-event loss rate the season has negative expectation. It is also c/W, the rate at which the wing is fairly priced." },
       { label: "Expected value per season", value: signedPct1(mean - 1), sub: `mean ${x2(mean)} − 1 · ≈ 2p − 1 = ${signedPct1(2 * d.pClean - 1)}`, help: "Mean season end minus one: the average over a pool of independent replays, the same for Coin and Spread. The shorthand 2p − 1 is exact when the clean end is 2×." },
       { label: `Clean season (${coin.name})`, value: pct(d.pClean), sub: `(1 − q)^${n} at q ${pct2(q)}`, color: "a" },
       { label: "Clean end", value: x2(end), sub: `(1 + b)^${n}`, help: "What the tranche becomes if no event hits max loss." },

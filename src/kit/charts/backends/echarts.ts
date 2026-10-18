@@ -6,7 +6,7 @@ import { BarAccumulator, exposeProbe, inRange, type AxisProbe, type RenderProbe,
 import { formatNumber } from "../format";
 import { LABEL_FONT_PX, LEGEND_ROW_PX, resolveChart, screenPx, type ResolvedAxis, type ResolvedChart, type ScreenAnnotation } from "../resolve";
 import { fieldFormat, fieldLabel, type ChartSpec, type SeriesSpec } from "../spec";
-import { THEME, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
+import { THEME, barFill, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
 import { BAND_ALPHA, bandPoints, barPoints, linePoints, markOf, numberOrNull, seriesName, type Backend, type RenderHandle } from "./types";
 
 echarts.use([
@@ -28,13 +28,18 @@ echarts.use([
 
 type EOption = Record<string, unknown>;
 
-/** Read per build, so configureTheme() reaches it. */
-const labelBg = () => withAlpha(THEME.surface, 0.82);
+/**
+ * Read per build, so configureTheme() reaches it. Labels are knocked out of what they
+ * cross by a page-coloured halo round the glyphs: a box, even in the page colour, shows
+ * as a dark tag wherever a label sits on a band or an area fill.
+ */
+const labelHalo = () => withAlpha(THEME.page, 0.9);
 /** The grid's insets in px; the plot box is what remains of the container. */
 const GRID = { left: 66, right: 22, top: 18, legendTop: 14, bottom: 46 };
 const ANNOTATIONS_ID = "__annotations";
 
-function axisOption(ax: ResolvedAxis, which: "x" | "y"): EOption {
+/** Grid lines run across the value axis only (no plaid); `valueAxis` says whether this is it. */
+function axisOption(ax: ResolvedAxis, which: "x" | "y", valueAxis: boolean): EOption {
   const base: EOption = {
     type: ax.categorical ? "category" : ax.scale === "log" ? "log" : "value",
     name: ax.label,
@@ -50,7 +55,7 @@ function axisOption(ax: ResolvedAxis, which: "x" | "y"): EOption {
     },
     axisLine: { lineStyle: { color: THEME.hairline } },
     axisTick: { show: false },
-    splitLine: { show: ax.grid && !ax.categorical, lineStyle: { color: THEME.grid } },
+    splitLine: { show: valueAxis && ax.grid && !ax.categorical, lineStyle: { color: THEME.grid } },
   };
   if (ax.categorical) {
     base.data = ax.labels;
@@ -84,7 +89,7 @@ function lineSeries(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): EOption 
   // A category axis takes one value per category, in category order.
   const data = rc.h.categorical || rc.v.categorical ? pts.map((p) => (rc.horizontal ? p[0] : p[1])) : pts;
   const common: EOption = { id: s.field, name: seriesName(spec, s), data, z: 3 };
-  const lineStyle = { color, width, opacity: op, type: s.dash ? "dashed" : "solid" };
+  const lineStyle = { color, width, opacity: op, type: s.dash === "dot" ? "dotted" : s.dash ? "dashed" : "solid" };
   // "middle" steps arrive as explicit vertices; "after" steps are the library's own.
   const step = mark === "step" && (spec.step ?? "after") === "after" ? (rc.horizontal ? "start" : "end") : false;
   switch (mark) {
@@ -99,7 +104,6 @@ function lineSeries(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): EOption 
 
 /** Bars on a categorical axis: the library's own bars, grouped by the plan. */
 function categoryBars(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): EOption {
-  const color = roleColor(s.color);
   const op = emphasisOpacity(s.emphasis);
   const pts = barPoints(spec, rc, s);
   const byCat = new Map(pts.map((p) => [String(p.pos), p]));
@@ -107,8 +111,8 @@ function categoryBars(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): EOptio
   const data = cats.map((c, i) => {
     const p = byCat.get(String(c));
     const value = p ? p.value : null;
-    const itemColor = s.colors ? roleColor(s.colors[i % s.colors.length]) : color;
-    return { value, itemStyle: { color: withAlpha(itemColor, op) } };
+    const itemRole = s.colors ? s.colors[i % s.colors.length] : s.color;
+    return { value, itemStyle: { color: barFill(itemRole, op) } };
   });
   const mode = rc.bars?.mode;
   return {
@@ -116,7 +120,7 @@ function categoryBars(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): EOptio
     name: seriesName(spec, s),
     type: "bar",
     data,
-    itemStyle: { color: withAlpha(color, op), borderRadius: rc.horizontal ? [0, 2, 2, 0] : [2, 2, 0, 0] },
+    itemStyle: { color: barFill(s.color, op), borderRadius: rc.horizontal ? [0, 2, 2, 0] : [2, 2, 0, 0] },
     barCategoryGap: "25%",
     barGap: mode === "overlay" ? "-100%" : "0%",
     stack: mode === "stack" ? "total" : undefined,
@@ -130,7 +134,6 @@ function categoryBars(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): EOptio
  * position and push each bar off the value it stands for.
  */
 function numericBars(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): EOption {
-  const color = roleColor(s.color);
   const op = emphasisOpacity(s.emphasis);
   const pts = barPoints(spec, rc, s);
   const thickness = rc.bars?.thicknessPx ?? 6;
@@ -144,10 +147,10 @@ function numericBars(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): EOption
     clip: true,
     z: 2,
     // The series colour, for the legend; each bar carries its own below.
-    itemStyle: { color: withAlpha(color, op) },
+    itemStyle: { color: barFill(s.color, op) },
     dimensions: ["pos", "top", "bottom", "value"],
     encode: horizontal ? { x: 1, y: 0, tooltip: [3] } : { x: 0, y: 1, tooltip: [3] },
-    data: pts.map((p, i) => ({ value: [p.shifted, p.top, p.bottom, p.value], itemStyle: { color: withAlpha(s.colors ? roleColor(s.colors[i % s.colors.length]) : color, op) } })),
+    data: pts.map((p, i) => ({ value: [p.shifted, p.top, p.bottom, p.value], itemStyle: { color: barFill(s.colors ? s.colors[i % s.colors.length] : s.color, op) } })),
     renderItem: (params: { coordSys: { x: number; y: number; width: number; height: number } }, api: { value: (d: number) => number; coord: (v: number[]) => number[]; style: () => Record<string, unknown> }) => {
       const pos = api.value(0);
       const top = api.value(1);
@@ -196,7 +199,8 @@ function annotationSeries(rc: ResolvedChart): EOption {
   const areas: unknown[] = [];
   for (const a of rc.annotations) {
     const color = roleColor(a.color ?? "muted");
-    const lineStyle = { color, type: a.dash === false ? "solid" : "dashed", width: 1.2 };
+    // Reference lines are 1px: they frame the data, they are not data.
+    const lineStyle = { color, type: a.dash === false ? "solid" : "dashed", width: 1 };
     if (a.kind === "vline") lines.push({ xAxis: a.x, lineStyle, label: { show: false } });
     else if (a.kind === "hline") lines.push({ yAxis: a.y, lineStyle, label: { show: false } });
     else if (a.kind === "point") points.push({ coord: [a.x, a.y], symbol: "circle", symbolSize: 11, itemStyle: { color: roleColor(a.color ?? "ink"), borderColor: THEME.surface, borderWidth: 2 }, label: { show: false } });
@@ -249,9 +253,9 @@ function labelGraphics(rc: ResolvedChart, grid: { left: number; top: number; wid
         font: `${LABEL_FONT_PX}px ${THEME.fontUi}`,
         align: l.align,
         verticalAlign: l.baseline,
-        backgroundColor: a.kind === "xband" ? undefined : labelBg(),
-        padding: [2, 4],
-        borderRadius: 3,
+        // The halo hides the lines behind the text (a band's edges never cut through its label).
+        stroke: labelHalo(),
+        lineWidth: 4,
       },
     });
   }
@@ -277,6 +281,14 @@ function xyOption(spec: ChartSpec, width: number, height: number): EOption {
   }
   series.push(annotationSeries(rc));
   const seriesFmt = new Map(spec.series.map((s) => [seriesName(spec, s), fieldFormat(spec.data, s.field)]));
+  // Series that opt out of the readout (the sampled paths of a fan: forty identical rows say nothing).
+  const quiet = new Set(spec.series.filter((s) => s.tooltip === false).map((s) => s.field));
+  const legendSeries = spec.series.filter((s) => s.legend !== false);
+  // One legend key for every chart: a filled bar (10×3) for lines, a square for bars, a
+  // split bar for a dashed line; never the library's line-and-hollow-circle.
+  const allBars = legendSeries.length > 0 && legendSeries.every((s) => markOf(spec, s) === "bar");
+  const legendIcon = (s: SeriesSpec) =>
+    markOf(spec, s) === "bar" || allBars ? "roundRect" : s.dash === "dot" ? "path://M0,0h2v3h-2zM4,0h2v3h-2zM8,0h2v3h-2z" : s.dash ? "path://M0,0h4v3h-4zM6,0h4v3h-4z" : "roundRect";
   const posFmt = rc.axes.x.formatter;
   const valueOf = (p: { value: unknown; seriesType?: string }) => {
     const v = p.value as unknown;
@@ -299,13 +311,14 @@ function xyOption(spec: ChartSpec, width: number, height: number): EOption {
       top: 2,
       left: GRID.left,
       right: GRID.right,
-      data: spec.series.filter((s) => s.legend !== false).map((s) => seriesName(spec, s)),
+      data: legendSeries.map((s) => ({ name: seriesName(spec, s), icon: legendIcon(s) })),
       textStyle: { color: THEME.ink2, fontSize: 11, fontFamily: THEME.fontUi },
-      itemWidth: 18,
-      itemHeight: 8,
+      itemWidth: allBars ? 8 : 10,
+      itemHeight: allBars ? 8 : 3,
       itemGap: 14,
     },
     tooltip: {
+      show: spec.series.some((s) => s.tooltip !== false),
       trigger: spec.mark === "scatter" ? "item" : "axis",
       backgroundColor: THEME.raised,
       borderColor: THEME.hairline,
@@ -315,7 +328,7 @@ function xyOption(spec: ChartSpec, width: number, height: number): EOption {
       extraCssText: "font-size: var(--fs-ui);",
       axisPointer: { type: "line", axis: rc.horizontal ? "y" : "x", lineStyle: { color: THEME.muted, width: 1 } },
       formatter: (params: unknown) => {
-        const list = ((Array.isArray(params) ? params : [params]) as { seriesName: string; seriesId?: string; value: unknown; color: string; name?: string; seriesType?: string }[]).filter((p) => p.seriesId !== ANNOTATIONS_ID && !String(p.seriesId).endsWith("~band"));
+        const list = ((Array.isArray(params) ? params : [params]) as { seriesName: string; seriesId?: string; value: unknown; color: string; name?: string; seriesType?: string }[]).filter((p) => p.seriesId !== ANNOTATIONS_ID && !String(p.seriesId).endsWith("~band") && !quiet.has(String(p.seriesId)));
         if (!list.length) return "";
         const xv = posOf(list[0]);
         const head = `<div style="color:${THEME.muted};font-size:var(--fs-label);margin-bottom:4px">${typeof xv === "number" ? posFmt(xv) : (xv ?? "")}</div>`;
@@ -331,8 +344,8 @@ function xyOption(spec: ChartSpec, width: number, height: number): EOption {
         return head + body;
       },
     },
-    xAxis: axisOption(rc.h, "x"),
-    yAxis: axisOption(rc.v, "y"),
+    xAxis: axisOption(rc.h, "x", rc.h === rc.axes.y),
+    yAxis: axisOption(rc.v, "y", rc.v === rc.axes.y),
     series,
     graphic: { elements: labelGraphics(rc, grid) },
   };
@@ -445,8 +458,9 @@ function heatOption(spec: ChartSpec, width: number): EOption {
         data,
         // Narrow cells (a phone) take a smaller label so "−10.7%" stays inside its cell.
         label: { show: h.cellLabels !== false, color: THEME.ink, fontSize: cellLabelPx, fontFamily: THEME.fontMono, formatter: labelOf },
-        itemStyle: { borderColor: THEME.surface, borderWidth: 2, borderRadius: 3 },
-        emphasis: { itemStyle: { borderColor: THEME.ink } },
+        // Square cells on a 1px page-coloured seam: one field, not a soup of tiles.
+        itemStyle: { borderColor: THEME.page, borderWidth: 1, borderRadius: 0 },
+        emphasis: { itemStyle: { borderColor: THEME.ink2 } },
       },
       ...(outline.length
         ? [
@@ -457,7 +471,7 @@ function heatOption(spec: ChartSpec, width: number): EOption {
               silent: true,
               z: 3,
               label: { show: false },
-              itemStyle: { color: "transparent", borderColor: THEME.ink, borderWidth: 2.5, borderRadius: 3 },
+              itemStyle: { color: "transparent", borderColor: THEME.ink, borderWidth: 2.5, borderRadius: 0 },
               emphasis: { disabled: true },
               tooltip: { show: false },
             },

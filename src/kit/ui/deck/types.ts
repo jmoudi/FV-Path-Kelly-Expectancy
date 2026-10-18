@@ -15,20 +15,18 @@ export interface DeckField {
   phone?: boolean;
 }
 
-/** A group of fields in the reduced deck's first row, under an uppercase caption. */
+/** A group of fields in the reduced deck's first row, under a small caption. */
 export interface InputGroup {
   id: string;
   caption: string;
   fields: DeckField[];
 }
 
-/** One headline number of the status row: the value large, the label small under it. */
+/** One headline number of the status row: the value large and in ink, the label small under it. */
 export interface Figure {
   id: string;
   label: string;
   value: string;
-  /** CSS colour of the value (e.g. "var(--c)"); ink when absent. */
-  color?: string;
   /** Tooltip with the full definition. */
   title?: string;
 }
@@ -37,7 +35,7 @@ export interface Figure {
 export interface StatusLead {
   title: string;
   detail?: string;
-  /** CSS colour of the title. */
+  /** Identity colour (e.g. "var(--c)"): an 8px dot before the title, which stays ink. */
   color?: string;
   tooltip?: string;
 }
@@ -56,6 +54,7 @@ export interface FigureRow {
   label: string;
   basis?: string;
   value: string;
+  /** The identity colour of the one policy the figure belongs to: a dot before the label. The value stays ink. */
   color?: string;
   /** Rendered after the label, typically a "?" help. */
   help?: ReactNode;

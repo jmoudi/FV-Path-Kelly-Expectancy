@@ -8,20 +8,30 @@
    Rule: no literal font size outside :root. Every font-size reads a --fs-* token. */
 :root {
   color-scheme: dark;
+  /* Colour roles. Ink scale: --ink figures, titles, active text; --ink-2 labels and
+     secondary body; --muted captions, ticks, basis lines; no other greys. --accent only
+     marks where to act (focus ring, focused field, active chips, primary buttons, the
+     active tab, link-hover underlines); never in a chart, never on a figure. --a/--b/--c
+     are the three policies: chart marks, legend swatches, 8px identity dots. --loss and
+     --good are status: outcomes, messages, the heat map's sign. */
   --bg: #121416;
-  --surface: #191c1f;
-  --raised: #20242a;
-  --raised-2: #272c33;
-  --hairline: #2b3036;
-  --grid: #23272c;
+  --surface: #1a1d21;
+  --raised: #22262b;
+  --raised-2: #2a2f35;
+  --hairline: #30363d;
+  --grid: #1f2226;
   --ink: #e8e9eb;
-  --ink-2: #aeb4bb;
+  --ink-2: #b4bac1;
   --muted: #8d959e;
-  --a: #c4861a;
-  --b: #2ba3c7;
-  --c: #8b6fe4;
-  --loss: #d64566;
-  --good: #46a860;
+  --accent: #e8e1a3;
+  --accent-hover: #f3edbf;
+  --accent-tint: color-mix(in srgb, var(--accent) 12%, transparent);
+  --on-accent: #121416;
+  --a: #dfa54d;
+  --b: #63cfe9;
+  --c: #8976cd;
+  --loss: #df6768;
+  --good: #5cb572;
   --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
@@ -61,9 +71,6 @@
   /* The sweep strip's width in the deck's reserved slot, the same in every state. */
   --sweep-strip-w: 460px;
   --page-max: 1380px;
-  /* UI chrome accents (focus, primary buttons, sliders, running sweeps). Data colours stay --a/--b/--c. */
-  --accent: var(--b);
-  --accent-2: var(--c);
 }
 
 * {
@@ -97,9 +104,14 @@ textarea {
   font: inherit;
   color: inherit;
 }
+/* One ring, on the element's edge: no offset gap between it and the element's own border. */
 :focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: 0;
+}
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
 }
 @media (prefers-reduced-motion: reduce) {
   * {
@@ -109,6 +121,20 @@ textarea {
 }
 .mono {
   font-family: var(--font-mono);
+}
+/* An 8px identity dot before a policy name: the policy's colour lives here, not in the text. */
+.dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dot::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tone, var(--muted));
 }
 .caption {
   font-size: var(--fs-label);
@@ -133,7 +159,7 @@ textarea {
   height: var(--topbar-h);
   padding-left: var(--gutter-l);
   padding-right: var(--gutter-r);
-  background: rgba(18, 20, 22, 0.92);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--hairline);
   /* Menus render through a portal, so nothing here needs to overflow. */
@@ -176,19 +202,37 @@ textarea {
 }
 .topnav-link:hover,
 .topnav .k-menu-button:hover {
-  background: var(--surface);
+  background: var(--raised);
   color: var(--ink);
 }
 .topnav-link.on,
 .topnav .k-menu-button.on {
-  background: var(--raised);
+  background: var(--raised-2);
   color: var(--ink);
 }
 .topbar-tools {
   margin-left: auto;
   display: flex;
-  gap: 4px;
+  gap: 2px;
   align-items: center;
+}
+/* The tools read like the nav links beside them: same size, 30px tall, no border. */
+.topbar-tools .btn,
+.topbar-more .btn {
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--fs-ui);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.topbar-tools .btn:hover,
+.topbar-more .btn:hover {
+  background: var(--raised);
+  color: var(--ink);
 }
 .topbar-more {
   display: none;
@@ -239,9 +283,9 @@ textarea {
 }
 .rail-title {
   font-size: var(--fs-label);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
   padding: 0 10px 8px;
 }
 .rail a {
@@ -341,16 +385,42 @@ textarea {
 .badge-all {
   font-size: var(--fs-label);
   color: var(--muted);
-  font-style: italic;
 }
+/* Selects: no OS chevron; a small drawn one in the muted ink, the same on every select. */
+.param select,
+.dataset select,
+.field-select,
+.authoring select,
+.mini-field select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    right 13px center,
+    right 9px center;
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+  padding-right: 24px;
+  cursor: pointer;
+}
+/* A select in a field row is the height of a number box (26px) with the same border and fill. */
 .param select,
 .dataset select,
 .field-select {
-  background: var(--raised);
+  height: 26px;
+  background-color: var(--raised);
   border: 1px solid var(--hairline);
   border-radius: 6px;
-  padding: 5px 8px;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 8px;
   font-size: var(--fs-ui);
+}
+.param select:hover,
+.dataset select:hover,
+.field-select:hover,
+.authoring select:hover,
+.mini-field select:hover {
+  border-color: var(--muted);
 }
 
 /* ---------- help tooltip ---------- */
@@ -414,8 +484,9 @@ textarea {
   background: var(--raised);
   color: var(--ink);
   border-radius: 6px;
-  padding: 5px 11px;
+  padding: 4px 11px;
   font-size: var(--fs-ui);
+  line-height: 1.4;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -429,14 +500,25 @@ textarea {
 .btn.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #0b1316;
+  color: var(--on-accent);
   font-weight: 500;
+}
+.btn.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.btn.primary:disabled {
+  background: var(--raised-2);
+  border-color: var(--raised-2);
+  color: var(--muted);
+  opacity: 1;
 }
 .btn.quiet {
   background: transparent;
 }
+/* Small buttons are the same 28px row as the others; only their padding is tighter. */
 .btn.small {
-  padding: 3px 8px;
+  padding: 4px 9px;
   font-size: var(--fs-ui);
 }
 .btn.icon {
@@ -447,7 +529,7 @@ textarea {
 }
 .btn.icon:hover {
   color: var(--ink);
-  background: var(--surface);
+  background: var(--raised);
 }
 /* An action phrased as a sentence: a text link with an arrow, not a box. */
 .action-link {
@@ -501,8 +583,8 @@ textarea {
   color: var(--ink);
 }
 .chip.on {
-  background: var(--raised-2);
-  border-color: var(--accent-2);
+  background: var(--accent-tint);
+  border-color: var(--accent);
   color: var(--ink);
 }
 .chip.tiny {
@@ -511,7 +593,8 @@ textarea {
   line-height: 1.5;
 }
 .chip.play.on {
-  border-color: var(--accent-2);
+  background: var(--accent-tint);
+  border-color: var(--accent);
 }
 /* ---------- tables ---------- */
 .table-wrap {
@@ -563,20 +646,13 @@ textarea {
   color: var(--ink);
   font-weight: 500;
 }
-.table td.role-loss {
-  color: var(--loss);
-}
-.table td.role-good {
-  color: var(--good);
-}
-.table td.role-a {
-  color: var(--a);
-}
-.table td.role-b {
-  color: var(--b);
-}
+/* A column's colour role is read as emphasis, not as a text colour: numbers stay in ink. */
+.table td.role-loss,
+.table td.role-good,
+.table td.role-a,
+.table td.role-b,
 .table td.role-c {
-  color: var(--c);
+  color: var(--ink);
 }
 
 /* Quoted vs recomputed. */
@@ -690,20 +766,27 @@ textarea {
 .authoring .grid2 > span {
   white-space: nowrap;
 }
+/* 92px holds "−0.500" and a unit whole; the boxes are 26px tall like every other box. */
 .authoring input[type="number"],
 .authoring input[type="text"],
 .authoring select {
-  background: var(--surface);
+  height: 26px;
+  background-color: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: 5px;
-  padding: 3px 6px;
+  padding: 0 6px;
   font-family: var(--font-mono);
   font-size: var(--fs-ui);
-  width: 84px;
+  width: 92px;
 }
 .authoring select {
   font-family: var(--font-ui);
   width: auto;
+  padding-right: 24px;
+}
+/* The editor's range boxes hold "−0.500" whole beside the run marker's reserved slot. */
+.authoring .nf.compact .nf-box {
+  width: 92px;
 }
 .authoring .series-list {
   display: grid;
@@ -922,12 +1005,13 @@ textarea.json,
   background: var(--hairline);
   border-radius: 1px;
 }
+/* At rest the slider is ink; only the field being worked on takes the accent. */
 .nf-fill {
   position: absolute;
   left: 0;
   top: 8px;
   height: 2px;
-  background: var(--accent);
+  background: color-mix(in srgb, var(--ink-2) 50%, transparent);
   border-radius: 1px;
 }
 .nf-thumb {
@@ -937,15 +1021,12 @@ textarea.json,
   height: 10px;
   margin-left: -5px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--ink-2);
   border: 2px solid var(--bg);
 }
 .nf.active .nf-thumb {
-  box-shadow: 0 0 0 2px var(--accent);
-}
-.nf.running .nf-fill,
-.nf.running .nf-thumb {
-  background: var(--accent-2);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-tint);
 }
 .nf-box {
   width: 84px;
@@ -974,10 +1055,6 @@ textarea.json,
 }
 .nf.linked .nf-box {
   width: 62px;
-}
-.nf-run {
-  font-size: var(--fs-label);
-  color: var(--accent-2);
 }
 .nf-box.as-button {
   text-align: center;
@@ -1011,7 +1088,7 @@ textarea.json,
   border-bottom: 1px solid var(--grid);
 }
 .preset.on .preset-main b {
-  color: var(--accent-2);
+  color: var(--ink);
 }
 .preset-main {
   display: grid;
@@ -1038,13 +1115,17 @@ textarea.json,
 }
 .mini-field input[type="text"],
 .mini-field select {
-  background: var(--raised);
+  height: 26px;
+  background-color: var(--raised);
   border: 1px solid var(--hairline);
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: 0 8px;
   font-size: var(--fs-ui);
   color: var(--ink);
   min-width: 160px;
+}
+.mini-field select {
+  padding-right: 24px;
 }
 .mini-field.check {
   display: flex;

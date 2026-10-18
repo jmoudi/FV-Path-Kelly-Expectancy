@@ -10,7 +10,7 @@ and never imports the app's types.
 | Answer strip, figure | `AnswerStrip.tsx` | `FigureItem[]`; the first is the hero, the rest open with "+N more figures" |
 | Footer line and tabbed panel | `TabbedPanel.tsx` | `PanelTab[]` (id, label, count, render); fixed height, scrolls inside |
 | View page | `ViewFrame.tsx` | eyebrow, title, prev/next (`LinkItem`), main and aside nodes |
-| Comparison grid | `DeskGrid.tsx` | `GridColumn[]`, `GridGroup[]` of `GridRow`s with cells by column id; one hero cell per group |
+| Comparison grid | `DeskGrid.tsx` | `GridColumn[]` (a `tone` is the dot before the name), `GridGroup[]` of `GridRow`s with cells by column id; one hero row per group; the highlighted column in ink, the rest in ink-2 |
 | Menus | `Menu.tsx` | `MenuButton` (portal panel, closes on Escape, outside click, hashchange), `LinkGroups`, `MenuItems` |
 | Settings | `Settings.tsx` | `SettingsLayout`, `SettingsGroup`, `SettingRow`, `KeyLegend` (`KeyBinding[]`), `Segmented` |
 | Chart frame | `../charts/ChartFrame.tsx` | title, subtitle, tools, tag, stories, story note, a plot box of fixed height, overlay, footer |
@@ -25,13 +25,19 @@ and never imports the app's types.
 
 Styles live in `kit.css` and read only the theme's tokens: `--fs-title`, `--fs-view`,
 `--fs-h`, `--fs-chart`, `--fs-body`, `--fs-ui`, `--fs-label`, `--fs-hero`, `--fs-kpi`
-(with `--fw-*` weights), the colours (`--bg`, `--surface`, `--raised`, `--hairline`,
-`--grid`, `--ink`, `--ink-2`, `--muted`), and the spacing (`--space-section`,
-`--space-block`, `--gutter-2col`, `--prose-max`, `--claim-w`, `--panel-h`,
-`--topbar-h`, `--deck-h`). No frame draws a box; structure is type, spacing and
-hairlines. The chrome (focus ring, primary buttons, sliders, running sweeps) reads
-`--accent` / `--accent-2`, which default to the `--b` / `--c` colour roles;
-`applyThemeVars()` (`applyTheme.ts`) writes the palette into the variables.
+(with `--fw-*` weights), the colours (`--bg`, `--surface`, `--raised`, `--raised-2`,
+`--hairline`, `--grid`, `--ink`, `--ink-2`, `--muted`), the accent (`--accent`,
+`--accent-hover`, `--accent-tint`, `--on-accent`), and the spacing
+(`--space-section`, `--space-block`, `--gutter-2col`, `--prose-max`, `--claim-w`,
+`--panel-h`, `--topbar-h`, `--deck-h`). No frame draws a box; structure is type,
+spacing and hairlines. Colour roles: figures, names and labels are ink (`--ink`,
+`--ink-2`, `--muted`); `--accent` (cream) marks only where to act (the focus ring,
+the focused field's box and thumb, active and linked chips, primary buttons, the
+active tab, link-hover underlines); the data colours `--a`/`--b`/`--c`, `--loss`,
+`--good` appear in the frames only as an identity dot (`.dot`, from a `tone`/`dot`/
+`color` prop) or a legend swatch. `applyThemeVars()` (`applyTheme.ts`) writes the
+palette into the variables. Icons are drawn (`Icon.tsx`: one 16-unit grid, one
+1.5px stroke), never font glyphs.
 
 `theme.css` and `deck/deck.css` still carry a few rules for this app's own classes
 (`desk-*`, `dkb-market*`, `topbar-*`, `topnav*`, `brand-*`, `rail-title`,

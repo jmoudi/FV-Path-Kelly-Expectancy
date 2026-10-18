@@ -8,7 +8,7 @@ import { stepVertices } from "../bars";
 import { formatNumber } from "../format";
 import { LABEL_FONT_PX, LEGEND_ROW_PX, resolveChart, type ResolvedAxis, type ResolvedChart } from "../resolve";
 import { fieldFormat, fieldLabel, type ChartSpec, type Row, type SeriesSpec } from "../spec";
-import { THEME, emphasisOpacity, emphasisWidth, heatPalette, roleColor } from "../theme";
+import { THEME, barFill, emphasisOpacity, emphasisWidth, heatPalette, roleColor } from "../theme";
 import { BAND_ALPHA, barPoints, categories, d3Format, linePoints, markOf, numberOrNull, seriesName } from "./types";
 
 export type VL = Record<string, unknown>;
@@ -23,7 +23,8 @@ function labelExpr(values: (number | string)[], labels: string[], fallbackFormat
   return `({${entries}})[toString(datum.value)] || ${fallback}`;
 }
 
-function axisEnc(ax: ResolvedAxis, field: string, withBands: boolean): VL {
+/** `valueAxis`: grid lines run across the value axis only (no plaid). */
+function axisEnc(ax: ResolvedAxis, field: string, withBands: boolean, valueAxis = false): VL {
   if (ax.categorical)
     return {
       field,
@@ -40,7 +41,7 @@ function axisEnc(ax: ResolvedAxis, field: string, withBands: boolean): VL {
     title: ax.label,
     // padding 0: Vega-Lite pads continuous scales under bars, which would widen the shared range.
     scale: { type: ax.scale === "log" ? "log" : "linear", domain: [ax.min, ax.max], nice: false, zero: false, clamp: false, padding: 0 },
-    axis: { grid: ax.grid, values: ax.ticks, labelExpr: labelExpr(ax.ticks, ax.labels, fmt), labelOverlap: true, labelFlush: false },
+    axis: { grid: valueAxis && ax.grid, values: ax.ticks, labelExpr: labelExpr(ax.ticks, ax.labels, fmt), labelOverlap: true, labelFlush: false },
   };
 }
 
@@ -76,7 +77,7 @@ function lineLayer(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec, legend: Le
     const pos = rc.horizontal ? v : h;
     return { __key: s.field, __i: i, h, v, __t: typeof val === "number" ? formatNumber(val, fmt) : "", __p: typeof pos === "number" ? posFmt(pos) : String(pos ?? "") };
   });
-  const dash = s.dash ? [6, 4] : undefined;
+  const dash = s.dash === "dot" ? [1.5, 3] : s.dash ? [6, 4] : undefined;
   // Steps hold the value along the position axis: horizontal first, or vertical first when bars run sideways.
   const interpolate = mark === "step" && (spec.step ?? "after") === "after" ? (rc.horizontal ? "step-before" : "step-after") : "linear";
   let m: VL;
@@ -84,13 +85,14 @@ function lineLayer(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec, legend: Le
   else if (mark === "area") m = { type: "area", color, opacity: 0.16 * op, orient: rc.horizontal ? "horizontal" : "vertical", line: { color, strokeWidth: width, opacity: op, strokeDash: dash } };
   else m = { type: "line", color, opacity: op, strokeWidth: width, interpolate, strokeDash: dash };
   const enc: VL = {
-    x: axisEnc(rc.h, "h", rc.bars != null),
-    y: axisEnc(rc.v, "v", rc.bars != null),
-    tooltip: [
+    x: axisEnc(rc.h, "h", rc.bars != null, rc.h === rc.axes.y),
+    y: axisEnc(rc.v, "v", rc.bars != null, rc.v === rc.axes.y),
+  };
+  if (s.tooltip !== false)
+    enc.tooltip = [
       { field: "__p", title: rc.axes.x.label },
       { field: "__t", title: seriesName(spec, s) },
-    ],
-  };
+    ];
   // A line follows the data order. (On an area, `order` would split the fill into one group per row.)
   if (mark === "line" || mark === "step") enc.order = { field: "__i", type: "quantitative" };
   // An area fills down to the value axis' baseline: zero, or the axis start on a log scale.
@@ -109,7 +111,6 @@ function lineLayer(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec, legend: Le
 }
 
 function barLayer(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec, legend: LegendInfo | null): VL {
-  const color = roleColor(s.color);
   const op = emphasisOpacity(s.emphasis);
   const fmt = fieldFormat(spec.data, s.field) ?? "auto";
   const pts = barPoints(spec, rc, s);
@@ -124,7 +125,8 @@ function barLayer(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec, legend: Leg
       top: p.top,
       bottom: p.bottom,
       value: p.value,
-      __color: s.colors ? roleColor(s.colors[Math.max(0, ci) % s.colors.length]) : color,
+      // The fill carries its own alpha (status bars at most 0.6, ink bars in ink2); the mark adds the emphasis.
+      __color: barFill(s.colors ? s.colors[Math.max(0, ci) % s.colors.length] : s.color, 1),
       __t: formatNumber(p.value, fmt),
       __p: categorical ? (rc.axes.x.labels[ci] ?? String(p.pos)) : posFmt(p.pos as number),
     };
@@ -134,7 +136,7 @@ function barLayer(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec, legend: Leg
   const radius = horizontal ? { cornerRadiusTopRight: 2, cornerRadiusBottomRight: 2 } : { cornerRadiusTopLeft: 2, cornerRadiusTopRight: 2 };
   const m: VL = { type: "bar", orient: horizontal ? "horizontal" : "vertical", opacity: op, ...radius, ...(thickness && !categorical ? (horizontal ? { height: thickness } : { width: thickness }) : {}) };
   const posEnc = axisEnc(rc.axes.x, "pos", true);
-  const valEnc = axisEnc(rc.axes.y, "top", false);
+  const valEnc = axisEnc(rc.axes.y, "top", false, true);
   const enc: VL = horizontal ? { y: posEnc, x: valEnc, x2: { field: "bottom" } } : { x: posEnc, y: valEnc, y2: { field: "bottom" } };
   if (categorical && rc.bars?.mode === "group") {
     const names = (rc.bars.keys ?? []).map((k) => seriesName(spec, spec.series.find((x) => x.field === k)!));
@@ -183,8 +185,8 @@ function bandLayer(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): VL | null
   const interpolate = mode === "after" ? (rc.horizontal ? "step-before" : "step-after") : "linear";
   const posEnc = axisEnc(rc.axes.x, "pos", false);
   const enc: VL = rc.horizontal
-    ? { y: posEnc, x: axisEnc(rc.axes.y, "hi", false), x2: { field: "lo" }, detail: { field: "__run" } }
-    : { x: posEnc, y: axisEnc(rc.axes.y, "hi", false), y2: { field: "lo" }, detail: { field: "__run" } };
+    ? { y: posEnc, x: axisEnc(rc.axes.y, "hi", false, true), x2: { field: "lo" }, detail: { field: "__run" } }
+    : { x: posEnc, y: axisEnc(rc.axes.y, "hi", false, true), y2: { field: "lo" }, detail: { field: "__run" } };
   return { data: { values }, mark: { type: "area", color: roleColor(s.color), opacity: BAND_ALPHA, interpolate, orient: rc.horizontal ? "horizontal" : "vertical", clip: true }, encoding: enc };
 }
 
@@ -194,8 +196,8 @@ function annotationLayers(rc: ResolvedChart): VL[] {
   for (const a of rc.annotations) {
     const color = roleColor(a.color ?? "muted");
     const dash = a.dash === false ? undefined : [4, 4];
-    if (a.kind === "vline") layers.push({ data: one("line"), mark: { type: "rule", color, strokeDash: dash, strokeWidth: 1.2, clip: true }, encoding: { x: { datum: a.x } } });
-    else if (a.kind === "hline") layers.push({ data: one("line"), mark: { type: "rule", color, strokeDash: dash, strokeWidth: 1.2, clip: true }, encoding: { y: { datum: a.y } } });
+    if (a.kind === "vline") layers.push({ data: one("line"), mark: { type: "rule", color, strokeDash: dash, strokeWidth: 1, clip: true }, encoding: { x: { datum: a.x } } });
+    else if (a.kind === "hline") layers.push({ data: one("line"), mark: { type: "rule", color, strokeDash: dash, strokeWidth: 1, clip: true }, encoding: { y: { datum: a.y } } });
     else if (a.kind === "point") layers.push({ data: one("dot"), mark: { type: "point", filled: true, color: roleColor(a.color ?? "ink"), opacity: 1, size: 90, stroke: THEME.surface, strokeWidth: 2, clip: true }, encoding: { x: { datum: a.x }, y: { datum: a.y } } });
     else if (a.kind === "xband") layers.push({ data: one("area"), mark: { type: "rect", color, opacity: 0.1, clip: true }, encoding: { x: { datum: a.x }, x2: { datum: a.x2 } } });
     else if (a.kind === "yband") layers.push({ data: one("area"), mark: { type: "rect", color, opacity: 0.1, clip: true }, encoding: { y: { datum: a.y }, y2: { datum: a.y2 } } });
@@ -274,14 +276,15 @@ function heatSpec(spec: ChartSpec, height: number): VL {
   const yEnc = { field: h.yField, type: "ordinal", title: spec.y.label ?? fieldLabel(spec.data, h.yField), axis: { labelExpr: catExpr(ys, yFmt) }, sort: [...ys].reverse() };
   const layers: VL[] = [
     {
-      mark: { type: "rect", stroke: THEME.surface, strokeWidth: 2, cornerRadius: 3 },
+      mark: { type: "rect", stroke: THEME.page, strokeWidth: 1, cornerRadius: 0 },
       encoding: {
         x: xEnc,
         y: yEnc,
         color: {
           field: h.valueField,
           type: "quantitative",
-          scale: { domain, range: palette },
+          // RGB, as the other backends blend: Vega's default (HCL) swings red-to-graphite through violet.
+          scale: { domain, range: palette, interpolate: "rgb" },
           legend: h.palette === "binary" ? null : { title: null, format: d3Format(vf), orient: "bottom", direction: "horizontal", gradientLength: 140, gradientThickness: 8, labelFontSize: 10.5 },
         },
         tooltip: [
@@ -296,7 +299,7 @@ function heatSpec(spec: ChartSpec, height: number): VL {
   if (h.highlight) {
     layers.push({
       transform: [{ filter: `toString(datum["${h.xField}"]) === ${JSON.stringify(String(h.highlight.x))} && toString(datum["${h.yField}"]) === ${JSON.stringify(String(h.highlight.y))}` }, { calculate: "0", as: "__cell" }],
-      mark: { type: "rect", fill: null, stroke: THEME.ink, strokeWidth: 2.5, cornerRadius: 3 },
+      mark: { type: "rect", fill: null, stroke: THEME.ink, strokeWidth: 2.5, cornerRadius: 0 },
       encoding: { x: xEnc, y: yEnc },
     });
   }
@@ -310,7 +313,7 @@ export function buildVegaSpec(spec: ChartSpec, width = 720): { vl: VL; resolved:
   const rc = resolveChart(spec, width);
   const legendList = spec.series.filter((s) => s.legend !== false);
   const legend: LegendInfo | null = rc.legend
-    ? { domain: legendList.map((s) => seriesName(spec, s)), range: legendList.map((s) => roleColor(s.color)), symbol: legendList.every((s) => markOf(spec, s) === "bar") ? "square" : "stroke", columns: rc.legend.columns }
+    ? { domain: legendList.map((s) => seriesName(spec, s)), range: legendList.map((s) => (markOf(spec, s) === "bar" ? barFill(s.color, 1) : roleColor(s.color))), symbol: legendList.every((s) => markOf(spec, s) === "bar") ? "square" : "stroke", columns: rc.legend.columns }
     : null;
   // The box is fixed by the spec: legend rows beyond the first come out of the plot.
   const plotHeight = Math.max(60, height - Math.max(0, (rc.legend?.gridRows ?? 1) - 1) * LEGEND_ROW_PX);

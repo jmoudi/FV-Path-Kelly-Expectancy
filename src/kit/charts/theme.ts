@@ -1,41 +1,53 @@
 import type { ColorRole, Emphasis } from "./spec";
 
 /**
- * Graphite: the one theme. Three categorical accents (amber, cyan, violet), a loss red and a
- * gain green reserved for status, and a cyan ramp for ordered scenarios of one
- * parameter. Validated for colour-vision separation on the chart surface.
+ * Graphite: the one theme. Colour has four jobs and no colour does two of them:
+ * - the ink scale (ink, ink2, muted) for every figure, title, label and caption;
+ * - the accent (cream) for "act here" only: focus ring, focused field, active chips,
+ *   primary buttons, the active tab; never in a chart, never on a figure;
+ * - three policy colours (a amber, b cyan, c violet) for chart marks, legend swatches,
+ *   8px identity dots and that policy's annotation lines;
+ * - status (loss red, good green) for ruin and clean outcomes, messages, the heat
+ *   map's sign and the rates pair, as lines and dots, never on a hero figure.
+ * Ordered scenarios of one parameter use the neutral ramp. The policy trio passes the
+ * colour-vision separation and contrast checks on the page.
  */
 export const THEME = {
   page: "#121416",
-  surface: "#191c1f",
-  raised: "#20242a",
-  hairline: "#2b3036",
-  grid: "#23272c",
+  surface: "#1a1d21",
+  raised: "#22262b",
+  raised2: "#2a2f35",
+  hairline: "#30363d",
+  grid: "#1f2226",
   ink: "#e8e9eb",
-  ink2: "#aeb4bb",
+  ink2: "#b4bac1",
   muted: "#8d959e",
+  /** The UI accent (chrome only) and its companions. */
+  accent: "#e8e1a3",
+  accentHover: "#f3edbf",
+  onAccent: "#121416",
   fontUi: '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif',
   fontMono: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
   roles: {
-    a: "#C4861A",
-    b: "#2BA3C7",
-    c: "#8B6FE4",
-    loss: "#D64566",
-    good: "#46A860",
+    a: "#dfa54d",
+    b: "#63cfe9",
+    c: "#8976cd",
+    loss: "#df6768",
+    good: "#5cb572",
     ink: "#e8e9eb",
-    ink2: "#aeb4bb",
+    ink2: "#b4bac1",
     muted: "#8d959e",
-    ramp1: "#9fd6e8",
-    ramp2: "#4fb6d4",
-    ramp3: "#1f87a7",
-    ramp4: "#125c74",
+    ramp1: "#e4e8ed",
+    ramp2: "#babec3",
+    ramp3: "#8f9397",
+    ramp4: "#66696d",
   } satisfies Record<ColorRole, string>,
-  /** Sequential ramp (cyan) for magnitudes, light to dark. */
-  sequential: ["#1b2c33", "#174a5b", "#1f6f88", "#2b97b8", "#59b9d4", "#9fd6e8"],
-  /** Diverging ramp: loss red <- neutral graphite -> gain green. */
-  diverging: ["#D64566", "#8a3a4e", "#3a3b40", "#2f6a44", "#46A860"],
-  /** Two-state cells: won (calm) and lost (loss red). */
-  binary: ["#1f4a5a", "#D64566"],
+  /** Sequential ramp (neutral) for magnitudes, dark to light. */
+  sequential: ["#202429", "#393e42", "#54595e", "#767b80", "#9a9fa5", "#bfc5ca"],
+  /** Diverging ramp: muted loss red <- graphite -> muted gain green, ends matched in lightness. */
+  diverging: ["#ad4b4b", "#733a39", "#27292c", "#2f5838", "#38804b"],
+  /** Two-state cells: won (graphite) and lost (loss red). */
+  binary: ["#2a2f35", "#df6768"],
 };
 
 export type Theme = typeof THEME;
@@ -68,6 +80,20 @@ export function emphasisOpacity(e: Emphasis | undefined): number {
 
 export function emphasisWidth(e: Emphasis | undefined, base = 2): number {
   return e === "muted" ? Math.max(1, base - 1) : e === "strong" ? base + 1 : base;
+}
+
+/** Status colours may fill a bar at most at this opacity, so a red or green bar never outshouts the data. */
+export const STATUS_BAR_ALPHA = 0.6;
+
+/**
+ * A bar's fill: status roles at most STATUS_BAR_ALPHA, ink bars in secondary ink (a
+ * near-white slab is the brightest mark on the page and carries no news), the rest
+ * at the emphasis opacity.
+ */
+export function barFill(role: ColorRole | undefined, op: number): string {
+  if (role === "loss" || role === "good") return withAlpha(roleColor(role), STATUS_BAR_ALPHA * op);
+  if (!role || role === "ink") return withAlpha(THEME.roles.ink2, op);
+  return withAlpha(roleColor(role), op);
 }
 
 export function withAlpha(hex: string, alpha: number): string {

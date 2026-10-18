@@ -67,9 +67,7 @@ export function DeskPage({ desk, scenarios, pending }: { desk: DeskView; scenari
               <div className="k-fig-l">Robust risk a night</div>
             </div>
             <div className="k-fig">
-              <div className="k-fig-v" style={{ color: "var(--c)" }}>
-                {pct(s.risk)}
-              </div>
+              <div className="k-fig-v">{pct(s.risk)}</div>
               <div className="k-fig-l">You risk a night</div>
             </div>
             <div className="k-fig">

@@ -11,6 +11,7 @@ import { Authoring } from "./Authoring";
 import { saveText } from "./download";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { Num } from "@kit/inputs/Num";
+import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 import { TableView } from "./TableView";
 
@@ -184,16 +185,16 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
     <>
       {viewId && (
         <a className="icon-btn" href={viewHref(viewId)} title="Open this chart in its own view" aria-label="Open this chart in its own view">
-          ↗
+          <Icon name="open" />
         </a>
       )}
       {!isTable && (
         <button type="button" className={`icon-btn${tableView ? " on" : ""}`} title={tableView ? "Back to the chart" : "Show the numbers"} aria-label={tableView ? "Back to the chart" : "Show the numbers behind this chart"} aria-pressed={tableView} onClick={() => setTableView((v) => !v)}>
-          ⊞
+          <Icon name="table" />
         </button>
       )}
       <button ref={gearRef} type="button" className={`icon-btn${open || edited ? " on" : ""}`} title="Chart definition: display, axes, marks, backend" aria-label="Open the chart definition" aria-expanded={open} aria-controls={`authoring-${base.id}`} onClick={() => setAuthoringOpen(open ? null : base.id)}>
-        ⚙
+        <Icon name="settings" />
       </button>
     </>
   );

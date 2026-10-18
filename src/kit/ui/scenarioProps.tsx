@@ -1,6 +1,6 @@
 /**
  * Adapters from a ScenarioView to the frames' small shapes: a KPI becomes a FigureItem,
- * a colour role a CSS colour, a section's views become links and menu groups.
+ * a policy's colour role an identity dot, a section's views become links and menu groups.
  */
 
 import { viewHref } from "./route";
@@ -9,14 +9,15 @@ import type { FigureItem, LinkGroup, LinkItem } from "./types";
 import { Help } from "./Help";
 import type { KPI, ScenarioView } from "@kit/charts/scenario";
 
-/** Policy hues and the two status colours carry over; ink, muted and the ramps read as ink. */
-export function toneOf(role: ColorRole | undefined): string | undefined {
+/**
+ * A figure's identity dot: only the three policy roles have one (the figure belongs to
+ * that policy). Status, ink and the ramps never colour a figure.
+ */
+export function dotOf(role: ColorRole | undefined): string | undefined {
   switch (role) {
     case "a":
     case "b":
     case "c":
-    case "loss":
-    case "good":
       return `var(--${role})`;
     default:
       return undefined;
@@ -24,7 +25,7 @@ export function toneOf(role: ColorRole | undefined): string | undefined {
 }
 
 export function kpiItem(k: KPI): FigureItem {
-  return { id: k.label, value: k.value, label: k.label, sub: k.sub, tone: toneOf(k.color), help: k.help ? <Help text={k.help} /> : undefined };
+  return { id: k.label, value: k.value, label: k.label, sub: k.sub, dot: dotOf(k.color), help: k.help ? <Help text={k.help} /> : undefined };
 }
 
 /** "03": the two-digit section number the prose refers to. */

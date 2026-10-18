@@ -51,7 +51,7 @@ export function buildCorrelation(p: Params, d: Derived, _data: Datasets): Scenar
     title: "Season ruin against how often the names share a cause",
     subtitle: single
       ? "x share of nights with one shared cause (log) · y P(ruin) per season, whole tranche (log) · with one name a night there is nothing to share, so the joint loss is q itself"
-      : `x share of nights with one shared cause, c (log) · y P(ruin) per season, whole tranche (log) · dashed = independent names · line = crossover c = q${power(k - 1)} · dot = your c`,
+      : `x share of nights with one shared cause, c (log) · y P(ruin) per season, whole tranche (log)`,
     kind: "xy",
     data: table([f("c", "Share of nights with one shared cause, c", "pct2"), f("ruin", "Ruin per season, whole tranche", "pct2"), f("indep", "Ruin if independent", "pct3"), f("joint", "Joint loss per night", "pct3")], cRows),
     mark: "line",
@@ -63,7 +63,7 @@ export function buildCorrelation(p: Params, d: Derived, _data: Datasets): Scenar
     ],
     height: 320,
     annotations: [
-      ...(single ? [] : [{ kind: "vline" as const, x: cross, text: `c = q${power(k - 1)} = ${smallPct(cross)}: shared cause takes over`, color: "ink" as const, at: "start" as const }]),
+      ...(single ? [] : [{ kind: "vline" as const, x: cross, text: `c = q${power(k - 1)} = ${smallPct(cross)}: shared cause takes over`, color: "muted" as const, at: "start" as const }]),
       { kind: "point", x: Math.max(c, 1e-5), y: ruinJoint, text: `your c ${pct2(c)}: ruin ${smallPct(ruinJoint)}`, color: "ink", at: "end" },
     ],
     stories: curveStories,
@@ -93,15 +93,15 @@ export function buildCorrelation(p: Params, d: Derived, _data: Datasets): Scenar
   const convexity: ChartSpec = {
     id: "cor-shock",
     title: "Loss-rate multiplier under a volatility shock",
-    subtitle: `x realized ÷ priced sigma · y multiplier on the loss rate (log) · one name, and all ${k} names at once · line = your shock`,
+    subtitle: `x realized ÷ priced sigma · y multiplier on the loss rate (log)`,
     kind: "xy",
     data: table([f("scale", "Realized ÷ priced sigma", "x2"), f("single", "Per-name loss rate multiplier", "x2"), f("joint", `All ${k} names at once`, "num")], shockRows),
     mark: "line",
     x: { field: "scale", format: "x2", domain: [1, 2.5] },
     y: { field: "single", scale: "log", label: "Multiplier on the loss rate", format: "num" },
     series: [
-      { field: "single", color: "ramp2", label: "One name" },
-      { field: "joint", color: "loss", label: `All ${k} names at once` },
+      { field: "single", color: "ramp3", label: "One name" },
+      { field: "joint", color: "ramp1", label: `All ${k} names at once`, emphasis: "strong" },
     ],
     height: 260,
     annotations: [{ kind: "vline", x: p.volShock, text: `your shock ${ratio(p.volShock)}: ${typographic(mNow.toFixed(1))}× and ${typographic(Math.pow(mNow, k).toFixed(0))}×`, color: "ink", at: "start" }],
@@ -112,7 +112,7 @@ export function buildCorrelation(p: Params, d: Derived, _data: Datasets): Scenar
   const shareChart: ChartSpec = {
     id: "cor-shock-share",
     title: "Season ruin as more nights carry the shock",
-    subtitle: `x share of shocked nights · y P(ruin) per season, whole tranche · at ${ratio(p.volShock)} priced sigma, directions independent · line = your share`,
+    subtitle: `x share of shocked nights · y P(ruin) per season, whole tranche · at ${ratio(p.volShock)} priced sigma, directions independent`,
     kind: "xy",
     data: table([f("share", "Share of shocked nights", "pct"), f("ruin", "Ruin per season, whole tranche", "pct3")], shareRows),
     mark: "line",
@@ -161,7 +161,7 @@ export function buildCorrelation(p: Params, d: Derived, _data: Datasets): Scenar
       { id: "vol-shock", title: "When volatility shocks everything at once", blurb: "How a shared move in realized volatility multiplies single and joint losses.", charts: ["cor-shock", "cor-shock-share"], params: ["volShock", "volShockShare"], kpis: [3] },
     ],
     kpis: [
-      { label: "Joint loss per night", value: `${smallPct(pIndep)} → ${smallPct(pRef)}`, sub: refLabel, color: "loss" },
+      { label: "Joint loss per night", value: `${smallPct(pIndep)} → ${smallPct(pRef)}`, sub: refLabel },
       { label: "Ruin per season, whole tranche", value: `${smallPct(ruinIndep)} → ${smallPct(ruinRef)}`, sub: refLabel },
       { label: "Crossover c", value: single ? "–" : smallPct(cross), sub: `q${power(k - 1)}`, help: "Above this share of shared-cause nights the correlation term dominates the independent one." },
       { label: "Vol shock multiplier", value: `${typographic(mNow.toFixed(1))}× / ${typographic(Math.pow(mNow, k).toFixed(0))}×`, sub: `one name / all ${k} at ${ratio(p.volShock)} sigma` },

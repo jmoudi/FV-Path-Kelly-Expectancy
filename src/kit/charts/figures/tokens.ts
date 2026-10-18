@@ -27,6 +27,8 @@ export interface Tokens {
   hairline: string;
   grid: string;
   surface: string;
+  /** The page behind the figure (a knock-out paints this). */
+  page: string;
 }
 
 /** Read at draw time, so configureTheme() before the first render reaches the figures. */
@@ -48,6 +50,9 @@ export const TOKENS: Tokens = {
   },
   get surface() {
     return THEME.surface;
+  },
+  get page() {
+    return THEME.page;
   },
 };
 

@@ -14,7 +14,7 @@ export function deskGroups(desk: DeskView): GridGroup[] {
   return desk.groups.map((g) => ({
     id: g.id,
     title: g.title,
-    hero: { row: g.hero.row, column: g.hero.policy },
+    hero: { row: g.hero.row },
     rows: g.rows.map((r) => ({
       id: r.id,
       label: r.label,

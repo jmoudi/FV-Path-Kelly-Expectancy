@@ -13,8 +13,9 @@ lays them out.
   `DeckField` is `{ id, node, below?, phone? }`. `node` is the app's input widget;
   `below` a line under it (e.g. a `LinkedValue`); `phone` keeps it in the row at
   ≤ 700px. Groups sit 40px apart with a hairline between them and wrap whole.
-- row 2: `lead?: StatusLead` (`{ title, detail?, color?, tooltip? }`),
-  `status: Figure[]` (`{ id, label, value, color?, title? }`, value over label),
+- row 2: `lead?: StatusLead` (`{ title, detail?, color?, tooltip? }`; `color` is
+  drawn as an 8px dot before the title), `status: Figure[]` (`{ id, label, value,
+  title? }`, value over label, always in ink),
   `note?: string` (a muted comparison), `legend: LegendItem[]`
   (`{ id, label, color }`), and `strip?: ReactNode` for a slot that is always
   reserved (`stripIdle` when it only holds a placeholder: hidden on a phone).
@@ -29,6 +30,9 @@ lays them out.
   `text` (button and title words); `phoneQuery` (default `(max-width: 700px)`).
 
 Colours are CSS colour strings (`var(--c)`), so the frame never sees palette roles.
+They are identity colours: the frame draws them as dots (before the lead, before a
+figure row's label) and swatches (the legend), never as the colour of a value or a
+name. A `FigureRow.color` says which one policy the row belongs to.
 
 Also here: `LinkedValue` (a derived figure shown as text that turns into a box on
 click, or always a box, handing the typed text back to the app to back-solve its

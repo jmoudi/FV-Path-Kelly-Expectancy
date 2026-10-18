@@ -8,6 +8,7 @@ import { DeskPage } from "@app/desk/DeskPage";
 import { DataDialog, DataSettings } from "@app/DataDialog";
 import { ImportExportDialog, SettingsDialog } from "@kit/ui/Dialogs";
 import { ErrorBoundary } from "@kit/ui/ErrorBoundary";
+import { Icon } from "@kit/ui/Icon";
 import { setViewOrder, useRoute, type Route, type RouteConfig } from "@kit/ui/route";
 import { Section } from "@kit/ui/Section";
 import { FullSettings } from "@kit/ui/SettingsBody";
@@ -19,12 +20,12 @@ import type { ScenarioView } from "@app/scenarios/types";
 
 type Dialog = "io" | "settings" | "data" | null;
 
-/** The brand mark: the favicon's three bars, for the phone top bar. */
+/** The brand mark: the favicon's three bars in ink (no policy colour), for the phone top bar. */
 function BrandMark() {
   return (
     <svg className="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
       <rect width="32" height="32" rx="6" fill="var(--surface)" />
-      <path d="M5 24h5v-8H5zM13.5 24h5V12h-5zM22 24h5V6h-5z" fill="var(--b)" />
+      <path d="M5 24h5v-8H5zM13.5 24h5V12h-5zM22 24h5V6h-5z" fill="var(--ink)" />
     </svg>
   );
 }
@@ -78,11 +79,11 @@ function TopBar({ route, scenarios, onDialog }: { route: Route; scenarios: Scena
           Import / export
         </button>
         <button type="button" className="btn small quiet" onClick={() => onDialog("settings")} title="Quick settings" aria-label="Quick settings">
-          ⚙
+          <Icon name="settings" size={15} />
         </button>
       </div>
       <div className="topbar-more">
-        <MenuButton label="⋯" ariaLabel="More tools" align="end" className="btn small quiet" panelClassName="more-menu">
+        <MenuButton label={<Icon name="more" size={15} />} ariaLabel="More tools" align="end" className="btn small quiet" panelClassName="more-menu">
           {(close) => <MenuItems items={tools} onPick={close} />}
         </MenuButton>
       </div>

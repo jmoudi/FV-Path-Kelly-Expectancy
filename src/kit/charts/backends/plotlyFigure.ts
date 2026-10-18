@@ -6,7 +6,7 @@ import { spanOfPx } from "../bars";
 import { formatNumber } from "../format";
 import { LABEL_FONT_PX, LEGEND_ROW_PX, resolveChart, type ResolvedAxis, type ResolvedChart } from "../resolve";
 import { fieldFormat, fieldLabel, type ChartSpec, type SeriesSpec } from "../spec";
-import { THEME, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
+import { THEME, barFill, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
 import { BAND_ALPHA, bandPoints, barPoints, categories, d3Format, linePoints, markOf, numberOrNull, seriesName, showLegend } from "./types";
 
 export type PTrace = Record<string, unknown>;
@@ -14,11 +14,12 @@ export type PLayout = Record<string, unknown>;
 
 export const MARGIN = { l: 60, r: 20, t: 14, b: 44 };
 
-function axisLayout(ax: ResolvedAxis, vertical: boolean): PLayout {
+/** Grid lines run across the value axis only (no plaid); `valueAxis` says whether this is it. */
+function axisLayout(ax: ResolvedAxis, vertical: boolean, valueAxis: boolean): PLayout {
   const out: PLayout = {
     title: { text: ax.label, font: { size: 11, color: THEME.muted, family: THEME.fontUi }, standoff: 10 },
     type: ax.categorical ? "category" : ax.scale === "log" ? "log" : "linear",
-    gridcolor: ax.grid && !ax.categorical ? THEME.grid : "transparent",
+    gridcolor: valueAxis && ax.grid && !ax.categorical ? THEME.grid : "transparent",
     zerolinecolor: THEME.hairline,
     linecolor: THEME.hairline,
     tickfont: { size: 11, color: THEME.muted, family: THEME.fontMono },
@@ -67,8 +68,9 @@ function lineTrace(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): PTrace {
     showlegend: s.legend !== false,
     customdata: values.map((v) => (typeof v === "number" ? formatNumber(v, fmt ?? "auto") : "")),
     hovertemplate: `%{customdata}<extra>${name}</extra>`,
+    ...(s.tooltip === false ? { hoverinfo: "skip" } : {}),
   };
-  const dash = s.dash ? "dash" : "solid";
+  const dash = s.dash === "dot" ? "dot" : s.dash ? "dash" : "solid";
   const shape = mark === "step" && (spec.step ?? "after") === "after" ? (rc.horizontal ? "vh" : "hv") : "linear";
   switch (mark) {
     case "scatter":
@@ -81,7 +83,6 @@ function lineTrace(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): PTrace {
 }
 
 function barTrace(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): PTrace {
-  const color = roleColor(s.color);
   const op = emphasisOpacity(s.emphasis);
   const name = seriesName(spec, s);
   const fmt = fieldFormat(spec.data, s.field);
@@ -90,7 +91,7 @@ function barTrace(spec: ChartSpec, rc: ResolvedChart, s: SeriesSpec): PTrace {
   const pos = pts.map((p) => (categorical ? catText(rc, p.pos) : p.shifted));
   const len = pts.map((p) => p.top - p.bottom);
   const base = pts.map((p) => p.bottom);
-  const colors = s.colors ? pts.map((p) => withAlpha(roleColor(s.colors![Math.max(0, rc.axes.x.categories.findIndex((c) => String(c) === String(p.pos))) % s.colors!.length]), op)) : withAlpha(color, op);
+  const colors = s.colors ? pts.map((p) => barFill(s.colors![Math.max(0, rc.axes.x.categories.findIndex((c) => String(c) === String(p.pos))) % s.colors!.length], op)) : barFill(s.color, op);
   const trace: PTrace = {
     name,
     meta: s.field,
@@ -154,8 +155,8 @@ function annotationLayout(rc: ResolvedChart): { shapes: PLayout[]; annotations: 
   for (const a of rc.annotations) {
     const color = roleColor(a.color ?? "muted");
     const dash = a.dash === false ? "solid" : "dot";
-    if (a.kind === "vline") shapes.push({ type: "line", xref: "x", yref: "paper", x0: a.x, x1: a.x, y0: 0, y1: 1, line: { color, width: 1.2, dash } });
-    else if (a.kind === "hline") shapes.push({ type: "line", xref: "paper", yref: "y", x0: 0, x1: 1, y0: a.y, y1: a.y, line: { color, width: 1.2, dash } });
+    if (a.kind === "vline") shapes.push({ type: "line", xref: "x", yref: "paper", x0: a.x, x1: a.x, y0: 0, y1: 1, line: { color, width: 1, dash } });
+    else if (a.kind === "hline") shapes.push({ type: "line", xref: "paper", yref: "y", x0: 0, x1: 1, y0: a.y, y1: a.y, line: { color, width: 1, dash } });
     else if (a.kind === "point")
       shapes.push({ type: "circle", xref: "x", yref: "y", xsizemode: "pixel", ysizemode: "pixel", xanchor: ax(a.x!), yanchor: ay(a.y!), x0: -5, x1: 5, y0: -5, y1: 5, line: { color: THEME.surface, width: 2 }, fillcolor: roleColor(a.color ?? "ink") });
     else if (a.kind === "xband") shapes.push({ type: "rect", xref: "x", yref: "paper", x0: a.x, x1: a.x2, y0: 0, y1: 1, fillcolor: withAlpha(color, 0.1), line: { width: 0 } });
@@ -171,8 +172,8 @@ function annotationLayout(rc: ResolvedChart): { shapes: PLayout[]; annotations: 
       yanchor: l.baseline,
       xshift: l.dx,
       yshift: -l.dy,
-      bgcolor: a.kind === "xband" ? undefined : withAlpha(THEME.surface, 0.82),
-      borderpad: 2,
+      bgcolor: withAlpha(THEME.page, 0.85),
+      borderpad: 1,
     };
     if (a.kind === "xband") {
       const lo = Math.max(Math.min(a.x!, a.x2!), h.min);
@@ -248,8 +249,8 @@ function heatFigure(spec: ChartSpec, base: PLayout): { data: PTrace[]; layout: P
         zmin,
         zmax,
         colorscale,
-        xgap: 2,
-        ygap: 2,
+        xgap: 1,
+        ygap: 1,
         hovertemplate: `%{x}, %{y}<br><b>%{text}</b><extra></extra>`,
         showscale: h.palette !== "binary",
         colorbar: { thickness: 8, len: 0.8, tickfont: { size: 10.5, color: THEME.muted, family: THEME.fontMono }, tickformat: d3Format(vf) ?? ".3~g", outlinewidth: 0 },
@@ -298,8 +299,8 @@ export function buildFigure(spec: ChartSpec, width = 720): { data: PTrace[]; lay
     data,
     layout: {
       ...base,
-      xaxis: axisLayout(rc.h, false),
-      yaxis: axisLayout(rc.v, true),
+      xaxis: axisLayout(rc.h, false, rc.h === rc.axes.y),
+      yaxis: axisLayout(rc.v, true, rc.v === rc.axes.y),
       shapes,
       annotations,
       // On a numeric axis the bars arrive already placed, so they overlay; on a

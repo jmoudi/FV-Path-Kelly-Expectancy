@@ -87,10 +87,10 @@ export function Railroad({ spec, width }: FigureProps) {
     <svg width={W} height={height} viewBox={`0 0 ${W} ${height}`} style={{ display: "block", overflow: "visible" }}>
       {/* The whole tranche, as the trunk; the reserve runs through at its own width. */}
       <line x1={left} x2={W - right} y1={cy} y2={cy} stroke={withAlpha(TOKENS.ink, 0.1)} strokeWidth={scale} strokeLinecap="butt" />
-      {reserveW > 0.4 && <line x1={left} x2={W - right} y1={cy} y2={cy} stroke={withAlpha(TOKENS.muted, 0.55)} strokeWidth={reserveW} />}
+      {reserveW > 0.4 && <line x1={left} x2={W - right} y1={cy} y2={cy} stroke={withAlpha(TOKENS.muted, 0.3)} strokeWidth={reserveW} />}
       {gapped && (
         <>
-          <rect x={gapStart} y={cy - scale / 2 - 1} width={Math.max(0, gapEnd - gapStart)} height={scale + 2} fill={TOKENS.surface} />
+          <rect x={gapStart} y={cy - scale / 2 - 1} width={Math.max(0, gapEnd - gapStart)} height={scale + 2} fill={TOKENS.page} />
           <line x1={gapStart} x2={gapEnd} y1={cy} y2={cy} stroke={TOKENS.muted} strokeWidth={1} strokeDasharray="2 4" />
           <text x={xAt(gapSlot)} y={cy - fanH - 8} textAnchor="middle" fill={TOKENS.muted} style={text}>
             {firstHidden === lastHidden ? `night ${firstHidden}` : `nights ${firstHidden}–${lastHidden}`}
@@ -103,8 +103,12 @@ export function Railroad({ spec, width }: FigureProps) {
         return (
           <g key={night}>
             <rect x={x - pitch * 0.15} y={cy - fanH - 2} width={pitch * 0.3} height={2 * fanH + 4} rx={3} fill={withAlpha(TOKENS.ink, 0.05)} />
+            {/* Each track: a quiet band as wide as the name's share, and a 1.5px line through it. */}
             {offsets.map((off, i) => (
-              <path key={i} d={splitPath(x, off)} fill="none" stroke={trackColor} strokeWidth={nameW} strokeLinecap="round" opacity={0.9} />
+              <g key={i}>
+                <path d={splitPath(x, off)} fill="none" stroke={withAlpha(trackColor, 0.22)} strokeWidth={nameW} strokeLinecap="round" />
+                <path d={splitPath(x, off)} fill="none" stroke={withAlpha(trackColor, 0.7)} strokeWidth={1.5} strokeLinecap="round" />
+              </g>
             ))}
             {(night === 1 || night === n || (night - 1) % labelEvery === 0) && (
               <text x={x} y={top + plotH + 16} textAnchor="middle" fill={TOKENS.muted} style={mono}>

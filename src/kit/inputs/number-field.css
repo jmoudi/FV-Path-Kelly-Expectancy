@@ -157,6 +157,9 @@
   text-overflow: ellipsis;
   flex: 0 1 auto;
 }
+.sw .sw-next {
+  margin-left: 4px;
+}
 .sw .sw-value {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;

@@ -30,7 +30,7 @@ Worker-safe (no React, no DOM; scenario builders may import them): `math/*`, `ch
 4. **Build** (`build/`). `defineBuildWorker((input, { only }) => output)` in the worker entry. In the app: `{ createWorker, build, settled: new SettleTracker() }` and `useBuild(input, config)` with a memoised `input`. The output is `{ scenarios: ScenarioView[]; partial?: string[] }` plus whatever else the app builds.
 5. **Provider** (`state/context.tsx`). `<KitProvider store={useStore} schema={SCHEMA} sweeps={SWEEPS} copy={KIT_COPY}>` around the app. `KitCopy` holds every sentence a frame says on its own, including `storyMoved(before, now)`, the badge of a story that moved the parameters.
 6. **Frames.** `Deck` takes `DeckProps` (groups of fields as nodes, a lead, figures, a legend, a strip, drawer sections). `Section` and `ViewPage` take a `ScenarioView`. `DeskGrid` takes columns and row groups. `FullSettings` takes a `data` slot. Routes: `useRoute(cfg)` with `{ home, pages, aliases?, sectionsPage }`; `#view/<id>` and `#s-<id>` are built in (`viewHref`, `sectionHref`).
-7. **Look.** `registerFigures({ name: { component, label, blurb } })` before the first render. `configureTheme(patch)` then `applyThemeVars()` for another palette. The CSS chrome reads `--accent` / `--accent-2` (default: the `b` / `c` roles), so chrome and data recolour separately.
+7. **Look.** `registerFigures({ name: { component, label, blurb } })` before the first render. `configureTheme(patch)` then `applyThemeVars()` for another palette. The CSS chrome reads `--accent` (with `--accent-hover`, `--accent-tint`, `--on-accent`), which is its own colour (`THEME.accent`), never a data role, so chrome and data recolour separately.
 
 ## Checklist for a second explainer
 

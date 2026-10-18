@@ -84,7 +84,7 @@ swapped without touching the others.
 | Sweeps | `src/kit/sweeps/` | Presets, plans and their sanitizers (`types.ts`, `engine.ts`, `sanitize.ts`, over the app's `PresetCatalog`); the frame-locked sweep clock (`runner.ts`: the next value only after the last one rendered, each value on screen at least its interval); the driver and the hotkeys (`useSweeps.ts`); the strip and the preset editor (`SweepStrip`, `SweepPanel`); and the `SweepAdapter` (`adapter.ts`) through which they ask the app for an input's context, its format and whether a build has rendered. |
 | State | `src/kit/state/` | `createAppStore(config)`: parameters with undo and redo, imported data, chart edits, default backend, presets and links, settings, and the snapshot of parameters a story moved (only one deck-moving story is active at a time). Sweep runs are saved as input, preset and pre-sweep value only (ticks are never saved), so a reload mid-sweep puts the input back. Validated on load, persisted locally under one key, exported and imported as one versioned JSON file; `#reset` in the address clears it. `<KitProvider>` with `useKit`, `useKitApi`, `useSchema`, `useKitSweeps`, `useKitCopy` is how kit components reach the store, the schema, the sweep adapter and the copy. |
 | Build | `src/kit/build/` | `defineBuildWorker` (the worker side) and `useBuild(input, { createWorker, build, settled })`: the build queue (`coalesce.ts`: one request in flight, the newest waiting, every answer newer than the last one shown rendered), `only` partial builds of the scenarios on screen during a sweep (`scope.ts`), and an inline fallback when the worker does not answer. |
-| Frames | `src/kit/ui/` | The section skeleton and its composition (`SectionFrame`, `Section`), the answer strip, the footer line and its tabbed panel, the view page (`ViewFrame`, `ViewPage`), the chart host with the editor in ⚙ and the ⊞ table (`ChartHost`, `Authoring`, `TableView`), the comparison grid (`DeskGrid`), portal menus, settings (`Settings`, `SettingsBody`) and the hotkey legend, dialogs, popovers, routes (`route.ts`: a `RouteConfig`, `viewHref`, `sectionHref`), the shell hooks (`Shell.tsx`: scroll spy, `[` / `]` between views, the crash screen), adapters from a `ScenarioView` to frame props (`scenarioProps.tsx`: KPIs into figures, sections into chips and the Views menu), the frames' default copy (`copy.ts`), and the deck (`deck/`: the two-row bar, the drawer, the linked value, the segmented switch), all through props. One dark theme, graphite: `theme.css` holds the colour tokens and the token-only type scale, `kit.css` reads only those tokens, `deck/deck.css` styles the deck frame; the chrome (focus, primary buttons, sliders, running sweeps) reads `--accent` / `--accent-2`. Stacking: deck 25, top bar 30, drawer 35, dialogs 50, popovers 70, menus 80. See `src/kit/ui/README.md` and `src/kit/ui/deck/README.md`. |
+| Frames | `src/kit/ui/` | The section skeleton and its composition (`SectionFrame`, `Section`), the answer strip, the footer line and its tabbed panel, the view page (`ViewFrame`, `ViewPage`), the chart host with the editor in ⚙ and the ⊞ table (`ChartHost`, `Authoring`, `TableView`), the comparison grid (`DeskGrid`), portal menus, settings (`Settings`, `SettingsBody`) and the hotkey legend, dialogs, popovers, routes (`route.ts`: a `RouteConfig`, `viewHref`, `sectionHref`), the shell hooks (`Shell.tsx`: scroll spy, `[` / `]` between views, the crash screen), adapters from a `ScenarioView` to frame props (`scenarioProps.tsx`: KPIs into figures, sections into chips and the Views menu), the frames' default copy (`copy.ts`), and the deck (`deck/`: the two-row bar, the drawer, the linked value, the segmented switch), all through props. One dark theme, graphite: `theme.css` holds the colour tokens and the token-only type scale, `kit.css` reads only those tokens, `deck/deck.css` styles the deck frame; the chrome (focus ring, focused field, active chips, primary buttons, active tab) reads `--accent`, a cream of its own; icons are drawn (`Icon.tsx`). Stacking: deck 25, top bar 30, drawer 35, dialogs 50, popovers 70, menus 80. See `src/kit/ui/README.md` and `src/kit/ui/deck/README.md`. |
 | Maths | `src/kit/math/stats.ts` | The error function and the normal distribution, Student-t, lgamma, binomial, the regularized incomplete Beta, a seeded RNG, linspace and logspace, integration. No domain. |
 
 ### The app (`src/app/`)
@@ -113,9 +113,10 @@ swapped without touching the others.
   event: loss rate q, gain b, optimistic loss rate · Per season: nights n, names a
   night k, shared-cause nights c · Sizing: at risk a night, seasons chained N), and
   under the loss rate "= 55% clean season (Coin)": click it to type a clean-season
-  probability and q is solved from it. Row 2: your policy (Spread + reserve) with EV
-  per season, the median after N seasons, P(below the threshold) and ruin in its
-  colour; the Coin's clean season and ruin, muted, over the policy legend; the sweep
+  probability and q is solved from it. Row 2: your policy (Spread + reserve, its
+  colour a dot before the name) with EV per season, the median after N seasons,
+  P(below the threshold) and ruin in ink; the Coin's clean season and ruin, muted,
+  over the policy legend; the sweep
   strip of the active input in a slot whose width never changes; Full deck ▾. Below
   1280px the groups wrap whole; below 900px the Coin line and the legend take row 2's
   last line. On a phone row 1 keeps loss rate, gain, names a night
@@ -217,6 +218,18 @@ swapped without touching the others.
 - Rates palette: optimistic = green, deck = ink (near white on graphite), break-even =
   red, wherever those rates are a series or an annotation; a test holds every chart to
   it. Policy colours are reserved for policies; `ink2` is the neutral accent for asides.
+- Colour roles (one job per colour; tested in `tests/charts.test.ts`): figures, names,
+  titles and labels are ink (`--ink`, `--ink-2`, `--muted`), so no number on a page is
+  coloured and "yours" reads as ink against ink-2. The cream `--accent` (#e8e1a3)
+  marks only where to act: the focus ring, the focused field, active and linked chips,
+  primary buttons, the active tab, link-hover underlines; never in a chart. Amber, cyan
+  and violet (Coin, Spread, Spread + reserve) live on chart marks, legend swatches,
+  that policy's annotation lines and the 8px dot before a policy's name or figure.
+  Loss red and good green mark ruin and clean outcomes, messages, the heat map's sign
+  and the rates pair, as lines and dots; status bars fill at most 0.6. Ordered
+  scenarios use the neutral grey ramp, or one policy's colour told apart by dash.
+  Reference lines are 1px muted dashes (ink only for the deck's own value); grid lines
+  run across the value axis only; labels sit on a page-coloured halo, not in a box.
 - Type: every font size reads a token (`--fs-title` 36 · `--fs-view` 30 · `--fs-h` 20 ·
   `--fs-chart` 17 · `--fs-body` 15 · `--fs-ui` 13 · `--fs-label` 11.5 · `--fs-hero` 28 ·
   `--fs-kpi` 20), defined once in `:root`. Borders remain only on inputs, popovers, the
