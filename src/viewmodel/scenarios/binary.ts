@@ -174,7 +174,7 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
     claim: "An all-in season is a coin: “roughly 50-50, doubled or zero” is the break-even point, not a premium over fair.",
     lede: `Where can a season of ${n} all-in nights end, and which single number decides it?`,
     views: [
-      { id: "season-outcomes", title: "Where a season ends", blurb: `The two ends of an all-in season and the sampled paths that get there (${coin.label}).`, charts: ["binary-outcomes", "binary-fan"], kpis: [0, 1, 2, 3] },
+      { id: "season-outcomes", title: "Where a season ends", blurb: `The two ends of an all-in season and the sampled paths that get there, for the ${coin.label}.`, charts: ["binary-outcomes", "binary-fan"], kpis: [0, 1, 2, 3] },
       { id: "clean-season-curve", title: "The one curve the coin reduces to", blurb: "P(clean season) against the per-event loss rate, with break-even and the deck marked.", charts: ["binary-curve", "binary-table"], kpis: [0, 4, 2] },
     ],
     kpis: [

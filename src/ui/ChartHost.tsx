@@ -3,9 +3,9 @@ import type { RenderHandle } from "../charts/backends/types";
 import { FIGURE_DEFAULT_HEIGHT, FigureFrame, figureFor } from "../charts/figures";
 import { loadBackend, BACKEND_INFO } from "../charts/registry";
 import { applyOverride, toCsv, type BackendId, type ChartSpec, type SpecOverride, type Story } from "../charts/spec";
-import { movedBadge } from "../app/figures";
 import { ChartFrame } from "../kit/charts/ChartFrame";
 import { useStore } from "../state/store";
+import { movedBadge } from "../viewmodel/derived";
 import { Authoring } from "./Authoring";
 import { saveText } from "./download";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -27,7 +27,7 @@ const STORY_CACHE = new Map<string, Story>();
 /** Pixels at the top of the viewport covered by the sticky top bar and deck. */
 function stickyInset(): number {
   let bottom = 0;
-  for (const sel of [".topbar", "#deck"]) {
+  for (const sel of [".topbar", ".dkb"]) {
     const el = document.querySelector(sel);
     if (el) bottom = Math.max(bottom, el.getBoundingClientRect().bottom);
   }
@@ -234,7 +234,8 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
         <FigureFrame spec={spec} Figure={figureFor(base)} height={height} />
       </div>
     );
-  else body = <div ref={plotRef} className={`k-plot${mounted ? "" : " loading"}`} data-loading={error ? "" : `Loading ${BACKEND_INFO[effective].label}…`} role="img" aria-label={spec.title} />;
+  // `chart-plot` is the element the backend mounts into and hangs its probe on (scripts/parity.mjs reads it).
+  else body = <div ref={plotRef} className={`k-plot chart-plot${mounted ? "" : " loading"}`} data-loading={error ? "" : `Loading ${BACKEND_INFO[effective].label}…`} role="img" aria-label={spec.title} />;
 
   const overlay = error ? (
     <div className="k-chart-error" role="alert">

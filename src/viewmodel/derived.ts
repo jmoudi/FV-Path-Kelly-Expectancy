@@ -1,9 +1,10 @@
-import type { ColorRole, NumberFormat } from "../charts/spec";
+import { formatNumber, MINUS, typographic } from "../charts/format";
+import type { ColorRole } from "../charts/spec";
 import { breakEvenLossRate, cleanEnd, pCleanFromLossRate } from "../model/binary";
 import { recordStats, type RecordStats } from "../model/calibration";
 import { medianGrowthPerSeason } from "../model/growth";
 import { betaPosterior, kellyFraction, nightOptimum, robustOptimum, seasonLogGrowth, seasonRuin, uniformBand, type RateWeights } from "../model/kelly";
-import { MARKET_TOL, marketLossRate, marketOf, type Datasets, type Market, type Params } from "../model/params";
+import { MARKET_TOL, marketLossRate, marketOf, PARAM_BY_KEY, type Datasets, type Market, type Params, type Unit } from "../model/params";
 import { POLICY_IDS, POLICY_LEGEND, YOUR_POLICY, policies, type PolicyDef, type PolicyId, type PolicyMeta } from "../model/policies";
 import { scheduleDistribution, summarize, type Distribution, type DistributionOptions, type Summary } from "../model/season";
 import { quoted, type SourceFigure } from "./types";
@@ -12,57 +13,11 @@ export type { PolicyId };
 
 // ---------------------------------------------------------------------------
 // The one number formatter. Every string the app shows a number in comes from
-// here; the minus sign is always U+2212.
+// here or from src/charts/format.ts, which these re-export (the charts layer cannot
+// import the view-model); the minus sign is always U+2212.
 // ---------------------------------------------------------------------------
 
-export const MINUS = "−";
-
-/** Replace the hyphen-minus a JavaScript number prints with the typographic minus. */
-export function typographic(s: string): string {
-  return s.replace(/-/g, MINUS);
-}
-
-/** Format a number in one of the chart formats (the same names src/charts/spec.ts uses). */
-export function formatNumber(v: number | string | null | undefined, fmt: NumberFormat = "auto"): string {
-  if (v == null) return "";
-  if (typeof v === "string") return v;
-  if (!Number.isFinite(v)) return v > 0 ? "∞" : v < 0 ? `${MINUS}∞` : "–";
-  switch (fmt) {
-    case "pct":
-      return pct(v, 0);
-    case "pct1":
-      return pct(v, 1);
-    case "pct2":
-      return pct(v, 2);
-    case "pct3":
-      return pct(v, 3);
-    case "x":
-      return x2(v);
-    case "x2":
-      return typographic(v.toFixed(2));
-    case "int":
-      return fmtInt(v);
-    case "sci":
-      return v === 0 ? "0" : typographic(v.toExponential(1));
-    case "num":
-      return typographic(Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(3));
-    default:
-      return autoFormat(v);
-  }
-}
-
-export function autoFormat(v: number): string {
-  const a = Math.abs(v);
-  if (a === 0) return "0";
-  if (a >= 1e6) return typographic(v.toExponential(1));
-  if (a >= 1000) return fmtInt(v);
-  if (a >= 100) return typographic(v.toFixed(0));
-  if (a >= 10) return typographic(v.toFixed(1));
-  if (a >= 1) return typographic(v.toFixed(2));
-  if (a >= 0.01) return typographic(v.toFixed(3));
-  if (a >= 1e-4) return typographic(v.toFixed(5));
-  return typographic(v.toExponential(1));
-}
+export { autoFormat, formatNumber, MINUS, typographic } from "../charts/format";
 
 /** A share as a percentage with `dd` decimals: 0.0294 → "2.94%". */
 export const pct = (v: number, dd = 0) => (Number.isFinite(v) ? typographic(`${(v * 100).toFixed(dd)}%`) : formatNumber(v));
@@ -136,6 +91,42 @@ export function near(quoted: number, computed: number, absTol: number, relTol = 
 /** The badge of a story that moves the deck: "moves deck: q 2.94% → 2.52%". */
 export function movesDeck(label: string, from: string, to: string): string {
   return `moves deck: ${label} ${from} → ${to}`;
+}
+
+/** A parameter value in its schema unit, as the deck prints it. */
+export function formatIn(unit: Unit, v: number): string {
+  switch (unit) {
+    case "pct":
+      return pct(v);
+    case "pct2":
+      return pct2(v);
+    case "int":
+      return fmtInt(v);
+    case "x":
+      return x2(v);
+    case "sigma":
+      return sigma(v);
+    default:
+      return typographic(v.toFixed(2));
+  }
+}
+
+/**
+ * What an active story moved, from the snapshot the store took before it moved the
+ * deck: "moves deck: q 2.94% → 2.52%". A rebuilt chart's own badge is computed from
+ * the deck as it is after the move, so the host reads this one instead. Null when
+ * nothing numeric moved.
+ */
+export function movedBadge(before: Partial<Params> | undefined, now: Params): string | null {
+  if (!before) return null;
+  const parts: string[] = [];
+  for (const [k, v] of Object.entries(before)) {
+    const def = PARAM_BY_KEY[k];
+    const cur = now[k as keyof Params];
+    if (!def || typeof v !== "number" || typeof cur !== "number" || v === cur) continue;
+    parts.push(`${def.short ?? def.shortLabel ?? def.label} ${formatIn(def.unit, v)} → ${formatIn(def.unit, cur)}`);
+  }
+  return parts.length ? `moves deck: ${parts.join(", ")}` : null;
 }
 
 /** The discussion's setup, which every quoted figure assumes. */
@@ -219,22 +210,32 @@ export interface MarketState {
   discussionRate: number;
   /** fair − q: the premium over fair per event the deck asserts, as a rate. */
   premium: number;
+  /** q sits at the fair rate (within display precision): premium over fair 0. */
   zeroPremium: boolean;
+  /** No positive premium (fair, or q above the fair rate): the growth-optimal risk at the deck's rate is 0. */
+  noPremium: boolean;
   /** The one line next to the switch. */
   line: string;
-  /** What the Desk and the sizing views say under fair pricing (empty otherwise). */
+  /** What the Desk and the sizing views say when there is no positive premium (empty otherwise). */
   sizingNote: string;
 }
 
 export const MARKET_LINE = "The discussion's case is an assumed risk premium for selling tail insurance, not an information edge.";
 export const ZERO_PREMIUM_NOTE = "At zero premium the growth-optimal risk is 0; sizing only changes the median, P(below threshold) and ruin.";
+export const NEGATIVE_PREMIUM_NOTE = "With a negative premium the growth-optimal risk is 0; sizing only changes how fast the median falls, P(below threshold) and ruin.";
 
 export function marketState(p: Params): MarketState {
   const fairRate = marketLossRate("fair", p);
   const discussionRate = marketLossRate("discussion", p);
   const actual = marketOf(p);
   const premium = fairRate - p.lossRate;
-  const zeroPremium = premium <= MARKET_TOL;
+  const zeroPremium = Math.abs(premium) <= MARKET_TOL;
+  const noPremium = premium <= MARKET_TOL;
+  const line = zeroPremium
+    ? `Fair pricing: q = b/(1+b) = ${pct2(fairRate)}, premium over fair 0.`
+    : noPremium
+      ? `The deck's q ${pct2(p.lossRate)} sits above the fair rate ${pct2(fairRate)}: the chain pays ${signedPp(premium)} premium over fair per event.`
+      : `${MARKET_LINE} The deck's q asserts ${signedPp(premium)} premium over fair per event.`;
   return {
     chosen: p.market,
     actual,
@@ -242,8 +243,9 @@ export function marketState(p: Params): MarketState {
     discussionRate,
     premium,
     zeroPremium,
-    line: zeroPremium ? `Fair pricing: q = b/(1+b) = ${pct2(fairRate)}, premium over fair 0.` : `${MARKET_LINE} The deck's q asserts ${signedPp(premium)} premium over fair per event.`,
-    sizingNote: zeroPremium ? ZERO_PREMIUM_NOTE : "",
+    noPremium,
+    line,
+    sizingNote: zeroPremium ? ZERO_PREMIUM_NOTE : noPremium ? NEGATIVE_PREMIUM_NOTE : "",
   };
 }
 

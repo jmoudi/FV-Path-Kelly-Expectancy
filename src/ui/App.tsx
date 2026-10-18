@@ -6,11 +6,11 @@ import { DeckBar } from "./DeckBar";
 import { DeskPage } from "./DeskPage";
 import { DataDialog, ImportExportDialog, SettingsDialog } from "./Dialogs";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { setViewOrder, useRoute, type Route } from "./route";
+import { setViewOrder, stepView, useRoute, type Route } from "./route";
 import { Section } from "./Section";
 import { FullSettings } from "./SettingsBody";
 import { useBuild } from "./useBuild";
-import { useSweepEngine, useSweepHotkeys } from "./useSweeps";
+import { isEditableTarget, useSweepEngine, useSweepHotkeys } from "./useSweeps";
 import { ViewPage } from "./ViewPage";
 import type { ScenarioView } from "../viewmodel/types";
 
@@ -33,6 +33,25 @@ function useScrollSpy(ids: string[], enabled: boolean): string {
 }
 
 type Dialog = "io" | "settings" | "data" | null;
+
+/**
+ * Plain [ and ] step to the previous or next view, in reading order, from any page.
+ * Not while focus is in an editable field or a select (typing wins there), not with
+ * Ctrl or ⌘ (those cycle sweep presets), and not while a dialog is open.
+ */
+function useViewKeys(blocked: boolean) {
+  useEffect(() => {
+    if (blocked) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || (e.key !== "[" && e.key !== "]")) return;
+      const el = document.activeElement;
+      if (isEditableTarget(el) || el?.tagName === "SELECT") return;
+      if (stepView(e.key === "]" ? 1 : -1)) e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [blocked]);
+}
 
 /** The brand mark: the favicon's three bars, for the phone top bar. */
 function BrandMark() {
@@ -117,6 +136,7 @@ export function App() {
   const active = useScrollSpy(ids, route.page === "explain");
   useSweepEngine();
   useSweepHotkeys();
+  useViewKeys(dialog != null);
 
   // The reading order of the views, for whichever key handler steps through them.
   useEffect(() => setViewOrder(viewOrder(scenarios)), [scenarios]);

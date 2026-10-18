@@ -318,7 +318,7 @@ export const PARAM_DEFS: ParamDef[] = [
     affectsAll: true,
     help: "Share of nights on which all names effectively share one outcome because of a common cause. It enters the Spread and Spread + reserve policies, so every section moves with it.",
   },
-  { key: "volShock", label: "Realized ÷ priced sigma on shocked nights", unit: "ratio", min: 1, max: 2.5, step: 0.05, tier: "secondary", section: "correlation", help: "On shocked nights the realized move is this many times what every chain priced." },
+  { key: "volShock", label: "Shock: realized ÷ priced sigma", unit: "ratio", min: 1, max: 2.5, step: 0.05, tier: "secondary", section: "correlation", help: "On shocked nights the realized move is this many times what every chain priced." },
   { key: "volShockShare", label: "Share of shocked nights", unit: "pct", min: 0, max: 1, step: 0.05, tier: "secondary", section: "correlation", help: "Fraction of nights that carry the shared volatility shock." },
   { key: "eventsPerYear", label: "Name-events per year", unit: "int", min: 10, max: 600, step: 10, tier: "secondary", section: "calibration", help: "How fast the track record grows." },
   { key: "zSigma", label: "Separation demanded", unit: "sigma", min: 1, max: 4, step: 0.25, tier: "secondary", section: "calibration", help: "How many standard errors apart two loss rates must sit before you call them different. 2σ is a weak bar; a one-sided 5% test with 80% power needs about 1.6× as many events." },
@@ -456,7 +456,7 @@ const DECK_PLACEMENT: Partial<Record<keyof Params, Placement>> = {
 };
 
 /** Seeds, caps and path counts take plain number boxes: a drag slider means nothing for them. */
-const NO_SLIDER: readonly (keyof Params)[] = ["seed", "maxCompositions", "mcPaths"];
+const NO_SLIDER: readonly (keyof Params)[] = ["seed", "maxCompositions", "mcPaths", "fanPaths"];
 
 for (const def of PARAM_DEFS) {
   const place = DECK_PLACEMENT[def.key];

@@ -37,8 +37,8 @@ export function useRoute(): Route {
 
 /*
  * The reading order of the views, registered by the app once the view-model exists,
- * so a key handler can step through them without knowing the view-model. The app
- * does not bind any key itself.
+ * so a key handler can step through them without knowing the view-model. The one
+ * handler that binds [ and ] is App.tsx's useViewKeys.
  */
 let viewOrder: string[] = [];
 

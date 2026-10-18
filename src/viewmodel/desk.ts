@@ -52,9 +52,10 @@ export interface DeskView {
     robust: number;
     nightKelly: number;
     kellyPerName: number;
-    /** Your risk as a multiple of the growth-optimal risk at the deck's rate; null at zero premium. */
+    /** Your risk as a multiple of the growth-optimal risk at the deck's rate; null without a positive premium. */
     ratioToKelly: number | null;
-    zeroPremium: boolean;
+    /** No positive premium over fair: the growth-optimal risk at the deck's rate is 0. */
+    noPremium: boolean;
     /** One line beside the heatmap. */
     text: string;
     chartId: string;
@@ -119,7 +120,7 @@ export function buildDesk(p: Params, d: Derived): DeskView {
   const qBE = d.breakEven;
   const events = eventsToResolve(qOpt, qBE, p.zSigma);
   const ratioToKelly = d.nightKelly.risk > 0 ? p.riskPerNight / d.nightKelly.risk : null;
-  const zero = d.market.zeroPremium;
+  const zero = d.market.noPremium;
   const sizingText = zero
     ? `${d.market.sizingNote} You risk ${pct(p.riskPerNight)} a night.${d.robust.risk > 0 ? ` Averaged over loss rates ${d.bandLabel}, which still reach the optimistic rate, the robust optimum is ${pct(d.robust.risk)}.` : ""}`
     : `You risk ${pct(p.riskPerNight)} a night. Robust optimum ${pct(d.robust.risk)}, averaged over loss rates ${d.bandLabel}; growth-optimal at the deck's rate alone ${pct(d.nightKelly.risk)}${ratioToKelly != null ? `, so you sit at ${ratioToKelly.toFixed(2).replace("-", "−")}× that` : ""}. Kelly per name ${pct1(d.kelly)}.`;
@@ -135,7 +136,7 @@ export function buildDesk(p: Params, d: Derived): DeskView {
       nightKelly: d.nightKelly.risk,
       kellyPerName: d.kelly,
       ratioToKelly,
-      zeroPremium: zero,
+      noPremium: zero,
       text: sizingText,
       chartId: "chain-heat",
       viewId: "sizing-grid",

@@ -1,20 +1,12 @@
+import { MarketSwitch } from "../app/deck/MarketSwitch";
 import { deskColumns, deskGroups } from "../app/desk/grid";
 import type { ChartSpec } from "../charts/spec";
 import { DeskGrid } from "../kit/ui/DeskGrid";
-import { Segmented } from "../kit/ui/Settings";
-import { marketPatch, type Market } from "../model/params";
-import { useStore } from "../state/store";
 import { pct, x2 } from "../viewmodel/derived";
 import type { DeskView } from "../viewmodel/desk";
 import type { ScenarioView } from "../viewmodel/types";
 import { allCharts } from "../viewmodel/types";
 import { ChartHost } from "./ChartHost";
-
-const MARKETS: { value: Market; label: string; title: string }[] = [
-  { value: "fair", label: "Fair market", title: "q = b/(1+b): the chain prices the tail fairly, premium 0" },
-  { value: "discussion", label: "Discussion case", title: "q such that a clean coin season has probability 55%" },
-  { value: "custom", label: "Custom", title: "q as typed in the deck" },
-];
 
 function chartById(scenarios: ScenarioView[], id: string): ChartSpec | undefined {
   for (const s of scenarios) {
@@ -24,16 +16,11 @@ function chartById(scenarios: ScenarioView[], id: string): ChartSpec | undefined
   return undefined;
 }
 
-/** The fair-market switch: wired to params.market through the schema's patch. */
-function MarketSwitch({ desk }: { desk: DeskView }) {
-  const params = useStore((s) => s.params);
-  const setParams = useStore((s) => s.setParams);
-  const value = desk.market.actual;
+/** Block 4: the deck's market switch (the same one the full deck holds) and what it moves. */
+function MarketBlock({ desk }: { desk: DeskView }) {
   return (
     <div className="desk-market">
-      <Segmented ariaLabel="Market" options={MARKETS} value={value} onChange={(m) => setParams(marketPatch(m, params))} />
-      <p className="desk-line">{desk.market.line}</p>
-      {desk.market.sizingNote && <p className="desk-line strong">{desk.market.sizingNote}</p>}
+      <MarketSwitch customFocusId="param-lossRate" />
       <p className="desk-line muted">
         The market sets the deck's loss rate q, so every figure on this page and every section moves with it.{" "}
         <a className="k-textlink" href={`#view/${desk.market.viewId}`}>
@@ -110,7 +97,7 @@ export function DeskPage({ desk, scenarios, pending }: { desk: DeskView; scenari
         <h2 className="k-block-h" id="desk-market">
           Market
         </h2>
-        <MarketSwitch desk={desk} />
+        <MarketBlock desk={desk} />
       </section>
       </div>
     </div>

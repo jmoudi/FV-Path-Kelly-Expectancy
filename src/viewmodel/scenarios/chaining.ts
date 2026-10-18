@@ -6,7 +6,7 @@ import type { Datasets, Params } from "../../model/params";
 import { POLICY_IDS, type PolicyId } from "../../model/policies";
 import { binnedDistributions, logHistogram, samplePaths, summarize, weightedQuantile } from "../../model/season";
 import { linspace } from "../../model/stats";
-import { fig, formatNumber, methodLabel, movesDeck, near, pct, pct1, pct2, signedPct1, smallPct, typographic, x2, type Derived } from "../derived";
+import { fig, formatNumber, methodLabel, movesDeck, near, pct, pct1, pct2, signedPct1, signedPp, smallPct, typographic, x2, type Derived } from "../derived";
 import type { ScenarioView } from "../types";
 
 const SEASON_WORDS: Record<number, string> = { 2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six", 7: "Seven", 8: "Eight", 9: "Nine", 10: "Ten", 11: "Eleven", 12: "Twelve" };
@@ -22,7 +22,8 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const sCoin = d.chained.coin.summary;
   const sSpread = d.chained.spread.summary;
   const sYours = d.chained[d.yours].summary;
-  const zero = d.market.zeroPremium;
+  // No positive premium (fair, or q past it): the growth-optimal risk at the deck's rate is 0.
+  const zero = d.market.noPremium;
 
   // Log growth grid: risk per night × true loss rate. Cells with material ruin say so.
   const riskList = Array.from(new Set([0.2, 0.3, 0.39, 0.5, 0.6, 0.75, 0.9, 1.0, Math.round(p.riskPerNight * 100) / 100])).sort((a, b) => a - b);
@@ -78,7 +79,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
       badge: movesDeck("q", pct2(p.lossRate), "3.20%"),
     });
   }
-  if (!zero) {
+  if (!d.market.zeroPremium) {
     sweepStories.push({
       id: "be",
       label: "The chain is right: q = break-even",
@@ -381,7 +382,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
     ],
     kpis: [
       zero
-        ? { label: "Robust risk a night", value: pct(d.robust.risk), sub: `peak of the averaged curve · at the deck's rate (zero premium) the growth-optimal risk is 0`, help: `Risk a night that maximises growth averaged over a loss rate drawn ${d.bandLabel}; the band still reaches the optimistic rate. ${d.market.sizingNote}` }
+        ? { label: "Robust risk a night", value: pct(d.robust.risk), sub: `peak of the averaged curve · at the deck's rate (premium over fair ${signedPp(d.market.premium)}) the growth-optimal risk is 0`, help: `Risk a night that maximises growth averaged over a loss rate drawn ${d.bandLabel}; the band still reaches the optimistic rate. ${d.market.sizingNote}` }
         : { label: "Robust risk a night", value: pct(d.robust.risk), sub: `peak of the averaged curve · growth-optimal at the deck's rate ${pct(d.nightKelly.risk)}`, help: `Risk a night that maximises growth averaged over a loss rate drawn ${d.bandLabel}. The deck's ${pct(p.riskPerNight)} is ${Number.isFinite(halfVsKelly) ? `${typographic(halfVsKelly.toFixed(2))}× the single-rate optimum` : "beyond any positive optimum"}.` },
       { label: `Median after ${seasonsWord}`, value: `${x2(sSpread.median)} → ${x2(sYours.median)}`, sub: `${P.spread.name} → ${yours.name}`, color: "c" },
       { label: `Mean after ${seasonsWord}`, value: `${x2(sSpread.mean)} → ${x2(sYours.mean)}`, sub: `${P.spread.name} → ${yours.name}` },

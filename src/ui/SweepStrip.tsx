@@ -103,11 +103,12 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
   const showRestore = origin != null && value !== origin;
   return (
     <div className={`${cls} named`} role="group" aria-label={`Sweep for ${def.label}`}>
-      {/* Idle, the deck's slot names the input by its symbol and leaves the room to the controls. */}
+      {/* Idle, the deck's slot names the input by its short word label (its symbol on a phone). */}
       {compact && (
         <>
-          <span className="sw-name sw-sym" title={def.label}>
-            {def.short ?? def.shortLabel ?? def.label}
+          <span className="sw-name" title={`${def.label}: the input the sweep hotkeys act on`}>
+            <span className="sw-wide">{def.shortLabel ?? def.label}</span>
+            <span className="sw-narrow">{def.short ?? def.shortLabel ?? def.label}</span>
           </span>{" "}
         </>
       )}
@@ -135,7 +136,7 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
         <>
           {position && !compact && <span className="sw-paused">paused · {position}</span>}{" "}
           <button type="button" className="chip tiny" onClick={() => stopSweep(key)} title={`Stop and keep the value (${HOTKEY_HINTS.stop})`} aria-label="Stop the sweep">
-            ■<span className="sw-wide"> stop</span>
+            ■{!compact && <span className="sw-wide"> stop</span>}
           </button>{" "}
         </>
       )}

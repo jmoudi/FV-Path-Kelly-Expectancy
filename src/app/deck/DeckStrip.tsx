@@ -1,18 +1,12 @@
-import { PARAM_BY_KEY } from "../../model/params";
 import { useStore } from "../../state/store";
 import { SweepStrip } from "../../ui/SweepStrip";
 
-/** The reserved strip slot: the active input's name and its sweep strip, or a hint. */
+/**
+ * The deck's reserved strip slot: the sweep strip of the active input, alone. The
+ * strip names the input, shows its hint when none is active, and follows a running
+ * sweep; the slot's width is the strip's (--sweep-strip-w), so nothing beside it moves.
+ */
 export function DeckStrip() {
   const active = useStore((s) => s.activeInput);
-  const def = active ? PARAM_BY_KEY[active] : undefined;
-  if (!active || !def) return <span className="dkb-hint">Focus an input to sweep it</span>;
-  return (
-    <>
-      <span className="dkb-active" title="The input the sweep hotkeys act on">
-        {def.shortLabel ?? def.label}
-      </span>
-      <SweepStrip inputKey={active} compact />
-    </>
-  );
+  return <SweepStrip inputKey={active} compact />;
 }

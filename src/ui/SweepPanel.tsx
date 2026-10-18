@@ -4,7 +4,7 @@ import { inputConfig, isSweepable, PARAM_BY_KEY, PARAM_DEFS, type ParamDef, type
 import { useStore } from "../state/store";
 import { BUILTIN_ANCHORS, clonePreset, isBuiltinAnchor, type AnchorRef, type BuiltinAnchor, type SweepKind, type SweepPreset, type SweepRange, type SweepRangeMode, type SweepSpot } from "../sweeps/types";
 import { Num } from "./Num";
-import { describeFor, HOTKEY_HINTS } from "./useSweeps";
+import { describeFor } from "./useSweeps";
 
 function newId(): string {
   return `p-${Math.random().toString(36).slice(2, 8)}`;
@@ -59,18 +59,17 @@ function rangeFor(mode: SweepRangeMode, subject: ParamDef, value: number): Sweep
 }
 
 /**
- * Create, edit, delete and link sweep presets. Lives in Settings and in the full deck.
- * Each preset is described in the active input's own units ("step 0.05 pp every
- * 400 ms"), so it reads the same way it will run.
+ * Create, edit, delete and link sweep presets, on the Settings page (the sweep rate,
+ * its cap and the hotkeys sit in their own groups there). Each preset is described in
+ * the active input's own units ("step 0.05 pp every 400 ms"), so it reads the same
+ * way it will run.
  */
-export function SweepPanel({ compact }: { compact?: boolean }) {
+export function SweepPanel() {
   const presets = useStore((s) => s.presets);
   const links = useStore((s) => s.links);
   const runs = useStore((s) => s.runs);
   const params = useStore((s) => s.params);
   const activeInput = useStore((s) => s.activeInput);
-  const ui = useStore((s) => s.ui);
-  const setUi = useStore((s) => s.setUi);
   const upsertPreset = useStore((s) => s.upsertPreset);
   const deletePreset = useStore((s) => s.deletePreset);
   const linkPreset = useStore((s) => s.linkPreset);
@@ -88,9 +87,7 @@ export function SweepPanel({ compact }: { compact?: boolean }) {
     <div className="sweeps">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
         <div>
-          {!compact && <h4 style={{ margin: 0 }}>Sweep presets</h4>}
           <p className="caption" style={{ margin: "2px 0 0" }}>
-            {!compact && "A preset drives an input automatically, in the input's own units. "}
             Active input: <b>{activeDef ? activeDef.label : "none (focus an input)"}</b>
             {activeDef && !sweepable ? " (not swept)" : ""}
             {!sweepable && `; descriptions read for ${subject.label}`}.
@@ -161,27 +158,6 @@ export function SweepPanel({ compact }: { compact?: boolean }) {
         />
       )}
 
-      {!compact && (
-        <div className="row" style={{ gap: 18, flexWrap: "wrap", alignItems: "flex-start" }}>
-          <div style={{ width: 220 }}>
-            <Num id="ui-sweepspeed" label="sweep rate (× preset speed)" value={ui.sweepSpeed} min={0.25} max={4} step={0.25} decimals={2} onChange={(v) => v != null && setUi({ sweepSpeed: v })} />
-          </div>
-          <div style={{ width: 220 }}>
-            <Num id="ui-sweephz" label="at most, values per second" value={ui.sweepHz} min={1} max={30} step={1} unit="int" onChange={(v) => v != null && setUi({ sweepHz: v })} />
-          </div>
-          <div style={{ width: 220 }}>
-            <Num id="ui-drag" label="drag speed (× units per 100 px)" value={ui.dragSensitivity} min={0.25} max={4} step={0.25} decimals={2} onChange={(v) => v != null && setUi({ dragSensitivity: v })} />
-          </div>
-          <div className="caption" style={{ maxWidth: 460 }}>
-            Hotkeys on the active input: {HOTKEY_HINTS.toggle} run or pause · {HOTKEY_HINTS.stop} stop and keep the value · {HOTKEY_HINTS.prev} / {HOTKEY_HINTS.next} previous or next preset · {HOTKEY_HINTS.all} pause or resume everything · {HOTKEY_HINTS.undo} put a swept input back where it was before the sweep, otherwise undo · {HOTKEY_HINTS.redo} redo · {HOTKEY_HINTS.views} previous or next view.
-          </div>
-        </div>
-      )}
-      {!compact && (
-        <div className="caption">
-          Linked inputs: {Object.keys(links).length === 0 ? "none" : Object.entries(links).map(([k, v]) => `${PARAM_BY_KEY[k]?.label ?? k} → ${presets.find((p) => p.id === v)?.name ?? v}`).join(" · ")}
-        </div>
-      )}
     </div>
   );
 }

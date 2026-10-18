@@ -310,12 +310,14 @@ function xyOption(spec: ChartSpec, width: number, height: number): EOption {
       borderColor: THEME.hairline,
       borderWidth: 1,
       textStyle: { color: THEME.ink, fontSize: 12, fontFamily: THEME.fontUi },
+      // The tooltip is HTML: its type follows the theme's tokens, not the canvas sizes.
+      extraCssText: "font-size: var(--fs-ui);",
       axisPointer: { type: "line", axis: rc.horizontal ? "y" : "x", lineStyle: { color: THEME.muted, width: 1 } },
       formatter: (params: unknown) => {
         const list = ((Array.isArray(params) ? params : [params]) as { seriesName: string; seriesId?: string; value: unknown; color: string; name?: string; seriesType?: string }[]).filter((p) => p.seriesId !== ANNOTATIONS_ID && !String(p.seriesId).endsWith("~band"));
         if (!list.length) return "";
         const xv = posOf(list[0]);
-        const head = `<div style="color:${THEME.muted};font-size:11px;margin-bottom:4px">${typeof xv === "number" ? posFmt(xv) : (xv ?? "")}</div>`;
+        const head = `<div style="color:${THEME.muted};font-size:var(--fs-label);margin-bottom:4px">${typeof xv === "number" ? posFmt(xv) : (xv ?? "")}</div>`;
         const body = list
           .filter((p) => valueOf(p) != null)
           .slice(0, 8)
@@ -335,7 +337,7 @@ function xyOption(spec: ChartSpec, width: number, height: number): EOption {
   };
 }
 
-function heatOption(spec: ChartSpec): EOption {
+function heatOption(spec: ChartSpec, width: number): EOption {
   const h = spec.heat!;
   const xs = uniqueCats(spec, h.xField);
   const ys = uniqueCats(spec, h.yField);
@@ -347,6 +349,9 @@ function heatOption(spec: ChartSpec): EOption {
   let min = Infinity;
   let max = -Infinity;
   const same = (a: unknown, b: unknown) => (typeof a === "number" && typeof b === "number" ? Math.abs(a - b) < 1e-9 : a === b);
+  // The highlighted cell's outline is its own series drawn over the grid, so the cells
+  // painted after it (to its right and above) cannot cover two of its edges.
+  const outline: unknown[] = [];
   for (const r of spec.data.rows) {
     const v = numberOrNull(r[h.valueField]);
     const xi = xs.indexOf(r[h.xField] as string | number);
@@ -354,8 +359,8 @@ function heatOption(spec: ChartSpec): EOption {
     const label = h.labelField ? r[h.labelField] : null;
     const hl = h.highlight && same(r[h.xField], h.highlight.x) && same(r[h.yField], h.highlight.y);
     const item: Record<string, unknown> = { value: [xi, yi, v, label ?? null] };
-    if (hl) item.itemStyle = { borderColor: THEME.ink, borderWidth: 2.5 };
-    if (v == null) item.itemStyle = { ...(item.itemStyle as object), color: THEME.raised };
+    if (hl) outline.push({ value: [xi, yi, v] });
+    if (v == null) item.itemStyle = { color: THEME.raised };
     data.push(item);
     if (v != null) {
       min = Math.min(min, v);
@@ -377,6 +382,8 @@ function heatOption(spec: ChartSpec): EOption {
     vmin = 0;
     vmax = 1;
   }
+  const cellW = (width - 84 - 22) / Math.max(1, xs.length);
+  const cellLabelPx = cellW >= 52 ? 11 : cellW >= 44 ? 10 : 9;
   const labelOf = (p: { value: unknown[] }) => (p.value[3] != null ? String(p.value[3]) : p.value[2] == null ? "" : formatNumber(p.value[2] as number, vf));
   return {
     animation: false,
@@ -387,6 +394,7 @@ function heatOption(spec: ChartSpec): EOption {
       backgroundColor: THEME.raised,
       borderColor: THEME.hairline,
       textStyle: { color: THEME.ink, fontSize: 12 },
+      extraCssText: "font-size: var(--fs-ui);",
       formatter: (p: { value: unknown[] }) =>
         `${fieldLabel(spec.data, h.xField)} ${catLabel(xs[p.value[0] as number], xFmt)}<br/>${fieldLabel(spec.data, h.yField)} ${catLabel(ys[p.value[1] as number], yFmt)}<br/><b style="font-family:${THEME.fontMono}">${labelOf(p)}</b>`,
     },
@@ -415,6 +423,7 @@ function heatOption(spec: ChartSpec): EOption {
     },
     visualMap: {
       show: h.palette !== "binary",
+      seriesIndex: 0,
       dimension: 2,
       min: vmin,
       max: vmax,
@@ -433,10 +442,26 @@ function heatOption(spec: ChartSpec): EOption {
         id: "heat",
         type: "heatmap",
         data,
-        label: { show: h.cellLabels !== false, color: THEME.ink, fontSize: 11, fontFamily: THEME.fontMono, formatter: labelOf },
+        // Narrow cells (a phone) take a smaller label so "−10.7%" stays inside its cell.
+        label: { show: h.cellLabels !== false, color: THEME.ink, fontSize: cellLabelPx, fontFamily: THEME.fontMono, formatter: labelOf },
         itemStyle: { borderColor: THEME.surface, borderWidth: 2, borderRadius: 3 },
         emphasis: { itemStyle: { borderColor: THEME.ink } },
       },
+      ...(outline.length
+        ? [
+            {
+              id: "heat-outline",
+              type: "heatmap",
+              data: outline,
+              silent: true,
+              z: 3,
+              label: { show: false },
+              itemStyle: { color: "transparent", borderColor: THEME.ink, borderWidth: 2.5, borderRadius: 3 },
+              emphasis: { disabled: true },
+              tooltip: { show: false },
+            },
+          ]
+        : []),
     ],
   };
 }
@@ -455,7 +480,7 @@ function uniqueCats(spec: ChartSpec, field: string): (string | number)[] {
 
 /** The ECharts option for a spec drawn in a container of this size. */
 export function buildOption(spec: ChartSpec, width = 720, height = (spec.height ?? 300) + 70): EOption {
-  return spec.kind === "heatmap" && spec.heat ? heatOption(spec) : xyOption(spec, width, height);
+  return spec.kind === "heatmap" && spec.heat ? heatOption(spec, width) : xyOption(spec, width, height);
 }
 
 // ---------------------------------------------------------------------------

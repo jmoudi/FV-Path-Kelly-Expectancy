@@ -177,7 +177,9 @@ export function Authoring({ base, spec, override, onClose }: Props) {
                     />
                     <span style={{ display: "flex", gap: 6, alignItems: "center", minWidth: 0 }}>
                       <span className="swatch" style={{ background: roleColor(s.color) }} />
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={label}>
+                        {label}
+                      </span>
                     </span>
                     <span className="row" style={{ gap: 4 }}>
                       <select value={override?.seriesMark?.[s.field] ?? s.mark ?? ""} onChange={(e) => patch({ seriesMark: { ...(override?.seriesMark ?? {}), [s.field]: (e.target.value || spec.mark) as MarkType } })} aria-label={`${label} mark`}>

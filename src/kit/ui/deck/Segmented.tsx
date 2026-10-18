@@ -27,7 +27,7 @@ export function Segmented<V extends string>({ options, value, onChange, ariaLabe
     ref.current?.querySelectorAll<HTMLButtonElement>("button")[j]?.focus();
   };
   return (
-    <div ref={ref} className="seg" role="radiogroup" aria-label={ariaLabel}>
+    <div ref={ref} className="seg-switch" role="radiogroup" aria-label={ariaLabel}>
       {options.map((o, i) => {
         const on = o.value === value;
         return (

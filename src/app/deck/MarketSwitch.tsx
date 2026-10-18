@@ -34,7 +34,7 @@ export function MarketSwitch({ customFocusId }: { customFocusId?: string }) {
     <div className="dkb-market">
       <Segmented options={options} value={selected} onChange={onChange} ariaLabel="Market" />
       <p className="dkb-market-line">{MARKET_LINE}</p>
-      <p className="dkb-market-state">{m.zeroPremium ? `${premium} ${m.sizingNote}` : premium}</p>
+      <p className="dkb-market-state">{m.sizingNote ? `${premium} ${m.sizingNote}` : premium}</p>
     </div>
   );
 }

@@ -109,7 +109,7 @@
   flex: 0 1 auto;
   flex-wrap: nowrap;
   white-space: nowrap;
-  width: var(--sweep-strip-w, 26rem);
+  width: var(--sweep-strip-w, 460px);
   max-width: 100%;
   min-width: 0;
   overflow: hidden;
@@ -124,11 +124,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 0 3 auto;
-}
-.sw .sw-sym {
-  font-family: var(--font-mono);
-  font-weight: 400;
-  color: var(--ink-2);
 }
 .sw .sw-preset {
   min-width: 4em;
@@ -206,29 +201,6 @@
 .sw .sw-keys {
   font-family: var(--font-mono);
   margin-left: auto;
-}
-.sw.sweeping .sw-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ink);
-  flex: 0 0 auto;
-  animation: sw-pulse 1.2s ease-in-out infinite;
-}
-@keyframes sw-pulse {
-  50% {
-    opacity: 0.25;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .sw.sweeping .sw-dot {
-    animation: none;
-  }
-}
-
-/* While the strip names the input it drives, the deck's own active-input label is redundant. */
-.dk-strip:has(> .sw.named) > .dk-active {
-  display: none;
 }
 
 /* ---------- sweep panel ---------- */

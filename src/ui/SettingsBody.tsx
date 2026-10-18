@@ -2,45 +2,15 @@ import { useState } from "react";
 import { BACKEND_INFO } from "../charts/registry";
 import type { BackendId } from "../charts/spec";
 import { KeyLegend, Segmented, SettingRow, SettingsGroup, SettingsLayout, type KeyBinding } from "../kit/ui/Settings";
-import { DEFAULT_PARAMS, inputConfig, PARAM_BY_KEY, PARAM_DEFS, type Params } from "../model/params";
+import { PARAM_DEFS } from "../model/params";
 import { useStore } from "../state/store";
 import { DataBody, ImportExportBody } from "./Dialogs";
-import { Help } from "./Help";
 import { Num } from "./Num";
-import { NumberField } from "./NumberField";
 import { ParamInput } from "./ParamInput";
 import { SweepPanel } from "./SweepPanel";
 import { HOTKEY_HINTS } from "./useSweeps";
 
 const BACKENDS: BackendId[] = ["echarts", "plotly", "vega"];
-
-/** A schema parameter as a plain number box: no slider (seeds, caps, counts). */
-function PlainParam({ k }: { k: keyof Params }) {
-  const def = PARAM_BY_KEY[k];
-  const value = useStore((s) => s.params[k]);
-  const setParam = useStore((s) => s.setParam);
-  if (def.unit === "choice") return <ParamInput k={k} compact />;
-  return (
-    <div className="plain-param">
-      <NumberField
-        id={`param-${k}`}
-        inputKey={k}
-        label={def.label}
-        value={typeof value === "number" ? value : def.min}
-        min={def.min}
-        max={def.max}
-        step={def.step}
-        unit={def.unit}
-        config={{ ...inputConfig(def), slider: false }}
-        onChange={(v) => setParam(k, v as Params[typeof k])}
-        defaultValue={typeof DEFAULT_PARAMS[k] === "number" ? (DEFAULT_PARAMS[k] as number) : undefined}
-        compact
-        extra={<Help text={def.help} />}
-        ariaLabel={def.label}
-      />
-    </div>
-  );
-}
 
 /** A reset with a confirm step. */
 function ResetButton({ label, confirmLabel, keepLabel, onConfirm, disabled }: { label: string; confirmLabel: string; keepLabel: string; onConfirm: () => void; disabled?: boolean }) {
@@ -83,12 +53,17 @@ function EverydayGroups({ compact }: { compact?: boolean }) {
         <p className="caption">{BACKEND_INFO[defaultBackend].blurb}</p>
       </SettingsGroup>
       <SettingsGroup id="set-feel" title="Inputs and sweeps">
-        <SettingRow label="Drag sensitivity" hint="× the distance each input needs">
+        <SettingRow label="Drag sensitivity" hint="× each input's units per 100 px of drag (Shift for fine)">
           <Num id="ui-drag" value={ui.dragSensitivity} min={0.25} max={4} step={0.25} decimals={2} slider={false} onChange={(v) => v != null && setUi({ dragSensitivity: v })} />
         </SettingRow>
-        <SettingRow label="Sweep rate" hint="values a second while a sweep runs">
-          <Num id="ui-sweephz" value={ui.sweepHz} min={1} max={30} step={1} unit="int" slider={false} onChange={(v) => v != null && setUi({ sweepHz: v })} />
+        <SettingRow label="Sweep rate" hint="× each preset's speed: 2 shows every value half as long">
+          <Num id="ui-sweepspeed" value={ui.sweepSpeed} min={0.25} max={4} step={0.25} decimals={2} slider={false} onChange={(v) => v != null && setUi({ sweepSpeed: v })} />
         </SettingRow>
+        {!compact && (
+          <SettingRow label="At most, values a second" hint="a cap on any sweep, whatever its preset and rate">
+            <Num id="ui-sweephz" value={ui.sweepHz} min={1} max={30} step={1} unit="int" slider={false} onChange={(v) => v != null && setUi({ sweepHz: v })} />
+          </SettingRow>
+        )}
       </SettingsGroup>
     </>
   );
@@ -144,15 +119,15 @@ export function FullSettings() {
       <SettingsGroup id="set-engine" title="Engine" blurb="How season distributions are computed and how many samples the sampled charts draw.">
         <div className="plain-params">
           {engine.map((d) => (
-            <PlainParam key={d.key} k={d.key} />
+            <ParamInput key={d.key} k={d.key} compact />
           ))}
         </div>
       </SettingsGroup>
       <SettingsGroup id="set-keys" title="Hotkeys">
         <KeyLegend bindings={KEYS} />
       </SettingsGroup>
-      <SettingsGroup id="set-presets" title="Sweep presets" blurb="A preset drives the active input on its own. Link one to an input, then run it from the deck's strip or with the hotkeys above." wide>
-        <SweepPanel compact />
+      <SettingsGroup id="set-presets" title="Sweep presets" blurb="A preset drives the active input on its own, in the input's own units. Link one to an input, then run it from the deck's strip or with the hotkeys above." wide>
+        <SweepPanel />
       </SettingsGroup>
       <SettingsGroup id="set-data" title="Your data" blurb="Two imports feed the model, one number per line (a CSV's last column is used). They are saved with the state and travel with the export." wide>
         <DataBody />
@@ -163,9 +138,4 @@ export function FullSettings() {
       <ResetGroup />
     </SettingsLayout>
   );
-}
-
-/** Kept for callers that pick the view with a flag. */
-export function SettingsBody({ full }: { full: boolean }) {
-  return full ? <FullSettings /> : <QuickSettings />;
 }

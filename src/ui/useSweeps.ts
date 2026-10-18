@@ -19,7 +19,6 @@ export const HOTKEY_HINTS = {
   all: `${mod}+Shift+Enter`,
   undo: `${mod}+Z`,
   redo: `${mod}+Shift+Z`,
-  views: "[ / ]",
 };
 
 /** Resolve a preset for one input now: its anchors read the parameters and the deck figures of the last build. */

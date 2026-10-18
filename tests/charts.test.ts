@@ -305,7 +305,7 @@ describe("the whole build", () => {
     expect(desk.calibration.viewId).toBe("events-needed");
     expect(desk.sizing.chartId).toBe("chain-heat");
     expect(desk.sizing.ratioToKelly).toBeCloseTo(1.28, 2);
-    expect(desk.sizing.zeroPremium).toBe(false);
+    expect(desk.sizing.noPremium).toBe(false);
     expect(desk.market.actual).toBe("discussion");
     expect(desk.market.line).toMatch(/not an information edge/);
     expect(desk.market.sizingNote).toBe("");
@@ -324,6 +324,14 @@ describe("the whole build", () => {
     // With the whole band at or past break-even nothing grows anywhere.
     const dead = buildAll({ ...DEFAULT_PARAMS, market: "fair", lossRate: breakEvenLossRate(DEFAULT_PARAMS.gain), altLossRate: breakEvenLossRate(DEFAULT_PARAMS.gain) }, EMPTY_DATASETS);
     expect(dead.desk.sizing.robust).toBe(0);
+    // q above the fair rate: a negative premium, said as one, never as "fair pricing".
+    const past = buildAll({ ...DEFAULT_PARAMS, market: "custom", lossRate: breakEvenLossRate(DEFAULT_PARAMS.gain) + 0.003 }, EMPTY_DATASETS);
+    expect(past.desk.market.zeroPremium).toBe(false);
+    expect(past.desk.market.noPremium).toBe(true);
+    expect(past.desk.market.line).not.toMatch(/Fair pricing/);
+    expect(past.desk.market.line).toMatch(/−0\.30 pp premium over fair/);
+    expect(past.desk.sizing.noPremium).toBe(true);
+    expect(past.desk.sizing.text).toMatch(/^With a negative premium the growth-optimal risk is 0/);
   });
 
   it("gives the deck row 2 and the drawer what they need", () => {

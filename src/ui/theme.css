@@ -58,6 +58,8 @@
   --topbar-h: 52px;
   /* The deck bar sets its own reduced height here at runtime; this is the fallback. */
   --deck-h: 117px;
+  /* The sweep strip's width in the deck's reserved slot, the same in every state. */
+  --sweep-strip-w: 460px;
   --page-max: 1380px;
 }
 
@@ -678,9 +680,12 @@ textarea {
 }
 .authoring .grid2 {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 8px 12px;
   align-items: center;
+}
+.authoring .grid2 > span {
+  white-space: nowrap;
 }
 .authoring input[type="number"],
 .authoring input[type="text"],
@@ -703,7 +708,7 @@ textarea {
 }
 .authoring .series-row {
   display: grid;
-  grid-template-columns: 14px 1fr auto;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
 }
@@ -986,25 +991,7 @@ textarea.json,
   display: none;
 }
 
-/* ---------- sweep strip and preset panel ---------- */
-.sweep-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
-  font-size: var(--fs-label);
-  color: var(--muted);
-  padding-top: 2px;
-}
-.sweep-strip-label {
-  font-size: var(--fs-label);
-}
-.sweep-strip-keys {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: var(--fs-label);
-  white-space: nowrap;
-}
+/* ---------- preset panel (the sweep strip lives in src/kit/inputs/number-field.css) ---------- */
 .sweeps {
   display: grid;
   gap: 10px;
@@ -1193,275 +1180,4 @@ textarea.json,
 .source-figures {
   display: grid;
   gap: 8px;
-}
-
-/* ---------- deck bar (legacy rules) ----------
-   The deck's own stylesheet (src/ui/deck.css, imported by DeckBar) replaces this block;
-   main.tsx imports theme.css first so deck.css wins wherever both style a class.
-   Delete this block once deck.css covers every class below. */
-.deckbar {
-  position: sticky;
-  top: calc(var(--topbar-h) + env(safe-area-inset-top, 0px));
-  z-index: 25;
-  background: rgba(18, 20, 22, 0.94);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--hairline);
-}
-.dk-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 36px;
-  padding: 8px var(--gutter-r) 7px var(--gutter-l);
-  max-width: var(--page-max);
-  margin: 0 auto;
-  min-width: 0;
-}
-.dk-inputs {
-  flex-wrap: wrap;
-  row-gap: 8px;
-}
-.dk-group {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-.dk-caption {
-  font-size: var(--fs-label);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-}
-.dk-fields {
-  display: flex;
-  gap: 16px;
-  align-items: flex-end;
-  flex-wrap: nowrap;
-}
-.dk-field {
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-}
-.dk-inputs .nf-label {
-  white-space: nowrap;
-  font-size: var(--fs-label);
-  color: var(--ink-2);
-  flex-wrap: nowrap;
-}
-.dk-inputs .nf-label .sym {
-  color: var(--muted);
-}
-.dk-inputs .nf-track {
-  min-width: 54px;
-  max-width: 76px;
-}
-.dk-inputs .nf-box {
-  width: 66px;
-}
-.dk-inputs .nf.linked .nf-box {
-  width: 60px;
-}
-.dk-status {
-  align-items: center;
-  gap: 18px;
-  padding-top: 5px;
-  padding-bottom: 7px;
-  border-top: 1px solid var(--grid);
-}
-.dk-figs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 22px;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-height: 26px;
-  overflow: hidden;
-  align-content: flex-start;
-  white-space: nowrap;
-}
-.fig {
-  font-size: var(--fs-label);
-  color: var(--muted);
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-}
-.fig b {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: var(--fs-body);
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-.fig.role-a b {
-  color: var(--a);
-}
-.fig.role-b b {
-  color: var(--b);
-}
-.fig.role-c b {
-  color: var(--c);
-}
-.dk-strip {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-.dk-strip .sweep-strip {
-  flex-wrap: nowrap;
-  padding-top: 0;
-}
-.dk-strip .sweep-strip-keys {
-  display: none;
-}
-.dk-hint {
-  font-size: var(--fs-label);
-  color: var(--muted);
-}
-.dk-active {
-  font-size: var(--fs-label);
-  color: var(--ink);
-  font-weight: 500;
-  flex-shrink: 0;
-}
-.deckbar-toggle {
-  flex-shrink: 0;
-}
-.dk-full {
-  border-top: 1px solid var(--hairline);
-  padding: 18px var(--gutter-r) 24px var(--gutter-l);
-  max-width: var(--page-max);
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-  gap: 20px 56px;
-  max-height: calc(100vh - var(--topbar-h) - var(--deck-h) - 8px);
-  overflow: auto;
-}
-.dk-col {
-  display: grid;
-  gap: 24px;
-  align-content: start;
-  min-width: 0;
-}
-.dk-h {
-  margin: 0;
-  font-size: var(--fs-h);
-  font-weight: var(--fw-h);
-  color: var(--ink);
-}
-.dk-section {
-  display: grid;
-  gap: 10px;
-}
-.dk-section > header {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.dk-section h4 {
-  margin: 0;
-  font-size: var(--fs-body);
-  font-weight: 600;
-  color: var(--ink);
-}
-.dk-section > header p {
-  margin: 0;
-  font-size: var(--fs-ui);
-  color: var(--muted);
-}
-.dk-fields.full {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 12px 28px;
-}
-.dk-fields.full .dk-field {
-  display: contents;
-}
-.figtable {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-.figrow {
-  display: contents;
-}
-.figrow .fl,
-.figrow .fv {
-  padding: 8px 0;
-  border-bottom: 1px solid var(--grid);
-}
-.figrow .fl .t {
-  font-size: var(--fs-ui);
-  color: var(--ink);
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-.figrow .fl .s {
-  font-size: var(--fs-label);
-  color: var(--muted);
-  margin-top: 1px;
-}
-.figrow .fv {
-  padding-left: 20px;
-  font-family: var(--font-mono);
-  font-size: var(--fs-kpi);
-  font-weight: var(--fw-kpi);
-  text-align: right;
-  align-self: center;
-  font-variant-numeric: tabular-nums;
-}
-.figrow.role-a .fv {
-  color: var(--a);
-}
-.figrow.role-b .fv {
-  color: var(--b);
-}
-.figrow.role-c .fv {
-  color: var(--c);
-}
-.defs {
-  margin: 0;
-  display: grid;
-  gap: 6px;
-}
-.defs > div {
-  display: grid;
-  grid-template-columns: 170px 1fr;
-  gap: 10px;
-  font-size: var(--fs-ui);
-}
-.defs dt {
-  color: var(--ink);
-  font-weight: 500;
-}
-.defs dd {
-  margin: 0;
-  color: var(--ink-2);
-}
-@media (max-width: 1100px) {
-  .dk-full {
-    grid-template-columns: 1fr;
-  }
-}
-@media (max-width: 900px) {
-  .dk-figs {
-    display: none;
-  }
-}
-@media (max-width: 700px) {
-  .dk-row {
-    gap: 8px 24px;
-  }
-  .dk-fields {
-    flex-wrap: wrap;
-    gap: 8px 16px;
-  }
 }

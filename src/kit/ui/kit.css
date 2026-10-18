@@ -366,6 +366,8 @@ kbd {
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  /* Beside a taller neighbour the frame keeps its rows together (no gap opens above the plot). */
+  align-content: start;
   gap: 8px;
   position: relative;
 }

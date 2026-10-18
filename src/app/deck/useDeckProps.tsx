@@ -23,6 +23,8 @@ export type DeckContent = Omit<DeckProps, "expanded" | "onExpandedChange" | "hid
 export function useDeckProps(deck: DeckView | null): DeckContent {
   const params = useStore((s) => s.params);
   const active = useStore((s) => s.activeInput);
+  // The strip follows a running or paused sweep even when no input is active.
+  const swept = useStore((s) => Object.keys(s.runs).length > 0);
   const layout = useMemo(() => deckLayout(), []);
 
   const groups: InputGroup[] = useMemo(
@@ -78,7 +80,7 @@ export function useDeckProps(deck: DeckView | null): DeckContent {
     note: status.note,
     legend: deckLegend,
     strip: <DeckStrip />,
-    stripIdle: !active,
+    stripIdle: !active && !swept,
     drawer,
     drawerTop: <DeckStrip />,
   };

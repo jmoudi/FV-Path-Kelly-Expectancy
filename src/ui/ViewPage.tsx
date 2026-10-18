@@ -34,7 +34,8 @@ export function ViewPage({ scenarios, viewId }: { scenarios: ScenarioView[]; vie
   const main = (
     <>
       {charts.map((c) => (
-        <ChartHost key={c.id} spec={c.kind === "table" ? c : { ...c, height: Math.max(c.height ?? 300, c.kind === "heatmap" || c.kind === "figure" ? (c.height ?? 300) : 360) }} />
+        // The spec fixes the plot box's height here as everywhere (the outcomes bar stays 140px).
+        <ChartHost key={c.id} spec={c} />
       ))}
       {scenario.actions && scenario.actions.length > 0 && (
         <div className="actions">

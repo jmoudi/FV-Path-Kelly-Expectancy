@@ -222,7 +222,7 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
   }
   const calendarFig = figureSpec({
     id: "axes-calendar",
-    title: "A season by the calendar",
+    title: "Capital in use each night of one sampled season",
     subtitle: `x trading day, five a week, ${n} days · bars = share of the tranche in use that night, one segment per name at the Kelly fraction ${pct1(fstar)} (capped at 1/names) · red segment = a name at max loss · line = cumulative log growth of this sampled season · dashed = its expectation · dashed horizontal = the median night`,
     figure: "calendar",
     data: table(
