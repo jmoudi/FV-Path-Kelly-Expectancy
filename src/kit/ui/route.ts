@@ -11,7 +11,8 @@ import { useBus } from "@kit/events/react";
  *
  * The shell calls useRoute once; every move to another route is announced as
  * route:changed on the event bus, so nothing else needs its own hashchange listener.
- * An #el-<id> in the address is no move: the open page stays and nothing is announced.
+ * An #el-<id> in the address is no move: the open page stays and nothing is announced
+ * (the link that scrolled there says route:jumped).
  */
 export interface Route {
   page: string;

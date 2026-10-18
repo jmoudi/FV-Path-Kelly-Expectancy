@@ -78,8 +78,14 @@ export interface KitEvents {
   "settings:changed": { what: "ui" | "backend" | "param"; key?: string };
   /** A build's answer is on screen; `at` is when it was requested, `partial` the scenarios a sweep build was limited to. */
   "build:settled": { at: number; ok: boolean; partial: string[] | null; error?: string };
-  /** The address moved to another route. */
+  /** The address moved to another route (a page, a view, or a part of a page). Never for an in-page anchor (#el-<id>), which keeps the route. */
   "route:changed": { from: RouteRef; to: RouteRef };
+  /**
+   * A link scrolled the open page to one of its elements, with no page switch: an in-page
+   * anchor (`to` is #el-<id>; the address stays, so no route:changed) or a part of the page
+   * already open (another section; route:changed for the new address comes first).
+   */
+  "route:jumped": { to: string; elementId: string };
   /** Something to tell the reader; the Notices stack shows it. */
   notice: Notice;
 }

@@ -37,7 +37,8 @@ export type GuideBlock =
    * A Markdown file read at run time, once per page load, relative to the page (never
    * bundled), in this page's prose styles under a "Loaded <time> · Reload" line;
    * `failure` follows the plain line shown when it cannot be loaded. Its headings' ids
-   * start with `idPrefix`, by default the section's own (`<page>-<id>-`).
+   * start with `idPrefix`, by default the section's own (`<page>-<id>-`); its in-app
+   * links go through `Link`.
    */
   | { kind: "markdown"; src: string; failure?: string; idPrefix?: string };
 

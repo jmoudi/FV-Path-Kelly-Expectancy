@@ -9,12 +9,14 @@
  *            line break from a trailing backslash or two trailing spaces
  *
  * Raw HTML is never interpreted: every character reaches the page as text. Links: an
- * in-app hash (#guide/keys, #view/<id>) is a route link that never reloads; http(s) and
+ * in-app hash (#guide/keys, #view/<id>, #el-<id>) goes through the kit's `Link`, so it
+ * never reloads and a part of the open page scrolls into place; http(s) and
  * mailto open in a new tab with ↗ after the label; a relative path is a plain anchor; any
  * other scheme (javascript:, data:, …) renders as text. Headings get ids from their text
  * (idPrefix + slug), so each one is linkable.
  */
 import { Fragment, createElement, useMemo, type ReactNode } from "react";
+import { Link } from "./Link";
 import "./markdown.css";
 
 /* ------------------------------------------------------------------ blocks */
@@ -344,7 +346,7 @@ export function linkKind(href: string): LinkKind {
   return "plain";
 }
 
-/** Draws one link; the app can pass its own (a router's link component) for route links. */
+/** Draws one link; the default sends an in-app hash through `Link`; the app can pass its own. */
 export type LinkRenderer = (link: { href: string; kind: Exclude<LinkKind, "unsafe">; children: ReactNode; key: string }) => ReactNode;
 
 const defaultLink: LinkRenderer = ({ href, kind, children, key }) =>
@@ -353,8 +355,12 @@ const defaultLink: LinkRenderer = ({ href, kind, children, key }) =>
       {children}
       <span aria-hidden="true"> ↗</span>
     </a>
+  ) : kind === "route" ? (
+    <Link key={key} to={href} className="k-md-link k-md-route">
+      {children}
+    </Link>
   ) : (
-    <a key={key} href={href} className={kind === "route" ? "k-md-link k-md-route" : "k-md-link"}>
+    <a key={key} href={href} className="k-md-link">
       {children}
     </a>
   );

@@ -13,7 +13,7 @@ The owner's words, quoted exactly (… marks a cut; spelling as written), then �
 2. “strict detaching of the data vs view model, so its swappable.”\
    → `src/app/model` → scenario builders in `src/app/scenarios` that return chart specs → backends in `src/kit/charts`.
 3. “i cant quite intuit what `mean` here would mean”\
-   → Section 02; the views [What the mean means](#view/replay-quantiles) and [What a pool of tranches would earn](#view/pooling).
+   → [Section 02](#s-mean-median); the views [What the mean means](#view/replay-quantiles) and [What a pool of tranches would earn](#view/pooling).
 4. “every scenario warrants more than one type of chart or table.”\
    → Primary and secondary charts, ⊞ on every chart, and Table · Derivations · Quoted vs recomputed.
 5. “not every input is equally important to be configurable to the same degree.”\

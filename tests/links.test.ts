@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Link, plainText, resolveLink, rich } from "@kit/ui/Link";
-import { anchorHref, matchHash, partElementId, type RouteConfig } from "@kit/ui/route";
+import { createBus } from "@kit/events/bus";
+import type { KitEvents } from "@kit/events/types";
+import { followLink, Link, plainText, resolveLink, rich } from "@kit/ui/Link";
+import { anchorHref, matchHash, partElementId, setRouteConfig, type RouteConfig } from "@kit/ui/route";
 import { SectionFrame } from "@kit/ui/SectionFrame";
 import { kpiItems } from "@kit/ui/scenarioProps";
 import { buildAll } from "@app/scenarios";
@@ -97,6 +100,56 @@ describe("Link resolves route and in-page targets", () => {
   });
 });
 
+describe("a jump within the open page is announced, a page switch is the router's", () => {
+  /** A page at `hash` with the given element ids, and the bus's record. */
+  function page(hash: string, ids: string[]) {
+    const loc = { hash, get href() { return `http://app.test/${this.hash}`; } };
+    const dispatched: string[] = [];
+    const scrolled: string[] = [];
+    const el = (id: string) => ({ id, scrollIntoView: () => scrolled.push(id), classList: { add() {}, remove() {} }, offsetWidth: 0, matches: () => false, setAttribute() {}, focus() {} });
+    vi.stubGlobal("location", loc);
+    vi.stubGlobal("history", { pushState: (_: unknown, __: string, h: string) => (loc.hash = h) });
+    vi.stubGlobal("HashChangeEvent", class { constructor(public type: string) {} });
+    vi.stubGlobal("window", { dispatchEvent: (e: { type: string }) => dispatched.push(e.type), setTimeout: () => 0, open() {} });
+    vi.stubGlobal("document", { getElementById: (id: string) => (ids.includes(id) ? el(id) : null) });
+    setRouteConfig(cfg);
+    const bus = createBus<KitEvents>();
+    const seen: string[] = [];
+    bus.onAny((name, p) => seen.push(`${name} ${JSON.stringify(p)}`));
+    return { loc, bus, seen, dispatched, scrolled };
+  }
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setRouteConfig(null);
+  });
+
+  it("an in-page anchor scrolls, keeps the address and says route:jumped", () => {
+    const p = page("#explain", ["chart-binary-outcomes"]);
+    expect(followLink("#el-chart-binary-outcomes", p.bus)).toBe("scrolled");
+    expect(p.loc.hash).toBe("#explain");
+    expect(p.dispatched).toEqual([]);
+    expect(p.scrolled).toEqual(["chart-binary-outcomes"]);
+    expect(p.seen).toEqual(['route:jumped {"to":"#el-chart-binary-outcomes","elementId":"chart-binary-outcomes"}']);
+  });
+
+  it("another part of the open page moves the address for the router, then says route:jumped", () => {
+    const p = page("#s-binary", ["s-binary", "s-wing"]);
+    expect(followLink("#s-wing", p.bus)).toBe("scrolled");
+    expect(p.loc.hash).toBe("#s-wing");
+    // The router hears the move (and announces route:changed itself); the jump follows.
+    expect(p.dispatched).toEqual(["hashchange"]);
+    expect(p.seen).toEqual(['route:jumped {"to":"#s-wing","elementId":"s-wing"}']);
+  });
+
+  it("a part of another page is a route change only: nothing jumps until that page renders it", () => {
+    const p = page("#desk", []);
+    expect(followLink("#guide/keys", p.bus)).toBe("routed");
+    expect(p.loc.hash).toBe("#guide/keys");
+    expect(p.scrolled).toEqual([]);
+    expect(p.seen).toEqual([]);
+  });
+});
+
 /** Every copy string of a section that the page renders with inline markup. */
 function richCopy(s: ScenarioView): { where: string; text: string }[] {
   const out: { where: string; text: string }[] = [];
@@ -153,10 +206,16 @@ describe("the copy links what it names", () => {
     expect(links).toBeGreaterThanOrEqual(14);
   });
 
-  it("points every link in the copy and the Guide at something that exists", () => {
+  it("points every link in the copy, the Guide and the directives document at something that exists", () => {
     const guideAnchors = new Set(GUIDE_SECTIONS.flatMap((s) => s.body.filter((b) => b.kind === "h").map((b) => `guide-${s.id}-${(b as { text: string }).text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`)));
+    // The Guide's Directives section reads this file at run time; its in-app links go through Link.
+    const directives = readFileSync(new URL("../docs/DIRECTIVES.md", import.meta.url), "utf8")
+      .split("\n")
+      .map((text, i) => ({ where: `DIRECTIVES.md:${i + 1}`, text }))
+      .filter((l) => /\]\(#/.test(l.text));
+    expect(directives.length).toBeGreaterThan(5);
     let checked = 0;
-    for (const { where, text } of [...appCopy, ...guideCopy()])
+    for (const { where, text } of [...appCopy, ...guideCopy(), ...directives])
       for (const [, , to] of text.matchAll(LINK)) {
         checked++;
         const r = matchHash(to, cfg);

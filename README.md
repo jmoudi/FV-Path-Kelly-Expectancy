@@ -303,9 +303,10 @@ swapped without touching the others.
 - Links: every in-app link is the kit's `Link` (`src/kit/ui/Link.tsx`), underlined;
   copy strings carry them as inline markup, `[Section 04](#s-wing)`, rendered by
   `rich()` wherever the page shows that copy (ledes, claims, notes, captions, help,
-  quoted rows, blurbs, the Guide). A test holds every "Section NN" in the copy to a
-  link to the section with that number, and every link to a section, view or Guide
-  part that exists. Sections are `s-<id>`, chart cards `chart-<id>`, a section's figures
+  quoted rows, blurbs, the Guide), and the directives document's in-app links go
+  through it as well. A test holds every "Section NN" in the copy to a link to the
+  section with that number, and every link to a section, view or Guide part that
+  exists. Sections are `s-<id>`, chart cards `chart-<id>`, a section's figures
   `s-<id>-fig-<i>`, Guide sections `guide-<id>` (headings `guide-<id>-h`, sub-headings
   and the directives' headings `guide-<id>-<slug>`); `#el-<id>` links to any of them
   on the open page.

@@ -21,6 +21,7 @@
  * Scrolling to a target is this module's alone: `followLink` for a click, and
  * `useRevealTarget` for a page that opens on a part (the address on load, or a link from
  * another page), which also holds the target in place while content above it arrives.
+ * A jump within the open page is announced on the bus as `route:jumped`.
  *
  * `rich(text)` renders inline markup in any copy string: `[label](to)` through Link,
  * `code` (a quote with a space in it is set without the chip), **term**, {{a:Name}} (a
@@ -29,6 +30,8 @@
  * a worker can carry links; `plainText` strips the markup for titles and labels.
  */
 import { forwardRef, Fragment, useEffect, type AnchorHTMLAttributes, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import type { Bus } from "@kit/events/bus";
+import { useOptionalBus } from "@kit/events/react";
 import { Icon, type IconName } from "./Icon";
 import { matchHash, parseHash, partElementId, routeConfig, type Route, type RouteConfig } from "./route";
 
@@ -106,8 +109,11 @@ function pushHash(hash: string): void {
 /** What following a link did. */
 export type Followed = "scrolled" | "routed" | "external" | "none";
 
-/** Follow a link as a plain click would. */
-export function followLink(to: string): Followed {
+/**
+ * Follow a link as a plain click would. With a bus, a jump within the open page says
+ * `route:jumped` (after `route:changed`, when the address moved to another part).
+ */
+export function followLink(to: string, bus?: Bus | null): Followed {
   const t = resolveLink(to, routeConfig(), location.hash);
   if (t.kind === "external") {
     window.open(t.href, "_blank", "noopener,noreferrer");
@@ -117,6 +123,7 @@ export function followLink(to: string): Followed {
     const el = document.getElementById(t.elementId);
     if (el) {
       revealElement(el, { focus: true });
+      bus?.emit("route:jumped", { to, elementId: t.elementId });
       return "scrolled";
     }
     if (to.startsWith("#el-")) return "none";
@@ -130,6 +137,7 @@ export function followLink(to: string): Followed {
       pushHash(t.hash);
     }
     revealElement(el, { focus: true });
+    bus?.emit("route:jumped", { to, elementId: t.elementId! });
     return "scrolled";
   }
   if (location.hash === t.hash) return "none";
@@ -200,6 +208,7 @@ function openHere() {
 }
 
 export const Link = forwardRef<HTMLAnchorElement, LinkProps>(function Link({ to, variant = "text", className, onClick, onAuxClick, children, ...rest }, ref) {
+  const bus = useOptionalBus();
   const external = !to.startsWith("#");
   const inPage = to.startsWith("#el-");
   const cls = [variant === "text" ? "k-link" : null, className].filter(Boolean).join(" ") || undefined;
@@ -222,7 +231,7 @@ export const Link = forwardRef<HTMLAnchorElement, LinkProps>(function Link({ to,
           return;
         }
         e.preventDefault();
-        followLink(to);
+        followLink(to, bus);
       }}
       onAuxClick={(e) => {
         onAuxClick?.(e);

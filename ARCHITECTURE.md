@@ -86,7 +86,8 @@ subscription order, each in its own try/catch.
 | `state:reset` | `{}` | the store: `resetEverything` |
 | `settings:changed` | `what` (`ui`, `backend`, `param`), `key?` | the store: `setUi`, `setDefaultBackend`, `setParamSettings`, `resetParamSettings` |
 | `build:settled` | `at, ok, partial, error?` | `useBuild`, after an answer rendered |
-| `route:changed` | `from, to` | `useRoute` (the shell calls it once) |
+| `route:changed` | `from, to` | `useRoute` (the shell calls it once), when the address names another route: a page, a view, or another part of a page (`#s-<id>`, `#guide/<part>`), whether typed, from history or from a `Link`. Never for an in-page anchor (`#el-<id>`): the route stays, nothing is announced |
+| `route:jumped` | `to, elementId` | `Link` (`followLink`), when a click scrolled the open page to one of its elements without a page switch: an `#el-<id>` anchor (the address stays; this is the only event) or another part of the open page (the address moves first, so `route:changed` comes before it). A page that opens on a part (`useRevealTarget`) is announced by `route:changed` alone |
 | `notice` | `kind` (`info`, `warn`, `error`), `text, ttlMs?, id?` | anyone; `src/app/view/announce.ts` for imports and stories |
 | `market:switched` (app) | `from, to` | the market switch |
 
@@ -149,7 +150,7 @@ locked ends with `sweep:stopped` and reason `lock`.
 4. Add a branch to the page switch in `App`.
 5. Add a link to `TopBar`'s nav, and to the ⋯ tools for narrow screens.
 6. Should the deck hide on it? Extend `DeckBar`'s `hidden`.
-7. Parts of the page are `#<name>/<part>` and arrive in `route.section`.
+7. Parts of the page are `#<name>/<part>` and arrive in `route.section`; give each the DOM id `<name>-<part>` and call `useRevealTarget(id, ready)` (`src/kit/ui/Link.tsx`), the one place that scrolls to it (and holds it while the page fills); links to it are `Link`s.
 8. Anything else that needs to know listens to `route:changed`; nothing adds a hashchange listener.
 9. Document it in the Guide's Pages section (`src/app/data/copy/guide.ts`).
 10. Check it at 1380×900 and 400×800.
@@ -260,3 +261,12 @@ locked ends with `sweep:stopped` and reason `lock`.
   the builders (11), the DOM-id focus (7; a `param:focus` event would replace it), the
   duplicated value formatting (6: `formatIn` and `valueText`), and the app classes in
   the kit's stylesheets (12).
+- With the links (merged after this audit): `Link` (`src/kit/ui/Link.tsx`) owns every
+  scroll to a target, a click's (`followLink`) and a page's that opens on a part
+  (`useRevealTarget`, which also holds the target while content above it arrives); no
+  page scrolls itself. It adds two module-level registries of the kind kept in 9: the
+  route config that `useRoute` registers for `Link` (`route.ts`), and the jump a link
+  has started (`pending`), so the page that renders the route next neither scrolls a
+  second time nor misses the mark. A link moves the address with `pushState` and a
+  synthetic `hashchange`, which the router hears like any other; `route:jumped` says a
+  link scrolled within the open page.

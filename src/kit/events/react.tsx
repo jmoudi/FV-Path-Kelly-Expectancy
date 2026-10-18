@@ -21,6 +21,11 @@ export function useBus<E extends object = KitEvents>(): Bus<E> {
   return bus as Bus<E>;
 }
 
+/** The bus of the nearest provider, or null outside one (for a kit piece that also renders on its own, such as `Link`). */
+export function useOptionalBus<E extends object = KitEvents>(): Bus<E> | null {
+  return useContext(BusContext) as Bus<E> | null;
+}
+
 /** Subscribe to one event for as long as the component is mounted; the newest `handler` is the one called. */
 export function useBusEvent<K extends EventName<KitEvents>>(name: K, handler: Handler<KitEvents[K]>): void {
   useTypedBusEvent<KitEvents, K>(name, handler);

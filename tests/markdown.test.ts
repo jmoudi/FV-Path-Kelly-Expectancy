@@ -86,11 +86,11 @@ describe("Markdown inline", () => {
     expect(linkKind("docs/x.md")).toBe("plain");
     expect(linkKind("javascript:alert(1)")).toBe("unsafe");
     expect(linkKind("data:text/html,x")).toBe("unsafe");
-    expect(p("[Keys](#guide/keys)")).toBe('<a href="#guide/keys" class="k-md-link k-md-route">Keys</a>');
+    expect(p("[Keys](#guide/keys)")).toBe('<a href="#guide/keys" class="k-link k-md-link k-md-route">Keys</a>');
     expect(p("[site](https://example.com)")).toBe('<a href="https://example.com" target="_blank" rel="noopener noreferrer" class="k-md-link k-md-ext">site<span aria-hidden="true"> ↗</span></a>');
     expect(p("[file](docs/x.md)")).toBe('<a href="docs/x.md" class="k-md-link">file</a>');
     expect(p("[click](javascript:alert(1))")).not.toContain("<a");
-    expect(p("[**bold** `code`](#desk)")).toBe('<a href="#desk" class="k-md-link k-md-route"><strong>bold</strong> <code>code</code></a>');
+    expect(p("[**bold** `code`](#desk)")).toBe('<a href="#desk" class="k-link k-md-link k-md-route"><strong>bold</strong> <code>code</code></a>');
     expect(p("[not a link] (#desk) and [x]()")).toBe("[not a link] (#desk) and [x]()");
   });
 

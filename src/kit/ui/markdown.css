@@ -92,15 +92,18 @@
   padding: 0 4px;
   overflow-wrap: anywhere;
 }
+/* The kit's text link (.k-link, which an in-app link also carries): ink-2, underlined in
+   the accent at 45%, the full accent on hover and focus. */
 .k-md-link {
-  color: var(--ink);
-  text-decoration: underline;
-  text-decoration-color: var(--muted);
+  color: var(--ink-2);
+  text-decoration-line: underline;
   text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
+  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .k-md-link:hover,
 .k-md-link:focus-visible {
+  color: var(--ink);
   text-decoration-color: var(--accent);
 }
 .k-md-quote {
