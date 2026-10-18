@@ -1,11 +1,12 @@
-import { f, table, tableSpec, type ChartSpec, type Row, type SeriesSpec, type Story } from "../../charts/spec";
+import { f, table, tableSpec, type ChartSpec, type ColorRole, type Row, type SeriesSpec, type Story } from "../../charts/spec";
 import { medianGrowthPerSeason } from "../../model/growth";
 import { robustSeasonLogGrowth, seasonLogGrowth, seasonRuin } from "../../model/kelly";
+import { coinOutcomes, doubleOrNothingShare, navKellyShare, navLogGrowth } from "../../model/nav";
 import type { Datasets, Params } from "../../model/params";
 import { POLICY_IDS, type PolicyId } from "../../model/policies";
 import { binnedDistributions, logHistogram, samplePaths, summarize, weightedQuantile } from "../../model/season";
 import { linspace } from "../../model/stats";
-import { fig, methodLabel, movesDeck, near, pct, pct1, pct2, signedPct1, smallPct, typographic, x2, type Derived } from "../derived";
+import { fig, formatNumber, methodLabel, movesDeck, near, pct, pct1, pct2, signedPct1, smallPct, typographic, x2, type Derived } from "../derived";
 import type { ScenarioView } from "../types";
 
 const SEASON_WORDS: Record<number, string> = { 2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six", 7: "Seven", 8: "Eight", 9: "Nine", 10: "Ten", 11: "Eleven", 12: "Twelve" };
@@ -248,6 +249,67 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
     ],
   };
 
+  // Refilling from NAV: once the tranche is refilled each season, the season is a bet of a
+  // share f of NAV on the season-end multiple X, and NAV grows at E[log(1 − f + f·X)].
+  const yoursOutcomes = d.season[d.yours].dist.outcomes;
+  const navPs = [0.5, 0.55, 0.6];
+  const coinAtDeck = coinOutcomes(d.pClean, d.cleanEnd);
+  const deckPShown = navPs.some((pp) => Math.abs(pp - d.pClean) < 0.005);
+  const navFloor = -0.1;
+  const navClip = (g: number) => (Number.isFinite(g) && g >= navFloor ? g : null);
+  const navRows: Row[] = linspace(0, 1, 101).map((share) => {
+    const row: Row = { share };
+    navPs.forEach((pp, i) => (row[`coin${i}`] = navClip(navLogGrowth(share, coinOutcomes(pp, d.cleanEnd)))));
+    row.coinDeck = navClip(navLogGrowth(share, coinAtDeck));
+    row.yours = navClip(navLogGrowth(share, yoursOutcomes));
+    return row;
+  });
+  const fYours = navKellyShare(yoursOutcomes);
+  const fCoin = navKellyShare(coinAtDeck);
+  const twoP = doubleOrNothingShare(d.pClean);
+  const navRamp: ColorRole[] = ["ramp1", "ramp2", "ramp3"];
+  const navSeries: SeriesSpec[] = [
+    ...navPs.map((pp, i): SeriesSpec => ({ field: `coin${i}`, color: navRamp[i], label: `${P.coin.name}, p = ${pct(pp)}` })),
+    ...(deckPShown ? [] : [{ field: "coinDeck", color: "ink", label: `${P.coin.name} at the deck's p = ${pct(d.pClean)}`, dash: true } as SeriesSpec]),
+    { field: "yours", color: "c", label: yours.label, emphasis: "strong" },
+  ];
+  const nav: ChartSpec = {
+    id: "chain-nav",
+    title: "Refilling the tranche from NAV each season",
+    subtitle: `x share of NAV allocated to the tranche per season · y NAV log growth per season, E[log(1 − f + f·X)] with X the season-end multiple · ${P.coin.name} at three clean-season probabilities · violet = ${yours.label} · dots = growth-optimal share · double-or-nothing: f* ≈ 2p − 1 · curves below ${signedPct1(navFloor)} are cut`,
+    kind: "xy",
+    data: table(
+      [f("share", "Share of NAV allocated per season", "pct"), ...navPs.map((pp, i) => f(`coin${i}`, `${P.coin.name}, p = ${pct(pp)}`, "pct1")), f("coinDeck", `${P.coin.name} at the deck's p = ${pct(d.pClean)}`, "pct1"), f("yours", yours.label, "pct1")],
+      navRows,
+    ),
+    mark: "line",
+    x: { field: "share", format: "pct", domain: [0, 1] },
+    y: { field: "yours", label: "NAV log growth per season", format: "pct", domain: [navFloor, null], zero: false },
+    series: navSeries,
+    height: 320,
+    annotations: [
+      { kind: "hline", y: 0, text: "no growth", color: "muted", at: "end" },
+      ...(fCoin > 0 ? [{ kind: "point" as const, x: fCoin, y: navLogGrowth(fCoin, coinAtDeck), text: `${P.coin.name} at p = ${pct(d.pClean)}: f* ${pct1(fCoin)} · 2p − 1 = ${pct1(twoP)}`, color: "ink" as const, at: "end" as const }] : []),
+      ...(fYours > 0 ? [{ kind: "point" as const, x: fYours, y: navLogGrowth(fYours, yoursOutcomes), text: `${yours.name}: f* ${pct(fYours)}`, color: "c" as const, at: (fYours > 0.6 ? "start" : "end") as "start" | "end" }] : []),
+    ],
+  };
+  const navCell = (g: number) => (Number.isFinite(g) ? g : formatNumber(g));
+  const navTbl = tableSpec({
+    id: "chain-nav-table",
+    title: "NAV log growth per season by the share allocated",
+    data: table(
+      [f("share", "Share of NAV", "pct"), ...navPs.map((pp, i) => f(`coin${i}`, `${P.coin.name}, p = ${pct(pp)}`, "pct2")), f("yours", yours.label, "pct2")],
+      [0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1].map((share) => {
+        const row: Row = { share };
+        navPs.forEach((pp, i) => (row[`coin${i}`] = navCell(navLogGrowth(share, coinOutcomes(pp, d.cleanEnd)))));
+        row.yours = navCell(navLogGrowth(share, yoursOutcomes));
+        return row;
+      }),
+    ),
+    columns: [{ field: "share", emphasize: true }, ...navPs.map((_, i) => ({ field: `coin${i}` })), { field: "yours", emphasize: true }],
+    caption: `Growth-optimal shares: ${P.coin.name} at the deck's p ${pct1(fCoin)} (2p − 1 = ${pct1(twoP)}), ${yours.name} ${pct(fYours)}. The whole NAV on a season that can end at zero is log(0), so the ${P.coin.name} rows stop short of 100%.`,
+  });
+
   const policyTbl = tableSpec({
     id: "chain-table",
     title: `${N} season${N === 1 ? "" : "s"} chained, same per-name loss rate`,
@@ -306,6 +368,14 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
     views: [
       { id: "sizing-grid", title: "How much to risk a night", blurb: "Growth per season by risk a night and true loss rate, and the curve averaged over the band of rates you cannot rule out.", charts: ["chain-heat", "chain-sweep", "chain-grid-table"], kpis: [0, 4, 5] },
       { id: "chained-outcomes", title: N === 1 ? "One season later" : `${SEASON_WORDS[N] ?? N} seasons later`, blurb: "Mean and median as seasons are chained, the distribution after N seasons, and sampled paths.", charts: ["chain-curve", "chain-dist", "chain-fan", "chain-table"], kpis: [1, 2, 3, 5] },
+      {
+        id: "nav-refill",
+        title: "Refilling from NAV",
+        blurb: "Once the tranche is refilled from NAV each season, the season is a bet of a share of NAV on its end multiple: NAV log growth against that share, for the coin at three clean-season probabilities and for your policy.",
+        charts: ["chain-nav", "chain-nav-table"],
+        kpis: [6, 1],
+        params: [],
+      },
     ],
     kpis: [
       zero
@@ -316,12 +386,23 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
       { label: `P(below ${x2(p.thresholdBelow)})`, value: `${pct(sSpread.pBelow)} → ${pct(sYours.pBelow)}`, sub: `${P.spread.name} → ${yours.name}`, color: "loss" },
       { label: `Log growth of surviving paths, ${yours.name}`, value: signedPct1(d.growthYours), sub: `${pct(p.riskPerNight)} a night at the deck's q · ruin ${smallPct(d.ruinYours)} a season`, color: "c", help: "E[log end | the tranche survives] per season at the deck's loss rate and your risk a night. Read it next to the ruin probability." },
       { label: `Median growth per season, ${yours.name}`, value: signedPct1(medianGrowth), sub: `median after ${seasonsWord} ${x2(sYours.median)} → ^(1/${N}) − 1`, color: "c", help: "The rate the middle path compounds at: median_N^(1/N) − 1." },
+      {
+        label: `Kelly share of NAV per season, ${yours.name}`,
+        value: pct(fYours),
+        sub: `${P.coin.name} at p = ${pct(d.pClean)}: ${pct1(fCoin)} · double-or-nothing f* ≈ 2p − 1 = ${pct1(twoP)}`,
+        color: "c",
+        help: "Refilling the tranche from NAV each season makes the season a bet of a share of NAV on the season-end multiple. This share maximises NAV log growth; for a double-or-nothing it is 2p − 1, the same quantity as the expected value per season.",
+      },
     ],
     primary: [heat, sweep],
-    secondary: [growthChart, endDist, fan],
-    tables: [policyTbl, gridTbl],
+    secondary: [growthChart, endDist, fan, nav],
+    tables: [policyTbl, gridTbl, navTbl],
     localParams: [],
     notes: [
+      {
+        title: "Where sizing re-enters",
+        body: `Excluding sizing is clean as long as the tranche is not refilled. Once it is refilled from NAV each season, the season becomes a bet of a share f of NAV on the season-end multiple X, and NAV grows at E[log(1 − f + f·X)] per season. For the ${P.coin.name} that is a double-or-nothing on a fraction of NAV and the growth-optimal fraction is f* ≈ 2p − 1 (${pct1(twoP)} at the deck's p; exactly ${pct1(fCoin)} with a clean end of ${x2(d.cleanEnd)} rather than 2): the same quantity that sets the expected value per season sets how much of the account the game can carry. ${yours.label} can never end at zero, so its curve keeps rising to ${pct(fYours)} of NAV.`,
+      },
       {
         title: "Which row to sit in",
         body: zero
@@ -346,6 +427,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
       gridFig(0.02945, "2.94%", "+1.9% / +1.7% / −0.1% / −4.1%", [0.019, 0.017, -0.001, -0.041]),
       gridFig(0.032, "3.20%", "−0.4% / −1.2% / −4.7% / −10.7%", [-0.004, -0.012, -0.047, -0.107]),
       fig(p, "Twice the optimal fraction gives roughly zero growth", "75% a night at 2.94%: −0.1%", signedPct1(seasonLogGrowth(0.75, k, 0.02945, p.gain, n, p.sharedOutcome)), near(-0.001, seasonLogGrowth(0.75, k, 0.02945, p.gain, n, p.sharedOutcome), 0.0011), ["b", "n", "k", "c"]),
+      fig(p, "Kelly share of NAV for the coin at p = 55%", "≈ 2p − 1 = 10%", pct1(navKellyShare(coinOutcomes(0.55, d.cleanEnd))), near(0.1, navKellyShare(coinOutcomes(0.55, d.cleanEnd)), 0.006), ["b", "n"]),
     ],
   };
 }

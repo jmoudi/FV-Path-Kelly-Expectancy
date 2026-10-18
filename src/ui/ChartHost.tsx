@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RenderHandle } from "../charts/backends/types";
+import { FIGURE_DEFAULT_HEIGHT, FigureFrame, figureFor } from "../charts/figures";
 import { loadBackend, BACKEND_INFO } from "../charts/registry";
-import { applyOverride, type BackendId, type ChartSpec } from "../charts/spec";
+import { applyOverride, toCsv, type BackendId, type ChartSpec, type SpecOverride } from "../charts/spec";
 import { useStore } from "../state/store";
 import { Authoring } from "./Authoring";
+import { saveText } from "./download";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { Num } from "./Num";
 import { Popover } from "./Popover";
 import { TableView } from "./TableView";
 
@@ -53,9 +56,12 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
   const setAuthoringOpen = useStore((s) => s.setAuthoringOpen);
   const applyStory = useStore((s) => s.applyStory);
   const spec = useMemo(() => applyOverride(base, override), [base, override]);
+  // A figure is drawn by the figure registry, never by a backend; ⊞ still shows its data.
+  const isFigure = base.kind === "figure";
   const backendId: BackendId = spec.backend ?? (base.kind === "table" ? "table" : defaultBackend);
   const [tableView, setTableView] = useState(false);
   const effective: BackendId = tableView ? "table" : backendId;
+  const mountsBackend = !isFigure && effective !== "table";
 
   const cardRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<HTMLDivElement>(null);
@@ -88,7 +94,7 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
   }, [visible]);
 
   useEffect(() => {
-    if (!visible || effective === "table") {
+    if (!visible || !mountsBackend) {
       handleRef.current?.dispose();
       handleRef.current = null;
       setMounted(null);
@@ -116,7 +122,7 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
       handleRef.current?.dispose();
       handleRef.current = null;
     };
-  }, [visible, effective]);
+  }, [visible, effective, mountsBackend]);
 
   useEffect(() => {
     if (!handleRef.current || mounted !== effective) return;
@@ -130,14 +136,15 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
 
   useEffect(() => {
     const el = plotRef.current;
-    if (!el || !("ResizeObserver" in window) || effective === "table") return;
+    if (!el || !("ResizeObserver" in window) || !mountsBackend) return;
     const ro = new ResizeObserver(() => handleRef.current?.resize());
     ro.observe(el);
     return () => ro.disconnect();
-  }, [effective, mounted]);
+  }, [effective, mounted, mountsBackend]);
 
   const open = authoringOpen === base.id;
-  const height = (spec.height ?? 300) + (base.kind === "heatmap" ? 90 : 70);
+  // A figure draws its own axes inside its height; a backend gets an axis band on top.
+  const height = isFigure ? (spec.height ?? FIGURE_DEFAULT_HEIGHT) : (spec.height ?? 300) + (base.kind === "heatmap" ? 90 : 70);
   const edited = !!override && !override.story;
   const activeStory = override?.story;
   const stories = base.stories ?? [];
@@ -178,6 +185,10 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
       )}
       {effective === "table" ? (
         <TableView spec={spec} />
+      ) : isFigure ? (
+        <div className="chart-plot" style={{ height }}>
+          <FigureFrame spec={spec} Figure={figureFor(base)} height={height} />
+        </div>
       ) : (
         <div
           ref={plotRef}
@@ -198,20 +209,53 @@ function ChartCard({ base, viewId }: { base: ChartSpec; viewId?: string }) {
           )}
         </div>
       )}
-      {(spec.caption || edited || effective !== defaultBackend) && (
+      {(spec.caption || edited || (!isFigure && effective !== defaultBackend)) && (
         <div className="caption" style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
           {spec.caption && <span>{spec.caption}</span>}
-          <span className="backend-tag" style={{ marginLeft: "auto" }}>
-            {BACKEND_INFO[effective].label}
-            {edited ? " · edited" : ""}
-          </span>
+          {(edited || !isFigure) && (
+            <span className="backend-tag" style={{ marginLeft: "auto" }}>
+              {isFigure ? "Figure" : BACKEND_INFO[effective].label}
+              {edited ? " · edited" : ""}
+            </span>
+          )}
         </div>
       )}
       {open && (
-        <Popover id={`authoring-${base.id}`} anchor={gearRef.current} onClose={() => setAuthoringOpen(null)} label={`Chart definition: ${base.title}`} width={420}>
-          <Authoring base={base} spec={spec} override={override} onClose={() => setAuthoringOpen(null)} />
+        <Popover id={`authoring-${base.id}`} anchor={gearRef.current} onClose={() => setAuthoringOpen(null)} label={`Chart definition: ${base.title}`} width={isFigure ? 300 : 420}>
+          {isFigure ? <FigureSettings base={base} spec={spec} override={override} onClose={() => setAuthoringOpen(null)} /> : <Authoring base={base} spec={spec} override={override} onClose={() => setAuthoringOpen(null)} />}
         </Popover>
       )}
+    </div>
+  );
+}
+
+/** The chart definition of a figure: not backend-switchable, so only its height and its data. */
+function FigureSettings({ base, spec, override, onClose }: { base: ChartSpec; spec: ChartSpec; override: SpecOverride | undefined; onClose: () => void }) {
+  const setOverride = useStore((s) => s.setOverride);
+  const clearOverride = useStore((s) => s.clearOverride);
+  return (
+    <div className="authoring" role="group" aria-label={`Figure: ${base.title}`}>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h5>Figure</h5>
+        <button type="button" className="btn small quiet" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <p style={{ margin: 0, color: "var(--muted)" }}>Drawn by the app, not by a chart backend, so only its height is editable here. ⊞ shows the numbers behind it.</p>
+      <div>
+        <h5>Size</h5>
+        <div style={{ marginTop: 6, maxWidth: 220 }}>
+          <Num id={`${base.id}-h`} label="height (px)" value={spec.height ?? FIGURE_DEFAULT_HEIGHT} min={160} max={800} step={10} unit="int" onChange={(v) => v != null && setOverride(base.id, { height: v })} />
+        </div>
+      </div>
+      <div className="foot">
+        <button type="button" className="btn small" onClick={() => void saveText(`${base.id}.csv`, toCsv(base.data), "text/csv")}>
+          Data as CSV
+        </button>
+        <button type="button" className="btn small quiet" onClick={() => clearOverride(base.id)} disabled={!override}>
+          Reset figure
+        </button>
+      </div>
     </div>
   );
 }

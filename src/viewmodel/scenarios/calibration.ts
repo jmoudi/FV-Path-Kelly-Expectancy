@@ -1,8 +1,10 @@
-import { f, table, tableSpec, type Annotation, type ChartSpec, type Row } from "../../charts/spec";
+import { f, table, tableSpec, type Annotation, type ChartSpec, type Row, type Story } from "../../charts/spec";
 import { eventsForTest, eventsToResolve, eventsUntilUpperBelow, observedRatePmf, wilsonInterval } from "../../model/calibration";
 import type { Datasets, Params } from "../../model/params";
+import { summarize, type Distribution } from "../../model/season";
 import { linspace, logspace, normalQuantile } from "../../model/stats";
-import { fig, fmtInt, movesDeck, near, pct2, years, type Derived } from "../derived";
+import { evMatchingStake, symmetricKelly, symmetricSeasonDistribution } from "../../model/symmetric";
+import { fig, fmtInt, movesDeck, near, pct, pct1, pct2, x2, years, type Derived } from "../derived";
 import type { KPI, ScenarioView } from "../types";
 
 /** Events for a two-sided 5% test with 80% power (the one-sided version is eventsForTest). */
@@ -142,6 +144,81 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
     caption: `Events needed = z² · q̄(1 − q̄) ÷ Δq², with q̄ the midpoint of the two rates. ${z}σ is a weak bar: it means each rate sits ${z} standard errors from the other, not 95% confidence. Pace: ${perYear} name-events a year.`,
   });
 
+  // The frequent-outcome system: a symmetric payoff at win rate p, one trade per event, the
+  // same number of events as a season. Its season is a hump of many ends; the coin has two.
+  const symP = p.symWinRate;
+  const symS = p.symStake;
+  const sym = symmetricSeasonDistribution(symP, symS, p.nights);
+  const symSum = summarize(sym, p.thresholdBelow);
+  const coinDist = d.season.coin.dist;
+  const coinSum = d.season.coin.summary;
+  const coin = d.byId.coin;
+  const below1 = (dist: Distribution) => dist.outcomes.reduce((s, o) => (o.value < 1 - 1e-9 ? s + o.prob : s), 0);
+  const symBelow = below1(sym);
+  const coinBelow = below1(coinDist);
+  const symHi = Math.ceil(Math.max(d.cleanEnd, symSum.max) * 1.05 * 20) / 20;
+  const symGrid = Array.from(new Set([0, ...coinDist.outcomes.map((o) => o.value), ...sym.outcomes.map((o) => o.value), symHi].map((v) => Math.min(symHi, Math.round(v * 1e6) / 1e6)))).sort((a, b) => a - b);
+  const cdfAt = (dist: Distribution, x: number) => Math.min(1, dist.outcomes.reduce((s, o) => (o.value <= x + 1e-9 ? s + o.prob : s), 0));
+  const symRows: Row[] = symGrid.map((x) => ({ end: x, coin: cdfAt(coinDist, x), sym: cdfAt(sym, x) }));
+  const symLabel = `Symmetric ${pct(symP)} system, ${pct1(symS)} a trade`;
+  const symKelly = symmetricKelly(symP);
+  const evStake = evMatchingStake(coinSum.mean, symP, p.nights);
+  const nSym = eventsToResolve(0.5, symP, z);
+  const symStories: Story[] = [];
+  if (Math.abs(symP - 0.5) > 1e-9) {
+    const fifty = symmetricSeasonDistribution(0.5, symS, p.nights);
+    symStories.push({
+      id: "fifty",
+      label: `What if the ${pct(symP)} system is really 50%?`,
+      narrative: `At a 50% win rate the hump sits around the start: median ${x2(summarize(fifty).median)}, P(below start) ${pct(below1(fifty))}. Telling ${pct(symP)} from 50% takes ${fmtInt(nSym)} trades at ${z}σ.`,
+      params: { symWinRate: 0.5 },
+      badge: movesDeck("win rate", pct(symP), "50%"),
+    });
+  }
+  if (symKelly > 0 && symKelly <= 0.25 && Math.abs(symS - symKelly) > 1e-6) {
+    const kd = symmetricSeasonDistribution(symP, symKelly, p.nights);
+    symStories.push({
+      id: "kelly",
+      label: "I stake the Kelly fraction 2p − 1",
+      narrative: `${pct(symKelly)} a trade: median ${x2(summarize(kd).median)}, P(below start) ${pct(below1(kd))}, 10th percentile ${x2(summarize(kd).p10)}; a far wider season for the same win rate.`,
+      params: { symStake: Math.round(symKelly * 1e4) / 1e4 },
+      badge: movesDeck("stake", pct1(symS), pct(symKelly)),
+    });
+  }
+  const symChart: ChartSpec = {
+    id: "cal-symmetric",
+    title: `The ${pct(symP)} symmetric system's season next to the ${coin.name}'s`,
+    subtitle: `x season end, units of the starting stake · y share of seasons ending at or below · ${p.nights} events each · amber = ${coin.label} · black = symmetric payoff, ${pct(symP)} win rate, ${pct1(symS)} staked a trade · red line = the start`,
+    kind: "xy",
+    data: table([f("end", "Season end", "x"), f("coin", coin.label, "pct1"), f("sym", symLabel, "pct1")], symRows),
+    mark: "step",
+    x: { field: "end", format: "x", domain: [0, symHi] },
+    y: { field: "sym", label: "P(season ends at or below)", format: "pct", domain: [0, 1] },
+    series: [
+      { field: "coin", color: "a", label: coin.label },
+      { field: "sym", color: "ink", label: symLabel, emphasis: "strong" },
+    ],
+    height: 300,
+    annotations: [
+      { kind: "vline", x: 1, text: "start", color: "loss", at: "start" },
+      { kind: "hline", y: 0.5, text: "median line", color: "muted", at: "end" },
+    ],
+    stories: symStories,
+  };
+  const symTbl = tableSpec({
+    id: "cal-symmetric-table",
+    title: "Two games over the same number of events",
+    data: table(
+      [f("game", "Game"), f("mean", "Mean", "x"), f("median", "Median", "x"), f("p10", "10th percentile", "x"), f("below", "P(below start)", "pct1"), f("ruin", "P(ruin)", "pct2"), f("ends", "Distinct season ends", "int"), f("events", `Events to tell it from fair, ${z}σ`, "int")],
+      [
+        { game: coin.label, mean: coinSum.mean, median: coinSum.median, p10: coinSum.p10, below: coinBelow, ruin: coinSum.pRuin, ends: coinDist.outcomes.length, events: nDeckBE },
+        { game: symLabel, mean: symSum.mean, median: symSum.median, p10: symSum.p10, below: symBelow, ruin: symSum.pRuin, ends: sym.outcomes.length, events: nSym },
+      ],
+    ),
+    columns: [{ field: "game", emphasize: true }, { field: "mean" }, { field: "median", emphasize: true }, { field: "p10" }, { field: "below", color: "loss" }, { field: "ruin", color: "loss" }, { field: "ends" }, { field: "events", emphasize: true }],
+    caption: `Both over ${p.nights} events. The symmetric system's case rests on a frequent outcome, so its record resolves in ${fmtInt(nSym)} trades; the tranche's rests on a rare one. Its growth-optimal stake is 2p − 1 = ${pct(symKelly)}${evStake != null ? `; ${pct2(evStake)} a trade would give it the ${coin.name}'s mean season` : ""}.`,
+  });
+
   const kpis: KPI[] = [
     { label: "Events to tell optimistic from break-even", value: fmtInt(nOptBE), sub: `${pct2(qOpt)} vs ${pct2(qBE)} at ${z}σ`, help: "Name-events needed before the record separates the optimistic rate from break-even." },
     { label: "At your pace", value: years(nOptBE, perYear), sub: `${perYear} events a year` },
@@ -149,6 +226,13 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
     { label: "The frequent game", value: `${fmtInt(nFrequent)} trades`, sub: `60% vs 50% win rate at ${z}σ · ${fmtInt(nFrequentTest)} as a 5%/80% test`, help: "A symmetric-payoff system with a 10-point gap in win rate resolves within a season or two." },
   ];
   if (rec) kpis.splice(1, 0, { label: "Your record", value: `${pct2(rec.rate)} over ${rec.events}`, sub: `band ${pct2(rec.interval[0])} to ${pct2(rec.interval[1])}`, color: "ink", help: rec.kind === "binary" ? "Full losses counted over the events you imported." : "Expected loss as a fraction of max loss, from the P&L you imported." });
+  const symKpi = kpis.length;
+  kpis.push({
+    label: `P(season below start), symmetric ${pct(symP)} system → ${coin.name}`,
+    value: `${pct(symBelow)} → ${pct(coinBelow)}`,
+    sub: `${p.nights} events · ${pct1(symS)} a trade · ${sym.outcomes.length} distinct ends → ${coinDist.outcomes.length}`,
+    help: "The frequent-outcome system spreads its season over many small ends around the start; the coin has two. Its case rests on a frequent outcome, which is why a few hundred trades calibrate it and a decade cannot calibrate the tranche.",
+  });
 
   const n1500 = eventsToResolve(0.0252, 0.0341, 2);
 
@@ -159,19 +243,23 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
     claim: "The premium over fair sits in a rare-event rate that a decade of your own trading cannot resolve; the estimate has to come from cross-sectional history.",
     lede: "How long until my record can tell the deck's loss rate from break-even?",
     views: [
-      { id: "events-needed", title: "How long until my record proves q", blurb: "How many name-events separate two loss rates, and what that is in years.", charts: ["cal-events", "cal-table"], params: ["altLossRate", "zSigma", "eventsPerYear"], kpis: [0, 1, 2, 3] },
+      { id: "events-needed", title: "How long until my record proves q", blurb: "How many name-events separate two loss rates, what that is in years, and the frequent-outcome system's season next to the coin's.", charts: ["cal-events", "cal-symmetric", "cal-table", "cal-symmetric-table"], params: ["altLossRate", "zSigma", "eventsPerYear", "symWinRate", "symStake"], kpis: [0, 1, 2, 3, symKpi] },
       { id: "sampling", title: "How wide the record's error bar is", blurb: "What an observed loss rate can look like under either true rate.", charts: ["cal-pmf-year", "cal-pmf-resolved"], params: ["eventsPerYear", "altLossRate"] },
       { id: "confidence-band", title: "Which rates my record cannot rule out", blurb: "How the uncertainty around an observed rate shrinks with the record.", charts: ["cal-band"], params: ["zSigma", "eventsPerYear"] },
     ],
     kpis,
     primary: [need],
-    secondary: [oneYear, resolved, band],
-    tables: [tbl],
-    localParams: ["altLossRate", "eventsPerYear", "zSigma"],
+    secondary: [oneYear, resolved, band, symChart],
+    tables: [tbl, symTbl],
+    localParams: ["altLossRate", "eventsPerYear", "zSigma", "symWinRate", "symStake"],
     notes: [
       {
         title: "Noise versus calibration",
         body: "The strategy is not more exposed to noise than a wick-counting system. It is more exposed to calibration: the number that sets the premium over fair is a rare-event frequency, and rare events are expensive to count. The track record cannot resolve it, so the estimate must come from many names across many quarters, and from the assumption that those distributions still apply.",
+      },
+      {
+        title: "The frequent game",
+        body: `A ${pct(symP)} win-rate system with a symmetric payoff has its case in a frequent outcome: its season is a hump of ${sym.outcomes.length} possible ends around the start, and ${fmtInt(nSym)} trades tell ${pct(symP)} from 50% at ${z}σ. The tranche's whole range from fair to about +19% a season lives in less than one percentage point of a rare-event frequency, and its season has two ends. Both games are probability; the tranche's is probability that is expensive to measure.`,
       },
       {
         title: "How the count is made",
@@ -187,6 +275,7 @@ export function buildCalibration(p: Params, d: Derived, _data: Datasets): Scenar
       fig(p, "At ~80 events a year", "cannot resolve this decade", years(n1500, 80), n1500 / 80 >= 10, []),
       fig(p, "Trades to tell a 60% win rate from 50%, 2σ apart", "a few hundred", fmtInt(eventsToResolve(0.5, 0.6, 2)), false, [], "2σ separation is a loose bar: each rate two standard errors from the other, not a test at a stated power."),
       fig(p, "Same, as a 5% test with 80% power", "a few hundred", `${fmtInt(eventsForTest(0.5, 0.6, 0.05, 0.8))} one-sided · ${fmtInt(eventsTwoSided(0.5, 0.6))} two-sided`, true, []),
+      fig(p, "A 60% symmetric system's case sits in a frequent outcome", "a hump, not a coin", `${sym.outcomes.length} distinct season ends against the ${coin.name}'s ${coinDist.outcomes.length} · P(below start) ${pct(symBelow)}`, sym.outcomes.length > coinDist.outcomes.length, []),
     ],
   };
 }

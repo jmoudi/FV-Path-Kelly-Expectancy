@@ -22,6 +22,12 @@ export type ColorRole =
   | "ramp4";
 
 export type MarkType = "line" | "step" | "area" | "bar" | "scatter";
+/**
+ * Figures drawn by a React component from src/charts/figures, not by a chart backend:
+ * the railroad schematic and the season calendar. Not backend-switchable; the table
+ * view shows their data.
+ */
+export type FigureName = "railroad" | "calendar";
 export type ScaleType = "linear" | "log";
 export type NumberFormat = "pct" | "pct1" | "pct2" | "pct3" | "x" | "x2" | "int" | "num" | "sci" | "auto";
 export type Emphasis = "strong" | "normal" | "muted";
@@ -136,8 +142,12 @@ export interface ChartSpec {
   id: string;
   title: string;
   subtitle?: string;
-  kind: "xy" | "heatmap" | "table";
+  kind: "xy" | "heatmap" | "table" | "figure";
   data: DataTable;
+  /** Which component draws a `figure` spec. */
+  figure?: FigureName;
+  /** Scalar inputs a figure needs beside its data table (shares, counts, labels). */
+  params?: Record<string, Cell>;
   mark: MarkType;
   x: AxisSpec;
   y: AxisSpec;
@@ -336,4 +346,10 @@ export const f = (name: string, label: string, format?: NumberFormat): Field => 
 export function tableSpec(init: Pick<ChartSpec, "id" | "title" | "data" | "columns"> & Partial<Pick<ChartSpec, "caption" | "highlightRow" | "subtitle">>): ChartSpec {
   const first = init.data.fields[0]?.name ?? "";
   return { kind: "table", mark: "line", x: { field: first }, y: { field: first }, series: [], ...init };
+}
+
+/** A figure spec: drawn by the named component; the data table is what ⊞ shows. */
+export function figureSpec(init: Pick<ChartSpec, "id" | "title" | "data"> & { figure: FigureName; params: Record<string, Cell> } & Partial<Pick<ChartSpec, "subtitle" | "caption" | "height" | "columns" | "stories">>): ChartSpec {
+  const first = init.data.fields[0]?.name ?? "";
+  return { kind: "figure", mark: "line", x: { field: first }, y: { field: first }, series: [], ...init };
 }

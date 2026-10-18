@@ -1,9 +1,11 @@
-import { f, table, tableSpec, type ChartSpec, type Row, type Story } from "../../charts/spec";
+import { f, table, tableSpec, type ChartSpec, type ColorRole, type Row, type SeriesSpec, type Story } from "../../charts/spec";
 import { pCleanFromLossRate } from "../../model/binary";
 import { marketPatch, MARKET_TOL, type Datasets, type Params } from "../../model/params";
+import { summarize } from "../../model/season";
 import { linspace } from "../../model/stats";
 import { fairRealizedRatio, movePdf, payoutFraction, ratioForLossRate, wingRates, type WingParams } from "../../model/wing";
-import { fig, movesDeck, near, pct, pct1, pct2, ratio, sigma, signedPct, signedPp, type Derived } from "../derived";
+import { partialShareOfBadSeasons, wingSeasonDistribution } from "../../model/wingSeason";
+import { fig, methodLabel, movesDeck, near, pct, pct1, pct2, ratio, sigma, signedPct, signedPp, smallPct, x2, type Derived } from "../derived";
 import type { Action, ScenarioView } from "../types";
 
 export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
@@ -176,6 +178,102 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
     caption: "Credit held fixed at the deck's c ÷ W while the strike moves, so the farther rows are not what a chain would quote. The premium column is the fair rate minus the effective rate; positive means the inputs assume the chain pays for tail insurance.",
   });
 
+  // The season the wing's payout produces, for three widths and yours. Realized ÷ priced is
+  // solved per width so every wing has the deck's effective rate: same mean, different shape.
+  const yourWidth = Math.round(p.wingWidth * 1000) / 1000;
+  const standardWidths = [0.25, 0.5, 1];
+  const widthList = Array.from(new Set([...standardWidths, yourWidth])).sort((a, b) => a - b);
+  const seasonByWidth = widthList.map((w) => {
+    const wpW: WingParams = { ...wp, wingWidth: w };
+    const solved = ratioForLossRate(q, wpW);
+    const wpUsed: WingParams = { ...wpW, realizedRatio: solved ?? p.realizedRatio };
+    const rates = wingRates(wpUsed);
+    const dist = wingSeasonDistribution(wpUsed, p.nights, { maxCompositions: p.maxCompositions });
+    let below1 = 0;
+    for (const o of dist.outcomes) if (o.value < 1 - 1e-9) below1 += o.prob;
+    return { width: w, ratio: wpUsed.realizedRatio, solved: solved != null, rates, dist, summary: summarize(dist, p.thresholdBelow), below1, partial: partialShareOfBadSeasons(dist) };
+  });
+  const yoursW = seasonByWidth.find((s) => s.width === yourWidth)!;
+  const w025 = seasonByWidth.find((s) => s.width === 0.25)!;
+  const w1 = seasonByWidth.find((s) => s.width === 1)!;
+  const hiEnd = Math.max(1.2, Math.ceil(Math.max(...seasonByWidth.map((s) => s.summary.max)) * 1.05 * 20) / 20);
+  const endGrid = [0, ...linspace(0.02, hiEnd, 160)];
+  const cursors = seasonByWidth.map(() => ({ i: 0, acc: 0 }));
+  const seasonRows: Row[] = endGrid.map((x) => {
+    const row: Row = { end: x };
+    seasonByWidth.forEach((s, i) => {
+      const cur = cursors[i];
+      const outs = s.dist.outcomes;
+      while (cur.i < outs.length && outs[cur.i].value <= x + 1e-9) cur.acc += outs[cur.i++].prob;
+      row[`w${i}`] = Math.min(1, cur.acc);
+    });
+    return row;
+  });
+  const widthColors: ColorRole[] = ["ramp1", "ramp2", "ramp3"];
+  const seasonSeries: SeriesSpec[] = seasonByWidth.map((s, i) => {
+    const std = standardWidths.indexOf(s.width);
+    const isYours = s.width === yourWidth;
+    return { field: `w${i}`, color: std >= 0 ? widthColors[std] : "ink", label: `${sigma(s.width)} wide${isYours ? " (your wing)" : ""}`, emphasis: isYours ? "strong" : "normal" };
+  });
+  const partialText = (s: (typeof seasonByWidth)[number]) => (s.partial == null ? "no bad seasons" : pct(s.partial));
+  const seasonStories: Story[] = [];
+  if (yourWidth !== 1) {
+    seasonStories.push({
+      id: "wide",
+      label: "I widen the wing to 1σ",
+      narrative: `${partialText(w1)} of the bad seasons end above zero instead of ${partialText(yoursW)}; ruin per season ${smallPct(w1.summary.pRuin)} instead of ${smallPct(yoursW.summary.pRuin)}, at the same effective rate.`,
+      params: { wingWidth: 1 },
+      badge: movesDeck("wing width", sigma(p.wingWidth), sigma(1)),
+    });
+  }
+  if (yourWidth !== 0.25) {
+    seasonStories.push({
+      id: "narrow",
+      label: "I narrow the wing to 0.25σ",
+      narrative: `${partialText(w025)} of the bad seasons end above zero instead of ${partialText(yoursW)}: the season moves toward the coin, ruin ${pct1(w025.summary.pRuin)} instead of ${smallPct(yoursW.summary.pRuin)}.`,
+      params: { wingWidth: 0.25 },
+      badge: movesDeck("wing width", sigma(p.wingWidth), sigma(0.25)),
+    });
+  }
+  const wingSeason: ChartSpec = {
+    id: "wing-season",
+    title: "Where a season ends when the wing pays out in part",
+    subtitle: `x season end, tranche units · y share of seasons ending at or below · one step per wing width, whole tranche on each of ${p.nights} events · realized ÷ priced solved per width so every wing has the deck's effective rate ${pct2(q)} · red line = the start · ${methodLabel(yoursW.dist.method)}`,
+    kind: "xy",
+    data: table([f("end", "Season end, tranche units", "x"), ...seasonByWidth.map((s, i) => f(`w${i}`, `${sigma(s.width)} wide`, "pct1"))], seasonRows),
+    mark: "step",
+    x: { field: "end", format: "x", domain: [0, hiEnd] },
+    y: { field: `w${seasonByWidth.indexOf(yoursW)}`, label: "P(season ends at or below)", format: "pct", domain: [0, 1] },
+    series: seasonSeries,
+    height: 300,
+    annotations: [
+      { kind: "vline", x: 1, text: "start: a bad season ends below", color: "loss", at: "start" },
+      { kind: "hline", y: 0.5, text: "median line", color: "muted", at: "end" },
+    ],
+    stories: seasonStories,
+  };
+  const seasonTbl = tableSpec({
+    id: "wing-season-table",
+    title: "The season by wing width, effective rate held at the deck's q",
+    data: table(
+      [
+        f("width", "Wing width, σ", "x2"),
+        f("ratio", "Realized ÷ priced solved", "x2"),
+        f("breach", "Breach", "pct2"),
+        f("fullGap", "Full gap", "pct2"),
+        f("below1", "P(season below start)", "pct1"),
+        f("ruin", "P(ruin)", "pct2"),
+        f("partial", "Bad seasons that are partial", "pct"),
+        f("median", "Median", "x"),
+        f("mean", "Mean", "x"),
+      ],
+      seasonByWidth.map((s) => ({ width: s.width, ratio: s.ratio, breach: s.rates.breach, fullGap: s.rates.fullGap, below1: s.below1, ruin: s.summary.pRuin, partial: s.partial, median: s.summary.median, mean: s.summary.mean })),
+    ),
+    columns: [{ field: "width", emphasize: true }, { field: "ratio" }, { field: "breach" }, { field: "fullGap" }, { field: "below1" }, { field: "ruin", color: "loss" }, { field: "partial", emphasize: true }, { field: "median" }, { field: "mean" }],
+    highlightRow: { field: "width", value: yourWidth },
+    caption: `Whole tranche on each of ${p.nights} events; one event multiplies the tranche by 1 + (c/W − payout)/(1 − c/W). Where a ratio could be solved the mean is the same for every width, because the effective rate is; the width changes the shape.${seasonByWidth.some((s) => !s.solved) ? " A width without a solvable ratio keeps the deck's realized ÷ priced." : ""}`,
+  });
+
   const fairDeck = marketPatch("fair", p);
   const fairQ = fairDeck.lossRate ?? d.breakEven;
   const actions: Action[] = [
@@ -208,7 +306,7 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
     claim: "q is expected loss per unit of max loss. A fairly priced wing puts it at c/W, which is exactly break-even; anything lower is a premium the chain pays, not information about the chain.",
     lede: "Which per-event loss rate belongs in the model: breach, effective or full gap?",
     views: [
-      { id: "move-vs-wing", title: "Which loss rate to plug in", blurb: "The realized move against the short and long strike, and the payout ramp between them.", charts: ["wing-density", "wing-payout"], params: ["strikeDistance", "wingWidth", "creditFraction", "moveDist", "tailDf", "realizedRatio"], kpis: [0, 1] },
+      { id: "move-vs-wing", title: "Which loss rate to plug in", blurb: "The realized move against the short and long strike, the payout ramp between them, and the season that payout produces at three wing widths.", charts: ["wing-density", "wing-payout", "wing-season", "wing-season-table"], params: ["strikeDistance", "wingWidth", "creditFraction", "moveDist", "tailDf", "realizedRatio"], kpis: [0, 1, 4] },
       { id: "wing-rates", title: "Breach, effective and full-gap rates", blurb: "The three candidate rates at your strikes and across strike distances, against the fair rate.", charts: ["wing-bars", "wing-sweep", "wing-table"], params: ["strikeDistance", "wingWidth", "creditFraction", "realizedRatio"], kpis: [0, 1, 2, 3] },
     ],
     kpis: [
@@ -216,10 +314,16 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
       { label: "Premium over fair per event", value: signedPp(r.premiumRate), sub: `c ÷ W ${pct2(r.fairRate)} − effective ${pct2(r.effective)} · EV ${signedPct(r.expectedPnlPerMaxLoss, 2)} of max loss`, help: "How far below the chain's fair rate the effective rate sits. Positive means these inputs assume the chain pays a premium for tail insurance, which is not an information edge; zero means fair pricing." },
       { label: "Fair rate c ÷ W", value: pct2(r.fairRate), sub: "= b ÷ (1 + b), break-even", color: "loss", help: "The effective rate at which credit equals expected payout. Identical to the break-even loss rate in section 01." },
       { label: "Breach / full gap", value: `${pct2(r.breach)} / ${pct2(r.fullGap)}`, sub: `beyond ${sigma(p.strikeDistance)} / ${sigma(dEnd)}` },
+      {
+        label: "Bad seasons that are partial",
+        value: partialText(yoursW),
+        sub: `${sigma(p.wingWidth)} wide · ${sigma(0.25)}: ${partialText(w025)} · ${sigma(1)}: ${partialText(w1)} · median season ${x2(yoursW.summary.median)}`,
+        help: "Among seasons that end below the start, the share that end above zero. Narrow wings make the binary exact, so a bad season is ruin; wide wings turn most bad seasons into partial losses. Realized ÷ priced is solved per width so each curve keeps the deck's effective rate.",
+      },
     ],
     primary: [density],
-    secondary: [payout, bars, sweep],
-    tables: [tbl],
+    secondary: [payout, bars, sweep, wingSeason],
+    tables: [tbl, seasonTbl],
     localParams: ["strikeDistance", "wingWidth", "creditFraction", "moveDist", "tailDf", "realizedRatio"],
     actions,
     notes: [
@@ -236,6 +340,10 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
         body: `The deck's q is the discussion case, ${pct2(p.lossRate)}. For this wing to produce that rate the realized move has to run ${ratio(p.realizedRatio)} the priced sigma; at 1.00 the chain would be right on average and the effective rate would be c/W = ${pct2(r.fairRate)}. The default is solved so the section opens with effective rate = deck q; the first action below takes the deck to fair pricing instead.`,
       },
       {
+        title: "Narrow wings make the binary exact; wide wings make the bad season partial",
+        body: `Per event the tranche multiplies by 1 + (c/W − payout)/(1 − c/W): ×(1 + b) when the wing expires worthless, ×0 when the move gaps past the long strike, and something between when it ends inside the wing. A narrow wing leaves almost no room inside, so nearly every bad event is a full loss and the season is the coin. A wide wing catches most breaches inside it, so most bad seasons end above zero: at ${sigma(1)} ${partialText(w1)} of them, at ${sigma(0.25)} ${partialText(w025)}, at your ${sigma(p.wingWidth)} ${partialText(yoursW)}. The comparison holds the effective rate at the deck's q by solving realized ÷ priced for each width, so the mean season is the same and only the shape differs.`,
+      },
+      {
         title: "One wing or two",
         body: "This section models one wing: the move is signed toward the short strike. Section 06 models a condor, where either side can breach, so its thresholds are two-sided. Importing moves under Data uses the one-sided convention: positive numbers are moves toward the short strike.",
       },
@@ -246,6 +354,15 @@ export function buildWing(p: Params, d: Derived, data: Datasets): ScenarioView {
       fig(p, "Breach overstates, full gap understates", "breach > effective > full gap", `${pct2(r.breach)} > ${pct2(r.effective)} > ${pct2(r.fullGap)}`, r.breach >= r.effective && r.effective >= r.fullGap, [], "The imported sample is too small for the ordering to hold."),
       fig(p, "Fair pricing puts q at break-even", "c ÷ W = b ÷ (1 + b)", `${pct2(r.fairRate)} = ${pct2(r.gainPerUnit / (1 + r.gainPerUnit))}`, near(r.fairRate, r.gainPerUnit / (1 + r.gainPerUnit), 1e-9), []),
       fig(p, "Clean season (Coin) the effective rate implies", `(1 − q)^${p.nights}`, pct(pCleanFromLossRate(r.effective, p.nights)), true, []),
+      fig(
+        p,
+        "Bad seasons that are partial, 0.25σ → 1σ wide",
+        "narrow: the binary is exact · wide: most are partial",
+        `${partialText(w025)} → ${partialText(w1)}`,
+        (w025.partial ?? 0) < (w1.partial ?? 0) && (w1.partial ?? 0) > 0.5,
+        [],
+        "At these inputs fewer than half of the bad seasons on a 1σ wing end above zero, or the narrow wing is not the more binary one.",
+      ),
     ],
   };
 }

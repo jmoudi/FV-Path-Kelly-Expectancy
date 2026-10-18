@@ -61,6 +61,17 @@ export interface Params {
   parallelTranches: number;
   /** The market switch: which pricing the deck's q was last set from. */
   market: Market;
+  /** Shares of calendar nights that offer 0 … 5 names (the calendar figure in section 07); the model scales them to 100%. */
+  calShare0: number;
+  calShare1: number;
+  calShare2: number;
+  calShare3: number;
+  calShare4: number;
+  calShare5: number;
+  /** Win rate of the symmetric-payoff system section 03 compares with (the discussion's 60%). */
+  symWinRate: number;
+  /** Stake per trade of that system, as a share of its account. */
+  symStake: number;
 
   // --- advanced ---
   engine: Engine;
@@ -105,6 +116,14 @@ export const DEFAULT_PARAMS: Params = {
   realizedRatio: DEFAULT_REALIZED_RATIO,
   parallelTranches: 400,
   market: "discussion",
+  calShare0: 0.25,
+  calShare1: 0.25,
+  calShare2: 0.2,
+  calShare3: 0.15,
+  calShare4: 0.1,
+  calShare5: 0.05,
+  symWinRate: 0.6,
+  symStake: 0.05,
 
   engine: "auto",
   mcPaths: 20_000,
@@ -112,6 +131,14 @@ export const DEFAULT_PARAMS: Params = {
   maxCompositions: 60_000,
   fanPaths: 40,
 };
+
+/** The six calendar-histogram inputs, in order of names per night. */
+export const CALENDAR_SHARE_KEYS = ["calShare0", "calShare1", "calShare2", "calShare3", "calShare4", "calShare5"] as const satisfies readonly (keyof Params)[];
+
+/** The calendar histogram as a list indexed by names per night (unnormalised). */
+export function calendarShares(p: Pick<Params, (typeof CALENDAR_SHARE_KEYS)[number]>): number[] {
+  return CALENDAR_SHARE_KEYS.map((k) => p[k]);
+}
 
 /** The loss rate each market state implies at the deck's gain and nights. */
 export function marketLossRate(market: Exclude<Market, "custom">, p: Pick<Params, "gain" | "nights">): number {
@@ -307,6 +334,22 @@ export const PARAM_DEFS: ParamDef[] = [
     help: "Scales the whole realized distribution against what the chain priced. 1.00 means the chain was right on average; the default is solved so the wing's effective loss rate equals the deck's q.",
   },
   { key: "parallelTranches", label: "Parallel tranches sampled", unit: "int", min: 50, max: 5000, step: 50, tier: "secondary", section: "mean-median", help: "How many independent replays the pooling chart averages.", sweepable: false },
+  ...CALENDAR_SHARE_KEYS.map(
+    (key, m): ParamDef => ({
+      key,
+      label: m === 0 ? "Empty nights" : `Nights with ${m} name${m === 1 ? "" : "s"}`,
+      unit: "pct",
+      min: 0,
+      max: 1,
+      step: 0.05,
+      tier: "secondary",
+      section: "axes",
+      help: `Share of the season's calendar nights that offer ${m === 0 ? "no names" : `${m} name${m === 1 ? "" : "s"}`}. The six shares are scaled to 100% together; each name is sized at its own Kelly fraction, so ${m === 0 ? "an empty night uses no capital and adds no term to the growth sum" : "a denser night uses more of the tranche"}.`,
+      input: { sensitivityPx: 160 },
+    }),
+  ),
+  { key: "symWinRate", label: "Win rate, symmetric system", unit: "pct", min: 0.5, max: 0.8, step: 0.01, tier: "secondary", section: "calibration", help: "Win rate of the frequent-outcome system section 03 compares with the tranche: a symmetric payoff, one trade per event, the same number of events as a season. The discussion's case is 60%." },
+  { key: "symStake", label: "Stake per trade, symmetric system", unit: "pct", min: 0.005, max: 0.25, step: 0.005, tier: "secondary", section: "calibration", help: "Share of that system's account won or lost on each trade. Its growth-optimal stake is 2p − 1; the chart compares shapes, so a modest stake keeps both seasons on one axis.", input: { decimals: 1 } },
   {
     key: "market",
     label: "Market",
