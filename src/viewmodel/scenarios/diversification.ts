@@ -75,7 +75,7 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
   const shape: ChartSpec = {
     id: "div-shape",
     title: "Season end, cumulative",
-    subtitle: `x season end, tranche units · y share of seasons ending at or below · one step per policy · ${methodLabel(d.season.spread.dist.method)} · red line = drawdown threshold · black = mean`,
+    subtitle: `x season end, tranche units · y share of seasons ending at or below · one step per policy · ${methodLabel(d.season.spread.dist.method)} · red line = drawdown threshold · white = mean`,
     kind: "xy",
     data: table(
       [f("end", "Season end, tranche units", "x"), ...ids.map((id) => f(id, P[id].label, "pct1")), f("halfFull", "Half the nights one name, whole tranche on it", "pct1"), f("halfCapped", `Half the nights one name, capped at 1/${k}`, "pct1")],

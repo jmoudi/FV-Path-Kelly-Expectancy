@@ -23,6 +23,7 @@ export const THEME = {
     loss: "#D64566",
     good: "#46A860",
     ink: "#e8e9eb",
+    ink2: "#aeb4bb",
     muted: "#8d959e",
     ramp1: "#9fd6e8",
     ramp2: "#4fb6d4",

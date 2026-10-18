@@ -18,7 +18,7 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
   const outcomes: ChartSpec = {
     id: "binary-outcomes",
     title: `Where a single-name season can end (${coin.name})`,
-    subtitle: "x season end, tranche units · bar = probability · red = ruin, green = clean · tick = mean",
+    subtitle: "x probability · y season end, tranche units · red = ruin, green = clean · line = mean",
     kind: "xy",
     data: table(
       [f("end", "Season end, tranche units", "x"), f("ruin", "Ruin", "pct1"), f("clean", "Clean season", "pct1")],
@@ -28,16 +28,23 @@ export function buildBinary(p: Params, d: Derived, _data: Datasets): ScenarioVie
       ],
     ),
     mark: "bar",
+    // Two horizontal segments on a season-end axis drawn up the side: where a season
+    // ends is the position, how often is the length, and the mean sits between them.
     orientation: "horizontal",
-    x: { field: "end", domain: [-0.25, Math.ceil((Math.max(end, mean) + 0.3) * 2) / 2], format: "x" },
+    x: { field: "end", label: "Season end", domain: [-0.5, Math.ceil((Math.max(end, mean) + 0.5) * 2) / 2], format: "x" },
     y: { field: "clean", label: "Probability", domain: [0, 1], format: "pct" },
     series: [
       { field: "ruin", color: "loss", label: `ruin ${pct(1 - d.pClean)}` },
       { field: "clean", color: "good", label: `clean ${pct(d.pClean)}` },
     ],
-    barWidthPx: 34,
+    legend: false,
+    barWidthPx: 22,
     height: 140,
-    annotations: [{ kind: "vline", x: mean, text: `mean ${x2(mean)}`, color: "ink" }],
+    annotations: [
+      { kind: "vline", x: mean, text: `mean ${x2(mean)}: no season ends here`, color: "ink" },
+      { kind: "label", x: 0, y: 1 - d.pClean, text: `ruin ${pct(1 - d.pClean)} → 0×`, color: "loss", at: "end" },
+      { kind: "label", x: end, y: d.pClean, text: `clean ${pct(d.pClean)} → ${x2(end)}`, color: "good", at: "end" },
+    ],
     caption: `The mean is p × ${x2(end)} = ${x2(mean)}; no season ends there. Section 02 takes the mean apart.`,
     stories: [
       {

@@ -90,7 +90,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
   const sweep: ChartSpec = {
     id: "chain-sweep",
     title: "Growth averaged over the loss-rate band",
-    subtitle: `x tranche at risk a night · y log growth per season of surviving paths · green = optimistic q · black = deck q · red = break-even q · thick = averaged over a loss rate drawn ${d.bandLabel} · violet line = your risk`,
+    subtitle: `x tranche at risk a night · y log growth per season of surviving paths · green = optimistic q · white = deck q · red = break-even q · thick = averaged over a loss rate drawn ${d.bandLabel} · violet line = your risk`,
     kind: "xy",
     data: table(
       [f("risk", "Tranche at risk a night", "pct"), ...sweepRates.map((qq, i) => f(`g${i}`, `q = ${pct2(qq)}`, "pct1")), f("robust", "averaged over the band", "pct1")],
@@ -176,7 +176,9 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
       seasonRows,
     ),
     mark: "step",
-    x: { field: "seasons", domain: [1, S] },
+    // Each season count owns a flat step centred on it, so the deck's line falls mid-step.
+    step: "middle",
+    x: { field: "seasons", domain: [0.5, S + 0.5] },
     y: { field: "medianReserve", label: "Tranche after N seasons", format: "x" },
     series: [
       { field: "p75Reserve", color: "c", label: `${P.reserve.name}, 25th to 75th percentile`, emphasis: "muted", band: "p25Reserve", width: 1 },
