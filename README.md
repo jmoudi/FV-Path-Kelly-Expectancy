@@ -41,7 +41,10 @@ be swapped without touching the others.
 | Switchboard | `src/charts/registry.ts`, `src/charts/backends/` | Routes a spec to ECharts, Plotly, Vega-Lite, or an HTML table. Each backend is loaded on first use. |
 | Figures | `src/charts/figures/` | Charts of kind `figure` (the railroad schematic, the season calendar) are drawn by a React SVG component from the registry in `index.ts`, sized to the width the host gives them, in the theme's colours. They are not backend-switchable: ⊞ shows their data table and ⚙ offers only the height. |
 | Authoring | `src/ui/Authoring.tsx`, stories in each spec | A story is a trader's question ("Half my nights have one name", "The chain is right: q = break-even") with a one-line answer; when it moves the deck it carries a badge ("moves deck: q 2.94% → 2.52%"). Display choices (axis scales, backends, zooms) are not stories; they live in ⚙, which edits the spec by hand (backend, mark, axis scale and domain in the axis's own units, x field, series visibility, mark and emphasis, extra columns, legend, height) and stores only the diff, keyed by chart id. |
-| State | `src/state/store.ts` | Parameters, imported data, chart edits, default backend, and the snapshot of parameters a story moved. Only one deck-moving story is active at a time: applying one turns the other off and restores its parameters. Validated on load, persisted locally, exported and imported as one JSON file (version 4). `#reset` in the address clears it. |
+| State | `src/state/store.ts` | Parameters, imported data, chart edits, default backend, and the snapshot of parameters a story moved. Only one deck-moving story is active at a time: applying one turns the other off and restores its parameters. Sweep runs are saved as input, preset and pre-sweep value only (ticks are never saved), so a reload mid-sweep puts the input back. Validated on load, persisted locally, exported and imported as one JSON file (version 4). `#reset` in the address clears it. |
+| Sweeps | `src/sweeps/` (presets, plans, sanitizer), `src/kit/sweeps/runner.ts` (the frame-locked clock), `src/app/params/sweepAnchors.ts` (anchor values, unit formatting) | Generic: a preset resolves for any input into a plan of values and holds. Anchors are data on the schema (`anchors` per parameter); the app computes their values (optimistic, deck, break-even for q; robust, Kelly, deck for the risk a night). |
+| Build | `src/kit/build/coalesce.ts`, `src/ui/useBuild.ts` | One request in flight, only the newest waiting; every answer newer than the last one shown is rendered, and each rendered answer is signalled (`buildSettled`) for the sweep clock. During a sweep `buildAll(…, { only })` builds the deck figures, the Desk and the scenarios on screen; a full build follows when it stops. |
+| Inputs | `src/kit/inputs/` | The synthetic number field (`SyntheticNumber`), its display rules, the wheel gate and its CSS; `src/ui/NumberField.tsx` wires it to the store. |
 | UI | `src/ui/` | Control deck, section layout, chart host, tables, dialogs. One dark theme, graphite, with three policy hues and two status colours. |
 
 ## Using the app
@@ -60,19 +63,34 @@ be swapped without touching the others.
   sizing grid, confidence band, candidate rates, a season by the calendar, refilling
   from NAV, …), each on its own page with the context beside it. Open them from the Views menu, the chips next to a section title,
   the ↗ on any chart, or Alt+← / Alt+→.
-- **Inputs** are synthetic number fields: type, use the wheel (Shift ×10, Alt ×0.1),
-  arrow keys, or drag the slider underneath. Dragging is relative and its feel is a
-  per-parameter distance in pixels (`input.sensitivityPx` in the schema), scaled by a
-  global sensitivity in Settings. Double-click a slider for the default. Focusing a
-  field makes it the active input.
-- **Sweeps** drive an input automatically from a saved preset: loop, ping-pong, or a
-  list of spots with hold times; over the whole range, a fraction of it, or absolute
-  values; with any step and interval, gliding or stepping. Presets are generic and
-  linked per input; links are saved with the state. On the active input: Ctrl+Enter
-  runs or pauses, Ctrl+. stops, Ctrl+[ and Ctrl+] switch presets, Ctrl+Shift+Enter
-  pauses everything. Inputs that make no sense to sweep (seed, engine caps) are marked.
+- **Inputs** are synthetic number fields: type, use the arrow keys, the wheel
+  (Shift ×10, Alt ×0.1), or drag the track beside the box. A click on the track
+  focuses the field and leaves the value alone; double-click returns to the default.
+  Dragging is relative, in the input's units per 100 px (`input.perHundredPx` in the
+  schema: q and b 0.25 pp, nights 5, names 1, risk a night 10 pp, seasons 1; Shift
+  ×0.1), times the drag speed in Settings. The wheel acts only on a focused field, or
+  after the pointer has rested on it for 400 ms with no page scroll in progress, so
+  scrolling past a field never changes it. Focusing a field makes it the active input.
+- **Sweeps** drive an input automatically from a saved preset, in the input's own
+  units: loop, ping-pong, or spots with hold times; over two named anchors (q:
+  optimistic, deck, break-even; risk a night: robust, Kelly, deck; every input: min,
+  current, max, default), ± around the current value, absolute values or a share of
+  the range; with a step in the input's units ("0.05 pp", "1 name") or a share of the
+  range. The defaults are "Optimistic to break-even" (q, loop, 0.05 pp every 400 ms),
+  "Around the current value" (± 20% of the range, ping-pong) and "Three spots"
+  (optimistic, deck, break-even for q; min, current, max elsewhere; 2 s each). A
+  named anchor an input lacks falls back to min, current or max. Runs are locked to
+  the page's frames: the next value is committed only after the build for the last
+  one has rendered, and each value stays on screen at least its interval. A run
+  starts from the current value; stop keeps the value; "↺ before sweep" or Ctrl+Z
+  puts back the value from before. The track shows the preset's range as a band and
+  the run's position as a moving tick; the deck strip reads "sweeping Loss rate per
+  name 2.97% · step 10 / 18 · Ctrl+. stop". On the active input: Ctrl+Enter runs or
+  pauses, Ctrl+. stops, Ctrl+[ and Ctrl+] switch presets, Ctrl+Shift+Enter pauses
+  everything. Settings has the sweep rate (× every preset's speed). Inputs that make
+  no sense to sweep (seed, engine caps) are marked.
 - **Undo.** Ctrl+Z / Ctrl+Shift+Z step through parameter changes, including the state
-  before a sweep started.
+  before a sweep started; inside an editable text field they are the field's own undo.
 - **Story chips** under a chart title ask a trader's question in one click ("What if
   q is really 3.2%?", "I widen the wing to 1σ") and answer it in one line. Clicking an
   active chip undoes it, including the deck parameters it moved.
