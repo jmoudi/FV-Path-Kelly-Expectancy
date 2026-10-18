@@ -4,7 +4,7 @@
  * key, paste that file's literal here so the page reads exactly as before.
  */
 import type { KitCopy } from "@kit/ui/copy";
-import type { Params } from "@app/params/params";
+import type { Params } from "@app/data/params";
 import { movedBadge } from "@app/scenarios/derived";
 
 export const KIT_COPY: Partial<KitCopy> = {

@@ -1,12 +1,12 @@
 import { f, table, tableSpec, type ChartSpec, type ColorRole, type Row, type SeriesSpec, type Story } from "@kit/charts/spec";
 import { pCleanFromLossRate } from "@app/model/binary";
-import { marketPatch, MARKET_TOL, type Params } from "@app/params/params";
-import type { Datasets } from "@app/params/datasets";
+import { marketPatch, MARKET_TOL, type Params } from "@app/data/params";
+import type { Datasets } from "@app/data/datasets";
 import { summarize } from "@app/model/season";
 import { linspace } from "@kit/math/stats";
 import { fairRealizedRatio, movePdf, payoutFraction, ratioForLossRate, wingRates, type WingParams } from "@app/model/wing";
 import { partialShareOfBadSeasons, wingSeasonDistribution } from "@app/model/wingSeason";
-import { fig } from "./discussion";
+import { fig } from "@app/data/discussion";
 import { methodLabel, type Derived } from "./derived";
 import { movesDeck, near } from "@kit/charts/scenario";
 import { pct, pct1, pct2, ratio, sigma, signedPct, signedPp, smallPct, x2 } from "@kit/charts/numbers";

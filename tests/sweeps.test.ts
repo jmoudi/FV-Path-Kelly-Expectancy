@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { anchorValue, deltaText, sweepContext, sweepFormat, valueText } from "@app/params/sweepAnchors";
+import { anchorValue, deltaText, sweepContext, sweepFormat, valueText } from "@app/sweepAnchors";
 import { BuildQueue, SettleTracker } from "@kit/build/coalesce";
 import { WheelAccumulator, wheelAllowed } from "@kit/inputs/wheelGate";
 import { committed, due, startCursor } from "@kit/sweeps/runner";
 import { breakEvenLossRate } from "@app/model/binary";
-import { DEFAULT_PARAMS, type Params } from "@app/params/params";
-import { PARAM_BY_KEY } from "@app/params/schema";
+import { DEFAULT_PARAMS, type Params } from "@app/data/params";
+import { PARAM_BY_KEY } from "@app/data/schema";
 import { describePreset, planSweep, resolveRange, valueAt, type SweepContext } from "@kit/sweeps/engine";
 import { migratePresetId, sanitizePreset, sanitizePresets } from "@kit/sweeps/sanitize";
-import { DEFAULT_PRESETS, PRESET_CATALOG } from "@app/params/presets";
+import { DEFAULT_PRESETS, PRESET_CATALOG } from "@app/data/presets";
 import type { SweepPreset } from "@kit/sweeps/types";
 import { buildAll } from "@app/scenarios";
 

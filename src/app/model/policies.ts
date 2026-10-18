@@ -7,7 +7,7 @@
  *   spread   k names, whole tranche, no reserve              (cyan,   role b)
  *   reserve  k names, the deck's share of the tranche a night (violet, role c)
  */
-import type { Params } from "@app/params/params";
+import type { Params } from "@app/data/params";
 import type { NightPolicy, ScheduleBlock } from "./season";
 
 export type PolicyId = "coin" | "spread" | "reserve";

@@ -1,10 +1,10 @@
 import { f, table, tableSpec, type ChartSpec, type Row } from "@kit/charts/spec";
 import { medianGrowthPerSeason } from "@app/model/growth";
-import type { Datasets } from "@app/params/datasets";
-import type { Params } from "@app/params/params";
+import type { Datasets } from "@app/data/datasets";
+import type { Params } from "@app/data/params";
 import { POLICY_IDS, type PolicyId } from "@app/model/policies";
 import { sampleFromDistribution, weightedQuantile } from "@app/model/season";
-import { fig } from "./discussion";
+import { fig } from "@app/data/discussion";
 import { methodLabel, type Derived } from "./derived";
 import { near } from "@kit/charts/scenario";
 import { pct, pct1, signedPct1, smallPct, x2 } from "@kit/charts/numbers";

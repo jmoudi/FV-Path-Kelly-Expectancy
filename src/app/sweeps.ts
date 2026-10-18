@@ -7,9 +7,9 @@
 import { isSweepable } from "@kit/inputs/schema";
 import type { SweepAdapter } from "@kit/sweeps/adapter";
 import { BUILD_SETTLED } from "@app/build";
-import type { Params } from "@app/params/params";
-import { SCHEMA } from "@app/params/schema";
-import { sweepContext, sweepFormat } from "@app/params/sweepAnchors";
+import type { Params } from "@app/data/params";
+import { SCHEMA } from "@app/data/schema";
+import { sweepContext, sweepFormat } from "@app/sweepAnchors";
 
 export const SWEEPS: SweepAdapter = {
   context(key, params: Params, at) {

@@ -1,10 +1,10 @@
 import { f, table, tableSpec, type ChartSpec, type Row, type SeriesSpec } from "@kit/charts/spec";
 import { binaryTable, pCleanFromLossRate, seasonMean } from "@app/model/binary";
-import type { Datasets } from "@app/params/datasets";
-import type { Params } from "@app/params/params";
+import type { Datasets } from "@app/data/datasets";
+import type { Params } from "@app/data/params";
 import { samplePaths } from "@app/model/season";
 import { linspace } from "@kit/math/stats";
-import { fig } from "./discussion";
+import { fig } from "@app/data/discussion";
 import { movesDeck, near } from "@kit/charts/scenario";
 import { pct, pct1, pct2, signedPct1, signedPp, x2 } from "@kit/charts/numbers";
 import { typographic } from "@kit/charts/format";

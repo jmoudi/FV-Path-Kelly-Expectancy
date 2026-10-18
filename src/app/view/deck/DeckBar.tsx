@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useDeckProps } from "./useDeckProps";
 import { Deck } from "@kit/ui/deck";
 import { useStore } from "@app/store";
-import type { DeckView } from "./deckView";
+import type { DeckView } from "@app/scenarios/deck";
 import "@kit/ui/deck/deck.css";
 
 /** The deck sits on every page except Settings and the Guide (#guide, #guide/<section>). Read from the hash the way src/kit/ui/route.ts does. */

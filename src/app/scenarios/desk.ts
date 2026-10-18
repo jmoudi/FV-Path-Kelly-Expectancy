@@ -4,7 +4,7 @@
  * Pure data; src/app/desk/DeskPage.tsx renders it.
  */
 import { eventsToResolve } from "@app/model/calibration";
-import type { Params } from "@app/params/params";
+import type { Params } from "@app/data/params";
 import { POLICY_IDS, type PolicyId, type PolicyMeta } from "@app/model/policies";
 import type { Summary } from "@app/model/season";
 import { fmtInt, pct, pct1, pct2, probPct, x2, years } from "@kit/charts/numbers";

@@ -4,12 +4,12 @@
  */
 import { useMemo } from "react";
 import type { DeckProps, DrawerSection, InputGroup } from "@kit/ui/deck";
-import { PARAM_DEFS } from "@app/params/schema";
-import type { Params } from "@app/params/params";
+import { PARAM_DEFS } from "@app/data/schema";
+import type { Params } from "@app/data/params";
 import { useStore } from "@app/store";
 import { Help } from "@kit/ui/Help";
 import { ParamInput } from "@kit/inputs/ParamInput";
-import type { DeckView } from "./deckView";
+import type { DeckView } from "@app/scenarios/deck";
 import { CleanSeasonField, CleanSeasonText } from "./CleanSeason";
 import { DeckStrip } from "./DeckStrip";
 import { deckLayout } from "./layout";

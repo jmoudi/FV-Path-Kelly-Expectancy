@@ -3,10 +3,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { hrefFor, parseHash, type RouteConfig } from "@kit/ui/route";
 import { GuideFrame, inline } from "@kit/ui/GuideFrame";
-import { GUIDE_LEDE, GUIDE_SECTIONS } from "@app/copy/guide";
+import { GUIDE_LEDE, GUIDE_SECTIONS } from "@app/data/copy/guide";
 import { clampTyped, effectiveSettings, patchParamSetting, quantize, sanitizeParamSetting, sanitizeParamSettings, schemaSettings, stepOnGrid } from "@kit/inputs/paramSettings";
-import { PARAM_BY_KEY, SCHEMA } from "@app/params/schema";
-import { DEFAULT_PARAMS } from "@app/params/params";
+import { PARAM_BY_KEY, SCHEMA } from "@app/data/schema";
+import { DEFAULT_PARAMS } from "@app/data/params";
 import type { SweepPreset } from "@kit/sweeps/types";
 
 const q = PARAM_BY_KEY.lossRate;

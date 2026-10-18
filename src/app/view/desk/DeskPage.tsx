@@ -1,9 +1,9 @@
-import { MarketSwitch } from "@app/deck/MarketSwitch";
+import { MarketSwitch } from "@app/view/deck/MarketSwitch";
 import { deskColumns, deskGroups } from "./grid";
 import type { ChartSpec } from "@kit/charts/spec";
 import { DeskGrid } from "@kit/ui/DeskGrid";
 import { pct, x2 } from "@kit/charts/numbers";
-import type { DeskView } from "./desk";
+import type { DeskView } from "@app/scenarios/desk";
 import type { ScenarioView } from "@app/scenarios/types";
 import { allCharts } from "@app/scenarios/types";
 import { ChartHost } from "@kit/ui/ChartHost";

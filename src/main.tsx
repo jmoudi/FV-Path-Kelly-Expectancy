@@ -7,13 +7,13 @@ import "@kit/ui/theme.css";
 import "@kit/ui/kit.css";
 import { applyThemeVars } from "@kit/ui/applyTheme";
 import { registerFigures } from "@kit/charts/figures/registry";
-import { FIGURES } from "@app/figures";
+import { FIGURES } from "@app/view/figures";
 import { KitProvider } from "@kit/state/context";
-import { KIT_COPY } from "@app/copy/kitCopy";
-import { SCHEMA } from "@app/params/schema";
+import { KIT_COPY } from "@app/data/copy/kitCopy";
+import { SCHEMA } from "@app/data/schema";
 import { useStore } from "@app/store";
 import { SWEEPS } from "@app/sweeps";
-import { App } from "@app/App";
+import { App } from "@app/view/App";
 
 // The palette lives in one place (src/kit/charts/theme.ts); the CSS reads it from these variables.
 applyThemeVars();

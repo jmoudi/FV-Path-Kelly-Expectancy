@@ -5,12 +5,12 @@
  * The engine (src/sweeps) is generic; this is where tranche knowledge enters.
  */
 import { breakEvenLossRate } from "@app/model/binary";
-import { DEFAULT_PARAMS, type Params } from "./params";
-import type { ParamDef } from "./schema";
+import { DEFAULT_PARAMS, type Params } from "@app/data/params";
+import type { ParamDef } from "@app/data/schema";
 import type { SweepContext, SweepFormat } from "@kit/sweeps/engine";
 import { fmtInt, fmtMs, pct, sigma, x2 } from "@kit/charts/numbers";
 import { typographic } from "@kit/charts/format";
-import type { DeckView } from "@app/deck/deckView";
+import type { DeckView } from "@app/scenarios/deck";
 
 export interface AnchorSource {
   params: Params;

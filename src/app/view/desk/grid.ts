@@ -4,7 +4,7 @@
  * season and N seasons, each row label linked to the view that explains it.
  */
 import type { GridColumn, GridGroup } from "@kit/ui/DeskGrid";
-import type { DeskView } from "./desk";
+import type { DeskView } from "@app/scenarios/desk";
 
 export function deskColumns(desk: DeskView): GridColumn[] {
   return desk.policies.map((p) => ({ id: p.id, label: p.name, sub: p.detail, tone: `var(--${p.color})`, highlight: p.yours, tag: p.yours ? "your policy" : undefined }));

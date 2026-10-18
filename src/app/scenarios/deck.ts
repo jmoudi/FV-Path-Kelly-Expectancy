@@ -1,6 +1,6 @@
 import type { ColorRole } from "@kit/charts/spec";
 import { medianGrowthPerSeason } from "@app/model/growth";
-import type { Params } from "@app/params/params";
+import type { Params } from "@app/data/params";
 import { POLICY_IDS, POLICY_LEGEND, type PolicyId, type PolicyMeta } from "@app/model/policies";
 import type { Distribution, Summary } from "@app/model/season";
 import { pct, pct1, pct2, probPct, x2, signedPct1, signedPp, smallPct } from "@kit/charts/numbers";

@@ -1,8 +1,8 @@
 import { Segmented, type SegmentOption } from "@kit/ui/deck";
-import { DISCUSSION_P_CLEAN, marketPatch, type Market } from "@app/params/params";
+import { DISCUSSION_P_CLEAN, marketPatch, type Market } from "@app/data/params";
 import { POLICY_META } from "@app/model/policies";
 import { useStore } from "@app/store";
-import { MARKET_LINE } from "@app/copy/market";
+import { MARKET_LINE } from "@app/data/copy/market";
 import { marketState } from "@app/scenarios/derived";
 import { pct, pct2 } from "@kit/charts/numbers";
 

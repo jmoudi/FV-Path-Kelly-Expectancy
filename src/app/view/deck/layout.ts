@@ -3,8 +3,8 @@
  * the reduced deck's first row, the drawer's input sections, and the phone's four.
  * Pure data, no React, so it is tested on its own.
  */
-import { GROUP_LABELS, PARAM_DEFS, type ParamDef, type ParamGroup } from "@app/params/schema";
-import type { Params } from "@app/params/params";
+import { GROUP_LABELS, PARAM_DEFS, type ParamDef, type ParamGroup } from "@app/data/schema";
+import type { Params } from "@app/data/params";
 
 export interface DeckLayoutGroup {
   group: ParamGroup;

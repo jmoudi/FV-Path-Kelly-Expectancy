@@ -2,14 +2,14 @@ import { typographic } from "@kit/charts/format";
 import { breakEvenLossRate, cleanEnd, pCleanFromLossRate } from "@app/model/binary";
 import { recordStats, type RecordStats } from "@app/model/calibration";
 import { betaPosterior, kellyFraction, nightOptimum, robustOptimum, seasonLogGrowth, seasonRuin, uniformBand, type RateWeights } from "@app/model/kelly";
-import { MARKET_TOL, marketLossRate, marketOf, type Market, type Params } from "@app/params/params";
-import { PARAM_BY_KEY } from "@app/params/schema";
-import type { Datasets } from "@app/params/datasets";
+import { MARKET_TOL, marketLossRate, marketOf, type Market, type Params } from "@app/data/params";
+import { PARAM_BY_KEY } from "@app/data/schema";
+import type { Datasets } from "@app/data/datasets";
 import type { Unit } from "@kit/inputs/schema";
 import { YOUR_POLICY, policies, type PolicyDef, type PolicyId } from "@app/model/policies";
 import { scheduleDistribution, summarize, type Distribution, type DistributionOptions, type Summary } from "@app/model/season";
 import { pct, pct2, x2, signedPp, fmtInt, sigma } from "@kit/charts/numbers";
-import { ZERO_PREMIUM_NOTE, NEGATIVE_PREMIUM_NOTE } from "@app/copy/market";
+import { ZERO_PREMIUM_NOTE, NEGATIVE_PREMIUM_NOTE } from "@app/data/copy/market";
 
 export function methodLabel(m: Distribution["method"]): string {
   return m === "exact" ? "computed exactly" : m === "binned" ? "computed on a fine log grid" : "Monte Carlo";

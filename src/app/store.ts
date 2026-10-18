@@ -1,10 +1,10 @@
 /** The one store of this explainer: the kit's factory with this app's schema, data, presets and keys. */
 import { createAppStore, type KitState } from "@kit/state/createAppStore";
 import { plannerFor } from "@kit/sweeps/adapter";
-import { EMPTY_DATASETS, sanitizeDatasets, type Datasets } from "@app/params/datasets";
-import type { Params } from "@app/params/params";
-import { PRESET_CATALOG } from "@app/params/presets";
-import { SCHEMA } from "@app/params/schema";
+import { EMPTY_DATASETS, sanitizeDatasets, type Datasets } from "@app/data/datasets";
+import type { Params } from "@app/data/params";
+import { PRESET_CATALOG } from "@app/data/presets";
+import { SCHEMA } from "@app/data/schema";
 import { SWEEPS } from "@app/sweeps";
 
 export type AppState = KitState<Params, Datasets>;
