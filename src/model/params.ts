@@ -164,13 +164,27 @@ export function marketPatch(market: Market, p: Pick<Params, "gain" | "nights">):
 export type Tier = "primary" | "secondary" | "advanced";
 export type Unit = "pct" | "pct2" | "x" | "int" | "sigma" | "ratio" | "choice";
 
-/** The deck's three input groups. */
-export type ParamGroup = "event" | "season" | "sizing";
-export const GROUP_LABELS: Record<ParamGroup, { label: string; blurb: string }> = {
-  event: { label: "Per event", blurb: "What one name does on one night." },
-  season: { label: "Per season", blurb: "How many nights, how many names a night." },
-  sizing: { label: "Sizing", blurb: "How much of the tranche a night can lose, and how long you replay it." },
+/**
+ * The deck's input groups, in drawer order. `label` is the caption over the group in
+ * the reduced deck's first row (only groups with a field placed in that row show
+ * there); `title` is the group's heading in the drawer.
+ */
+export type ParamGroup = "event" | "season" | "sizing" | "shared" | "band";
+export const GROUP_LABELS: Record<ParamGroup, { label: string; title: string; blurb: string }> = {
+  event: { label: "Per event", title: "Event", blurb: "What one name does on one night." },
+  season: { label: "Per season", title: "Season", blurb: "How many nights, how many names a night, and how often the names share a cause." },
+  sizing: { label: "Sizing", title: "Sizing", blurb: "How much of the tranche a night can lose, how long you replay it, and the drawdown the figures count." },
+  shared: { label: "Shared risk", title: "Shared risk", blurb: "Nights on which realized volatility runs above what every chain priced." },
+  band: { label: "Calibration band", title: "Calibration band", blurb: "How fast the record grows, and how far apart two loss rates must sit before the record tells them apart." },
 };
+
+/** Where an input sits in the deck beyond its group (tier 1 is the deck). */
+export interface DeckPlacement {
+  /** Shown in the reduced deck's first row, not only in the drawer. */
+  row?: boolean;
+  /** Kept in that row on a phone (≤ 700px), where the row holds four fields. */
+  phone?: boolean;
+}
 
 /**
  * How the synthetic number input behaves for one parameter. The slider's feel is a
@@ -200,8 +214,10 @@ export interface ParamDef {
   tier: Tier;
   /** Which section the secondary input belongs to. */
   section?: string;
-  /** Which deck group a primary input belongs to. */
+  /** Which deck group (drawer section) the input belongs to. */
   group?: ParamGroup;
+  /** Its place in the reduced deck; set in DECK_PLACEMENT below. */
+  deck?: DeckPlacement;
   help: string;
   /** A one-line definition for the glossary in the expanded deck. */
   definition?: string;
@@ -389,6 +405,45 @@ export const PARAM_DEFS: ParamDef[] = [
   { key: "seed", label: "Random seed", unit: "int", min: 1, max: 99_999, step: 1, tier: "advanced", help: "Seeds every sampled path and replay. Change it to see a different draw." },
   { key: "fanPaths", label: "Paths in fan charts", unit: "int", min: 5, max: 200, step: 5, tier: "advanced", help: "How many sampled seasons the railroad charts draw." },
 ];
+
+// ---------------------------------------------------------------------------
+// Tiering. Tier 1 is the deck, tier 2 the section strips (each scenario lists its
+// own inputs), tier 3 Settings. Where every deck input sits is kept here in one
+// table and applied onto the definitions above, so the deck's layout reads in one
+// place: `group` is the drawer section, `deck.row` puts the field in the reduced
+// deck's first row (eight fields in three groups), `deck.phone` keeps it there on a
+// phone (four fields).
+// ---------------------------------------------------------------------------
+
+type Placement = Partial<Pick<ParamDef, "group" | "tier" | "shortLabel" | "short" | "deck">>;
+
+const DECK_PLACEMENT: Partial<Record<keyof Params, Placement>> = {
+  lossRate: { group: "event", deck: { row: true, phone: true } },
+  gain: { group: "event", deck: { row: true, phone: true } },
+  // Secondary tier, in the row because sections 03, 07 and 08 all read it.
+  altLossRate: { group: "event", deck: { row: true } },
+  nights: { group: "season", shortLabel: "Nights", deck: { row: true } },
+  names: { group: "season", deck: { row: true, phone: true } },
+  // Enters every policy, so it is a deck input, not a section input.
+  sharedOutcome: { group: "season", tier: "primary", deck: { row: true } },
+  // "risk" is a word, not a symbol; the label already says it.
+  riskPerNight: { group: "sizing", short: undefined, deck: { row: true, phone: true } },
+  seasons: { group: "sizing", deck: { row: true } },
+  thresholdBelow: { group: "sizing" },
+  volShock: { group: "shared" },
+  volShockShare: { group: "shared" },
+  eventsPerYear: { group: "band" },
+  zSigma: { group: "band" },
+};
+
+/** Seeds, caps and path counts take plain number boxes: a drag slider means nothing for them. */
+const NO_SLIDER: readonly (keyof Params)[] = ["seed", "maxCompositions", "mcPaths"];
+
+for (const def of PARAM_DEFS) {
+  const place = DECK_PLACEMENT[def.key];
+  if (place) Object.assign(def, place);
+  if (NO_SLIDER.includes(def.key)) def.input = { ...def.input, slider: false };
+}
 
 export const PARAM_BY_KEY: Record<string, ParamDef> = Object.fromEntries(PARAM_DEFS.map((d) => [d.key, d]));
 

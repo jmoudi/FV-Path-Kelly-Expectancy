@@ -3,9 +3,15 @@ import { useStore } from "../state/store";
 import { Help } from "./Help";
 import { NumberField } from "./NumberField";
 
-/** One parameter from the schema, rendered as the synthetic number input (or a select). */
-export function ParamInput({ k, compact, bare }: { k: keyof Params; compact?: boolean; bare?: boolean }) {
+/**
+ * One parameter from the schema, rendered as the synthetic number input (or a select).
+ * `bare` is the reduced deck's form: the word label and symbol, no help or badge.
+ * `id` names the box when the same input is rendered twice (the deck's drawer); it
+ * defaults to `param-<key>`.
+ */
+export function ParamInput({ k, compact, bare, id }: { k: keyof Params; compact?: boolean; bare?: boolean; id?: string }) {
   const def = PARAM_BY_KEY[k];
+  const boxId = id ?? `param-${k}`;
   const value = useStore((s) => s.params[k]);
   const setParam = useStore((s) => s.setParam);
   const badge = def.affectsAll && !bare ? <span className="badge-all" title="This input enters the deck's policies, so every section moves with it.">all sections</span> : null;
@@ -20,7 +26,7 @@ export function ParamInput({ k, compact, bare }: { k: keyof Params; compact?: bo
             <Help text={def.help} />
           </div>
         )}
-        <select id={`param-${k}`} value={String(value)} onChange={(e) => setParam(k, e.target.value as Params[typeof k])} aria-label={def.label}>
+        <select id={boxId} value={String(value)} onChange={(e) => setParam(k, e.target.value as Params[typeof k])} aria-label={def.label}>
           {def.choices?.map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}
@@ -41,7 +47,7 @@ export function ParamInput({ k, compact, bare }: { k: keyof Params; compact?: bo
   );
   return (
     <NumberField
-      id={`param-${k}`}
+      id={boxId}
       inputKey={k}
       label={label}
       value={num}

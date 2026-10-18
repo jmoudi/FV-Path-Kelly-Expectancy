@@ -1,0 +1,618 @@
+/* The deck: the kit frame (src/kit/ui/deck) and the app's pieces inside it.
+   Sizes come from the theme's type tokens (spec §2); the fallbacks only keep the deck
+   readable where a token is missing. Colours are the theme's tokens. No literal
+   font sizes. */
+
+/* ---------- reduced bar ---------- */
+.dkb {
+  position: sticky;
+  top: calc(var(--topbar-h, 52px) + env(safe-area-inset-top, 0px));
+  z-index: 25;
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--hairline);
+}
+.dkb-row {
+  display: flex;
+  min-width: 0;
+  max-width: 1380px;
+  margin: 0 auto;
+  padding-left: var(--gutter-l, 16px);
+  padding-right: var(--gutter-r, 16px);
+}
+
+/* Row 1: groups set apart by 40px and a hairline; a group wraps whole. */
+.dkb-inputs {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  column-gap: 41px;
+  row-gap: 8px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.dkb-group {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  min-width: 0;
+}
+.dkb-group + .dkb-group::before {
+  content: "";
+  position: absolute;
+  left: -21px;
+  top: 1px;
+  bottom: 1px;
+  width: 1px;
+  background: var(--hairline);
+}
+.dkb-group[data-wrap-start]::before {
+  display: none;
+}
+.dkb-caption {
+  font-size: var(--fs-label, 11.5px);
+  line-height: 1.3;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.dkb-fields {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 20px;
+}
+/* Fields take their label's width at least and share the row's spare width, up to a cap. */
+.dkb-field {
+  flex: 1 0 auto;
+  max-width: 220px;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+/* The line under a field adds no width: typing into it never moves the row. */
+.dkb-below {
+  width: 0;
+  height: 16px;
+  line-height: 16px;
+  font-size: var(--fs-label, 11.5px);
+  white-space: nowrap;
+  overflow: visible;
+}
+
+/* The synthetic field in the row: word label and symbol, sentence case. The doubled
+   class outranks the theme's compact-field rules, which load after this sheet. */
+.dkb .dkb-inputs .nf {
+  gap: 2px;
+}
+.dkb .dkb-inputs .nf-label {
+  font-size: var(--fs-label, 11.5px);
+  line-height: 1.3;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink-2);
+  white-space: nowrap;
+  flex-wrap: nowrap;
+}
+.dkb .dkb-inputs .nf-label .sym {
+  color: var(--muted);
+}
+.dkb .dkb-inputs .nf-row {
+  gap: 8px;
+}
+.dkb .dkb-inputs .nf .nf-track {
+  flex: 1 1 auto;
+  min-width: 44px;
+  max-width: 140px;
+}
+.dkb .dkb-inputs .nf .nf-box {
+  width: 64px;
+  font-size: var(--fs-ui, 13px);
+  padding: 2px 6px;
+}
+
+/* Row 2: lead · figures · note over legend · strip slot · toggle. */
+.dkb-status {
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 28px;
+  row-gap: 6px;
+  padding-top: 6px;
+  padding-bottom: 7px;
+  border-top: 1px solid var(--grid);
+}
+.dkb-lead {
+  display: grid;
+  line-height: 1.25;
+  min-width: 0;
+}
+.dkb-lead-title {
+  font-size: var(--fs-ui, 13px);
+  font-weight: 600;
+  color: var(--tone, var(--ink));
+  white-space: nowrap;
+}
+.dkb-lead-detail {
+  font-size: var(--fs-label, 11.5px);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.dkb-figs {
+  display: flex;
+  gap: 24px;
+  margin: 0;
+}
+.dkb-fig {
+  display: flex;
+  flex-direction: column-reverse;
+}
+.dkb-fig dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-kpi, 20px);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  color: var(--tone, var(--ink));
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.dkb-fig dt {
+  font-size: var(--fs-label, 11.5px);
+  line-height: 1.3;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.dkb[data-pending] .dkb-fig dd,
+.dkb-drawer[data-pending] .dkb-ftable td {
+  opacity: 0.6;
+}
+.dkb-context {
+  display: grid;
+  gap: 2px;
+  font-size: var(--fs-label, 11.5px);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.dkb-note {
+  color: var(--muted);
+}
+.dkb-legend {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-2);
+}
+.dkb-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.dkb-legend li::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--swatch);
+}
+/* The strip slot keeps its width whether or not an input is active. */
+.dkb-strip {
+  margin-left: auto;
+  flex: 1 1 300px;
+  max-width: 420px;
+  min-width: 240px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.dkb-strip .sweep-strip,
+.dkb-drawer-top .sweep-strip {
+  flex-wrap: nowrap;
+  padding-top: 0;
+}
+.dkb-strip .sweep-strip-keys,
+.dkb-drawer-top .sweep-strip-keys {
+  display: none;
+}
+.dkb-hint {
+  font-size: var(--fs-label, 11.5px);
+  color: var(--muted);
+}
+.dkb-active {
+  font-size: var(--fs-label, 11.5px);
+  font-weight: 600;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+.dkb-btn {
+  flex-shrink: 0;
+  font-size: var(--fs-ui, 13px);
+  line-height: 1.4;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 4px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dkb-btn:hover {
+  border-color: var(--muted);
+  background: var(--surface);
+}
+.dkb[data-expanded] .dkb-toggle {
+  border-color: var(--muted);
+}
+
+/* ---------- linked value ("= 55% clean season (Coin)") ---------- */
+.lv {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--muted);
+}
+.lv-value {
+  font: inherit;
+  font-family: var(--font-mono);
+  color: var(--tone, var(--ink));
+  background: none;
+  border: 0;
+  border-bottom: 1px dotted var(--muted);
+  padding: 0;
+  line-height: 1.2;
+  cursor: text;
+}
+.lv-value:hover {
+  border-bottom-color: var(--ink);
+}
+.lv-editing {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+}
+.lv-edit {
+  width: 46px;
+  height: 16px;
+  padding: 0 4px;
+  font: inherit;
+  font-family: var(--font-mono);
+  color: var(--ink);
+  text-align: right;
+  background: var(--raised);
+  border: 1px solid var(--b);
+  border-radius: 4px;
+}
+.lv-edit:focus {
+  outline: none;
+}
+
+/* ---------- segmented switch ---------- */
+.seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+}
+.seg-opt {
+  display: grid;
+  gap: 1px;
+  text-align: left;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--ink-2);
+  cursor: pointer;
+  min-width: 0;
+}
+.seg-opt:hover {
+  color: var(--ink);
+}
+.seg-opt.on {
+  background: var(--raised-2, var(--raised));
+  border-color: var(--muted);
+  color: var(--ink);
+}
+.seg-label {
+  font-size: var(--fs-ui, 13px);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.seg-hint {
+  font-size: var(--fs-label, 11.5px);
+  font-family: var(--font-mono);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---------- drawer ---------- */
+.dkb-drawer {
+  position: fixed;
+  z-index: 28;
+  top: calc(var(--topbar-h, 52px) + env(safe-area-inset-top, 0px));
+  right: 0;
+  bottom: 0;
+  width: min(460px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--hairline);
+  box-shadow: -18px 0 40px rgba(0, 0, 0, 0.35);
+  outline: none;
+}
+.dkb-backdrop {
+  display: none;
+}
+.dkb-drawer-head {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 8px;
+  padding: 10px 24px 10px;
+  border-bottom: 1px solid var(--hairline);
+}
+.dkb-drawer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dkb-drawer-title {
+  font-size: var(--fs-label, 11.5px);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+}
+.dkb-drawer-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.dkb-drawer-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 24px 24px 48px;
+}
+.dkb-sec + .dkb-sec {
+  margin-top: 40px;
+}
+.dkb-sec-h {
+  margin: 0;
+  font-size: var(--fs-h, 20px);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--ink);
+}
+.dkb-sec-blurb {
+  margin: 4px 0 0;
+  font-size: var(--fs-ui, 13px);
+  color: var(--muted);
+}
+.dkb-sec-h + :not(.dkb-sec-blurb),
+.dkb-sec-blurb + * {
+  margin-top: 16px;
+}
+.dkb-sec-note {
+  margin-top: 12px;
+  font-size: var(--fs-ui, 13px);
+  color: var(--ink-2);
+}
+.dkb-sec-fields {
+  display: grid;
+  gap: 16px;
+}
+/* Fields in the drawer: the full label in sentence case, then track and box. */
+.dkb-drawer .nf-label {
+  font-size: var(--fs-ui, 13px);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+.dkb-drawer .nf-label .sym {
+  color: var(--muted);
+}
+.dkb-drawer .nf-box {
+  font-size: var(--fs-ui, 13px);
+}
+.dkb-drawer .badge-all {
+  display: none;
+}
+.dkb-drawer .param-label {
+  font-size: var(--fs-ui, 13px);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+.lv-box {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-ui, 13px);
+  text-align: right;
+}
+
+/* Figures: label and basis left, value right; one hairline between rows. */
+.dkb-ftable {
+  width: 100%;
+  border-collapse: collapse;
+}
+.dkb-ftable th,
+.dkb-ftable td {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--grid);
+  vertical-align: middle;
+}
+.dkb-ftable th {
+  text-align: left;
+  font-weight: 400;
+}
+.dkb-flabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-ui, 13px);
+  color: var(--ink);
+}
+.dkb-fbasis {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-label, 11.5px);
+  color: var(--muted);
+}
+.dkb-ftable td {
+  padding-left: 16px;
+  text-align: right;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--fs-kpi, 20px);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--tone, var(--ink));
+}
+
+.dkb-defs {
+  margin: 0;
+  display: grid;
+  gap: 14px;
+}
+.dkb-defs dt {
+  font-size: var(--fs-ui, 13px);
+  font-weight: 600;
+  color: var(--ink);
+}
+.dkb-defs dd {
+  margin: 2px 0 0;
+  font-size: var(--fs-body, 15px);
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.dkb-market {
+  display: grid;
+  gap: 10px;
+}
+.dkb-market p {
+  margin: 0;
+}
+.dkb-market-line {
+  font-size: var(--fs-body, 15px);
+  line-height: 1.5;
+  color: var(--ink);
+}
+.dkb-market-state {
+  font-size: var(--fs-ui, 13px);
+  color: var(--muted);
+}
+
+/* ---------- below 1280px the groups wrap; row 2 may take a second line ---------- */
+@media (max-width: 900px) {
+  .dkb-context {
+    display: none;
+  }
+}
+
+/* ---------- phone ---------- */
+@media (max-width: 700px) {
+  .dkb-inputs {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 16px;
+  }
+  .dkb-group,
+  .dkb-fields {
+    display: contents;
+  }
+  .dkb-caption,
+  .dkb-group::before,
+  .dkb-field:not([data-phone]) {
+    display: none;
+  }
+  .dkb-field {
+    max-width: none;
+  }
+  .dkb .dkb-inputs .nf .nf-track {
+    max-width: none;
+  }
+  .dkb .dkb-inputs .nf .nf-box {
+    width: 60px;
+  }
+  .dkb-inputs {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .dkb-status {
+    column-gap: 12px;
+    row-gap: 2px;
+    padding-top: 4px;
+    padding-bottom: 6px;
+  }
+  .dkb-status .dkb-toggle {
+    padding: 1px 10px;
+  }
+  .dkb-lead {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    flex: 1 1 auto;
+    order: 0;
+  }
+  .dkb-status .dkb-toggle {
+    order: 1;
+    margin-left: auto;
+  }
+  .dkb-figs {
+    order: 2;
+    flex: 1 1 100%;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .dkb-strip {
+    order: 3;
+    flex: 1 1 100%;
+    min-width: 0;
+    margin-left: 0;
+    height: 24px;
+  }
+  .dkb-strip[data-idle] {
+    display: none;
+  }
+  /* The drawer becomes a bottom sheet over a dimmed page. */
+  .dkb-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 27;
+    background: rgba(0, 0, 0, 0.5);
+  }
+  .dkb-drawer {
+    top: auto;
+    left: 0;
+    width: auto;
+    height: min(86dvh, calc(100dvh - var(--topbar-h, 52px) - 12px));
+    border-left: 0;
+    border-top: 1px solid var(--hairline);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -18px 40px rgba(0, 0, 0, 0.45);
+  }
+  .dkb-drawer-head,
+  .dkb-drawer-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
