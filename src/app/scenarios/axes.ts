@@ -69,7 +69,7 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
     y: { field: "tranche", format: "x", zero: false },
     series: [{ field: "tranche", color: yours.color, label: yours.label, emphasis: "strong" }],
     height: 200,
-    annotations: [{ kind: "hline", y: 1, text: "start", color: "muted", at: "start" }],
+    annotations: [{ kind: "hline", y: 1, text: "start", color: "ink2", at: "start" }],
   };
 
   const qs = linspace(0.005, Math.max(0.045, d.breakEven + 0.005), 161);
@@ -122,7 +122,7 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
     ],
     height: 300,
     annotations: [
-      { kind: "hline", y: 0, text: "no growth", color: "muted", at: "end" },
+      { kind: "hline", y: 0, text: "no growth", color: "ink2", at: "end" },
       ...(fstar <= fMax && fstar > 0 ? [{ kind: "point" as const, x: fstar, y: seasonLogGrowth(Math.min(1, k * fstar), k, q, b, n, p.sharedOutcome), text: `f* ${pct(fstar)}`, color: "ink" as const, at: "end" as const }] : []),
       { kind: "vline", x: p.riskPerNight / k, text: `your per-name fraction ${pct(p.riskPerNight / k)}`, color: "c", at: "start" },
     ],
@@ -326,7 +326,7 @@ export function buildAxes(p: Params, d: Derived, _data: Datasets): ScenarioView 
       },
       {
         title: "Where the axes still interact",
-        body: "- Capital ceiling. When k·f* exceeds 100%, every name is pushed down to 1/k and the extra name adds less than its standalone growth.\n- Correlation within a night. Shared causes shrink the count of independent bets (section 06).\n\nSamuelson's “Fallacy of Large Numbers” (1963) is the classic statement of the time-side half: repeating a bet you would refuse once does not make it acceptable, because repetition stacks risk over time instead of spreading it. Grinold's fundamental law (1989) is the institutional version of the collapse: skill per bet times the square root of independent bets per year, with cross-sectional and time-series bets counted as the same unit.",
+        body: "- Capital ceiling. When k·f* exceeds 100%, every name is pushed down to 1/k and the extra name adds less than its standalone growth.\n- Correlation within a night. Shared causes shrink the count of independent bets ([section 06](#s-correlation)).\n\nSamuelson's “Fallacy of Large Numbers” (1963) is the classic statement of the time-side half: repeating a bet you would refuse once does not make it acceptable, because repetition stacks risk over time instead of spreading it. Grinold's fundamental law (1989) is the institutional version of the collapse: skill per bet times the square root of independent bets per year, with cross-sectional and time-series bets counted as the same unit.",
       },
       {
         title: "Why full capital on a low-risk trade does not replace position size",

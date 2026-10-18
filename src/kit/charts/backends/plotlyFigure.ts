@@ -6,7 +6,7 @@ import { spanOfPx } from "../bars";
 import { formatNumber } from "../format";
 import { LABEL_FONT_PX, LEGEND_ROW_PX, resolveChart, type ResolvedAxis, type ResolvedChart } from "../resolve";
 import { fieldFormat, fieldLabel, type ChartSpec, type SeriesSpec } from "../spec";
-import { THEME, barFill, barStroke, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
+import { THEME, annotationLabelColor, barFill, barStroke, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
 import { BAND_ALPHA, bandPoints, barPoints, categories, d3Format, linePoints, markOf, numberOrNull, seriesName, showLegend } from "./types";
 
 export type PTrace = Record<string, unknown>;
@@ -162,11 +162,11 @@ function annotationLayout(rc: ResolvedChart): { shapes: PLayout[]; annotations: 
     else if (a.kind === "hline") shapes.push({ type: "line", xref: "paper", yref: "y", x0: 0, x1: 1, y0: a.y, y1: a.y, line: { color, width: 1, dash } });
     else if (a.kind === "point")
       shapes.push({ type: "circle", xref: "x", yref: "y", xsizemode: "pixel", ysizemode: "pixel", xanchor: ax(a.x!), yanchor: ay(a.y!), x0: -5, x1: 5, y0: -5, y1: 5, line: { color: THEME.surface, width: 2 }, fillcolor: roleColor(a.color ?? "ink") });
-    else if (a.kind === "xband") shapes.push({ type: "rect", xref: "x", yref: "paper", x0: a.x, x1: a.x2, y0: 0, y1: 1, fillcolor: withAlpha(color, 0.1), line: { width: 0 } });
-    else if (a.kind === "yband") shapes.push({ type: "rect", xref: "paper", yref: "y", x0: 0, x1: 1, y0: a.y, y1: a.y2, fillcolor: withAlpha(color, 0.1), line: { width: 0 } });
+    else if (a.kind === "xband") shapes.push({ type: "rect", xref: "x", yref: "paper", x0: a.x, x1: a.x2, y0: 0, y1: 1, fillcolor: withAlpha(color, BAND_ALPHA), line: { width: 0 } });
+    else if (a.kind === "yband") shapes.push({ type: "rect", xref: "paper", yref: "y", x0: 0, x1: 1, y0: a.y, y1: a.y2, fillcolor: withAlpha(color, BAND_ALPHA), line: { width: 0 } });
     const l = a.label;
     if (!l || !a.text) continue;
-    const textColor = a.kind === "xband" ? THEME.muted : roleColor(a.color ?? (a.kind === "point" || a.kind === "label" ? "ink" : "muted"));
+    const textColor = annotationLabelColor(a);
     const common = {
       text: a.text,
       showarrow: false,

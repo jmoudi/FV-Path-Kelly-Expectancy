@@ -96,8 +96,8 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
     ],
     height: 330,
     annotations: [
-      { kind: "hline", y: 0.5, text: "median line", color: "muted", at: "end" },
-      { kind: "vline", x: coin.mean, text: `mean, ${P.coin.name} and ${P.spread.name} ${x2(coin.mean)}`, color: "muted" },
+      { kind: "hline", y: 0.5, text: "median line", color: "ink2", at: "end" },
+      { kind: "vline", x: coin.mean, text: `mean, ${P.coin.name} and ${P.spread.name} ${x2(coin.mean)}`, color: "ink2" },
       { kind: "vline", x: p.thresholdBelow, text: `below ${x2(p.thresholdBelow)}`, color: "muted", at: "start" },
     ],
     stories: shapeStories,
@@ -256,7 +256,7 @@ export function buildDiversification(p: Params, d: Derived, _data: Datasets): Sc
     notes: [
       {
         title: "Same mean, less variance",
-        body: "You replay the tranche. A single-name tranche survives s seasons with probability p^s, while the diversified one keeps compounding. Geometric growth is roughly the mean minus half the variance, and variance is what diversification removes without touching the mean. It is close to fee-neutral too: fees and spreads scale with contract count, and splitting across names does not change the count.",
+        body: "You replay the tranche. A single-name tranche survives s seasons with probability p^s, while the diversified one keeps compounding. Geometric growth is roughly the mean minus half the variance ([section 02](#s-mean-median)), and variance is what diversification removes without touching the mean. It is close to fee-neutral too: fees and spreads scale with contract count, and splitting across names does not change the count.",
       },
       {
         title: "The measure that matters",

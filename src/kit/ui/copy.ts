@@ -21,6 +21,12 @@ export interface KitCopy {
   storyMoved: (before: Record<string, unknown> | undefined, now: Record<string, unknown>) => string | null;
   /** Settings page: the blurb of the engine group (the schema's advanced inputs). */
   engineSettingsBlurb: string;
+  /**
+   * Where the frames' own captions link to, when the app documents them: the inputs
+   * caption above a section's charts ("Inputs for this section") and the sweep strip's
+   * hint. Hash routes (e.g. "#guide/replayer"); without one the text is plain.
+   */
+  links: { inputs?: string; replayer?: string };
 }
 
 export const DEFAULT_COPY: KitCopy = {
@@ -34,4 +40,5 @@ export const DEFAULT_COPY: KitCopy = {
   manySeriesNote: (n) => `${n} series.`,
   storyMoved: () => null,
   engineSettingsBlurb: "How the model is computed and how many samples the sampled charts draw.",
+  links: {},
 };

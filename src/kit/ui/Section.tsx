@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { kpiItem, sectionNumber, viewChips } from "./scenarioProps";
+import { kpiItems, sectionNumber, viewChips } from "./scenarioProps";
 import type { PanelTab } from "./TabbedPanel";
 import { SectionFrame } from "./SectionFrame";
 import { useKit } from "@kit/state/context";
@@ -11,8 +11,9 @@ import { viewOfChart } from "@kit/charts/scenario";
 import { ChartHost } from "./ChartHost";
 import { ParamInput } from "@kit/inputs/ParamInput";
 import { useKitCopy } from "@kit/state/context";
-import { viewHref } from "./route";
+import { anchorHref, viewHref } from "./route";
 import { TableView } from "./TableView";
+import { Link, plainText, rich, RichText } from "./Link";
 
 function NoteBody({ body }: { body: string }) {
   const blocks = body.split(/\n\n+/);
@@ -24,18 +25,18 @@ function NoteBody({ body }: { body: string }) {
           return (
             <ul key={i}>
               {lines.map((l, j) => (
-                <li key={j}>{l.slice(2)}</li>
+                <li key={j}>{rich(l.slice(2))}</li>
               ))}
             </ul>
           );
         }
-        return <p key={i}>{blk}</p>;
+        return <p key={i}>{rich(blk)}</p>;
       })}
     </>
   );
 }
 
-/** The section's notes and derivations, as plain prose. */
+/** The section's notes and derivations, as prose (inline links and code rendered). */
 export function Notes({ notes }: { notes: Note[] }) {
   return (
     <div className="notes">
@@ -78,7 +79,7 @@ export function ActionButton({ a }: { a: Action }) {
       <button type="button" className="action-link" onClick={() => (a.warning ? setConfirm(true) : setParams(a.patch, { source: "action" }))}>
         {a.label}
       </button>
-      {a.hint && <span className="hint">{a.hint}</span>}
+      {a.hint && <span className="hint">{rich(a.hint)}</span>}
     </span>
   );
 }
@@ -107,12 +108,12 @@ export function SourceFigures({ view }: { view: ScenarioView }) {
         <tbody>
           {view.sourceFigures.map((s) => (
             <tr key={s.label}>
-              <td>{s.label}</td>
+              <td>{rich(s.label)}</td>
               <td className="num">{s.quoted}</td>
               <td className="num">{s.computed}</td>
               <td className={`agree${s.agrees ? "" : " no"}`}>
                 {s.agrees ? "yes" : "no"}
-                {!s.agrees && s.why && <span className="why">{s.why}</span>}
+                {!s.agrees && s.why && <span className="why">{rich(s.why)}</span>}
               </td>
             </tr>
           ))}
@@ -133,13 +134,10 @@ function Tables({ view, tables }: { view: ScenarioView; tables: ChartSpec[] }) {
           <div key={t.id} className="panel-table" id={`chart-${t.id}`}>
             <div className="panel-table-head">
               <span className="panel-table-title">{t.title}</span>
-              {v && (
-                <a className="k-textlink" href={viewHref(v.id)}>
-                  {v.title} ↗
-                </a>
-              )}
+              {v && <Link to={viewHref(v.id)}>{v.title} ↗</Link>}
             </div>
             <TableView spec={t} />
+            {t.caption && <p className="caption">{rich(t.caption)}</p>}
           </div>
         );
       })}
@@ -174,20 +172,35 @@ function usePairLegends(charts: ChartSpec[]): (i: number) => string[] | undefine
 
 /** A section of the Explain page: the scenario's view-model in the kit's section skeleton. */
 export function Section({ view }: { view: ScenarioView }) {
+  const copy = useKitCopy();
   const chart = (c: ChartSpec) => <ChartHost key={c.id} spec={c} viewId={viewOfChart(view, c.id)?.id} />;
   const peerLegend = usePairLegends(view.secondary);
+  const lead = view.primary[0];
   return (
     <SectionFrame
       id={`s-${view.id}`}
-      eyebrow={`Section ${sectionNumber(view)}`}
+      eyebrow={
+        <>
+          Section <span className="k-eyebrow-n">{sectionNumber(view)}</span>
+        </>
+      }
       chips={viewChips(view)}
       title={view.title}
-      lede={view.lede}
-      claim={view.claim}
-      answers={view.kpis.map(kpiItem)}
+      lede={<RichText text={view.lede} />}
+      claim={<RichText text={view.claim} />}
+      answers={kpiItems(view, { linkViews: true, idBase: `s-${view.id}-fig` })}
       answersShown={3}
+      // "Scroll here": from the figures down to the chart that draws them.
+      answersAfter={
+        lead ? (
+          <Link to={anchorHref(`chart-${lead.id}`)} className="k-answers-to" title="Scroll to the chart">
+            ↓ {plainText(lead.title)}
+          </Link>
+        ) : undefined
+      }
       actions={view.actions?.length ? view.actions.map((a) => <ActionButton key={a.label} a={a} />) : undefined}
       inputs={view.localParams.length ? view.localParams.map((k) => <ParamInput key={k} k={k} compact />) : undefined}
+      inputsHref={copy.links.inputs}
       primary={view.primary.map(chart)}
       secondary={view.secondary.map((c, i) => <ChartHost key={c.id} spec={c} viewId={viewOfChart(view, c.id)?.id} legendPeer={peerLegend(i)} />)}
       panels={sectionPanels(view)}

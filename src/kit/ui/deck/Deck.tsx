@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, type CSSPropert
 import { createPortal } from "react-dom";
 import type { DeckProps, DeckText, DrawerSection } from "./types";
 import { useMedia } from "./useMedia";
+import { Link } from "../Link";
 
 const DEFAULT_TEXT: DeckText = {
   expand: "Full deck ▾",
@@ -71,7 +72,7 @@ function SectionBody({ s }: { s: DrawerSection }): ReactNode {
               <tr key={r.id}>
                 <th scope="row">
                   <span className={`dkb-flabel${r.color ? " dot" : ""}`} style={tone(r.color)}>
-                    <span>{r.label}</span>
+                    {r.href ? <Link to={r.href}>{r.label}</Link> : <span>{r.label}</span>}
                     {r.help}
                   </span>
                   {r.basis && <span className="dkb-fbasis">{r.basis}</span>}
@@ -176,7 +177,7 @@ export function Deck(props: DeckProps) {
           <dl className="dkb-figs">
             {status.map((f) => (
               <div key={f.id} className="dkb-fig" title={f.title}>
-                <dt>{f.label}</dt>
+                <dt>{f.href ? <Link to={f.href}>{f.label}</Link> : f.label}</dt>
                 <dd>{f.value || t.computing}</dd>
               </div>
             ))}

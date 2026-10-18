@@ -2,19 +2,22 @@
  * The guide page: in-app documentation of how the GUI works, from structured content
  * the app supplies (GuideSection[]). A left rail of section links that highlights the
  * section being read, the page's title and lede, then each section's blocks:
- * paragraphs, sub-headings, lists, small tables and key rows. No boxes; prose stays
- * within the measure (--prose-max). Sections are addressed as #<page>/<id>.
+ * paragraphs, sub-headings, lists, small tables, key rows and callouts. No boxes; prose
+ * stays within the measure (--prose-max). Sections are addressed as #<page>/<id> and
+ * carry the DOM id `<page>-<id>` (sub-headings `<page>-<id>-<slug>`), so any link can
+ * point at them. A Markdown block's headings are `<page>-<id>-<slug>` too.
  *
- * Inline markup in any text: `code` (keys, addresses, names in the code; a quote with a
- * space in it is set without the chip), **term**, [label](#href) links, and {icon:name}
- * for a tool's drawn icon (the kit's Icon set), so the text shows the tool as the screen
- * draws it.
+ * Inline markup in any text (see `rich` in ./Link.tsx): `code` (keys, addresses, names
+ * in the code; a quote with a space in it is set without the chip), **term** (its first
+ * appearance on the page is marked as a definition), [label](#href) links, {{a:Coin}}
+ * for a name with its identity dot, and {icon:name} for a tool's drawn icon (the kit's
+ * Icon set), so the text shows the tool as the screen draws it.
  */
-import { Fragment, useEffect, useMemo, type ReactNode } from "react";
-import { Icon, type IconName } from "./Icon";
+import { useMemo, type ReactNode } from "react";
 import { KeyLegend, type KeyBinding } from "./Settings";
 import { RemoteMarkdown } from "./RemoteMarkdown";
 import { useScrollSpy } from "./Shell";
+import { Link, rich, useRevealTarget } from "./Link";
 import "./guide.css";
 
 export type GuideBlock =
@@ -28,10 +31,13 @@ export type GuideBlock =
   | { kind: "table"; head: string[]; rows: string[][]; caption?: string }
   /** Key rows: keys rendered as <kbd>, what they do, where they apply. */
   | { kind: "keys"; rows: KeyBinding[] }
+  /** A callout: "Note" (good to know, a green rule) or "Careful" (it clears or overrides something, a red rule). */
+  | { kind: "callout"; tone: "note" | "careful"; text: string }
   /**
    * A Markdown file read at run time, once per page load, relative to the page (never
    * bundled), in this page's prose styles under a "Loaded <time> · Reload" line;
-   * `failure` follows the plain line shown when it cannot be loaded.
+   * `failure` follows the plain line shown when it cannot be loaded. Its headings' ids
+   * start with `idPrefix`, by default the section's own (`<page>-<id>-`).
    */
   | { kind: "markdown"; src: string; failure?: string; idPrefix?: string };
 
@@ -51,62 +57,47 @@ export interface GuideFrameProps {
   page?: string;
 }
 
-const INLINE = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)\s]+\)|\{icon:[a-z]+\})/g;
-
-/** What a screen reader says for an icon in the text (the drawn icon itself is decorative). */
-const ICON_WORD: Partial<Record<IconName, string>> = { open: "open in its view", table: "show the numbers", settings: "settings", play: "run", pause: "pause", stop: "stop", restore: "back to the value before", next: "next", more: "more" };
-
 /** Section numbers as Explain writes them: "01", "02", … */
 export const guideNumber = (i: number) => String(i + 1).padStart(2, "0");
 
-/** `code`, **term**, [label](href) and {icon:name} inside a text. */
-export function inline(text: string): ReactNode {
-  const parts = text.split(INLINE);
-  return parts.map((part, i) => {
-    if (!part) return null;
-    if (part.startsWith("`") && part.endsWith("`")) {
-      const body = part.slice(1, -1);
-      return (
-        <code key={i} className={/\s/.test(body) ? "quote" : undefined}>
-          {body}
-        </code>
-      );
-    }
-    const icon = /^\{icon:([a-z]+)\}$/.exec(part);
-    if (icon)
-      return (
-        <Fragment key={i}>
-          <Icon name={icon[1] as IconName} size={13} className="k-guide-icon" />
-          <span className="sr-only">{ICON_WORD[icon[1] as IconName] ?? icon[1]}</span>
-        </Fragment>
-      );
-    if (part.startsWith("**") && part.endsWith("**")) return <strong key={i}>{part.slice(2, -2)}</strong>;
-    const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(part);
-    if (link) return <a key={i} href={link[2]}>{link[1]}</a>;
-    return <Fragment key={i}>{part}</Fragment>;
-  });
+/** `code`, **term**, [label](href), {{a:Name}} and {icon:name} inside a text (the kit's `rich`). */
+export function inline(text: string, terms?: Set<string>): ReactNode {
+  return rich(text, { terms });
 }
 
-function Block({ b }: { b: GuideBlock }) {
+const slug = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+const CALLOUT_LABEL = { note: "Note", careful: "Careful" } as const;
+
+function Block({ b, terms, idBase }: { b: GuideBlock; terms: Set<string>; idBase: string }) {
+  const t = (s: string) => inline(s, terms);
   switch (b.kind) {
     case "p":
-      return <p className="k-guide-p">{inline(b.text)}</p>;
+      return <p className="k-guide-p">{t(b.text)}</p>;
     case "h":
-      return <h3 className="k-guide-h3">{inline(b.text)}</h3>;
+      return (
+        <h3 className="k-guide-h3" id={`${idBase}-${slug(b.text)}`}>
+          {t(b.text)}
+        </h3>
+      );
     case "list": {
-      const items = b.items.map((it, i) => <li key={i}>{inline(it)}</li>);
+      const items = b.items.map((it, i) => <li key={i}>{t(it)}</li>);
       return b.ordered ? <ol className="k-guide-list">{items}</ol> : <ul className="k-guide-list">{items}</ul>;
     }
     case "table":
       return (
         <div className="k-guide-table-wrap">
           <table className="k-guide-table">
-            {b.caption && <caption>{inline(b.caption)}</caption>}
+            {b.caption && <caption>{t(b.caption)}</caption>}
             <thead>
               <tr>
                 {b.head.map((h, i) => (
                   <th key={i} scope="col">
-                    {inline(h)}
+                    {t(h)}
                   </th>
                 ))}
               </tr>
@@ -117,10 +108,10 @@ function Block({ b }: { b: GuideBlock }) {
                   {r.map((c, j) =>
                     j === 0 ? (
                       <th key={j} scope="row">
-                        {inline(c)}
+                        {t(c)}
                       </th>
                     ) : (
-                      <td key={j}>{inline(c)}</td>
+                      <td key={j}>{t(c)}</td>
                     ),
                   )}
                 </tr>
@@ -135,77 +126,58 @@ function Block({ b }: { b: GuideBlock }) {
           <KeyLegend bindings={b.rows} />
         </div>
       );
+    case "callout":
+      return (
+        <aside className={`k-guide-callout ${b.tone}`} aria-label={CALLOUT_LABEL[b.tone]}>
+          <span className="k-guide-callout-t">{CALLOUT_LABEL[b.tone]}</span> {t(b.text)}
+        </aside>
+      );
     case "markdown":
-      return <RemoteMarkdown src={b.src} failure={b.failure} idPrefix={b.idPrefix ?? "g-md-"} headingShift={1} classes={{ p: "k-guide-p", list: "k-guide-list" }} />;
+      return <RemoteMarkdown src={b.src} failure={b.failure} idPrefix={b.idPrefix ?? `${idBase}-`} headingShift={1} classes={{ p: "k-guide-p", list: "k-guide-list" }} />;
   }
 }
 
 export function GuideFrame({ title, lede, sections, current, page = "guide" }: GuideFrameProps) {
   const ids = useMemo(() => sections.map((s) => s.id), [sections]);
-  const spied = useScrollSpy(ids, true, "g-");
+  const spied = useScrollSpy(ids, true, `${page}-`);
   const active = spied || current || ids[0];
   const href = (id: string) => `#${page}/${id}`;
 
-  // A section in the address: scroll to it (also on first load). A section filled after
-  // the first paint (a document read at run time) can leave the page too short to land
-  // on, so land again as the page grows, until the reader moves or 10 s pass.
-  useEffect(() => {
-    const el = current ? document.getElementById(`g-${current}`) : null;
-    if (!el) return;
-    const land = () => el.scrollIntoView({ block: "start" });
-    land();
-    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(land);
-    ro?.observe(el.closest(".k-guide") ?? el);
-    const moves = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
-    let timer = 0;
-    const quit = () => {
-      ro?.disconnect();
-      window.clearTimeout(timer);
-      for (const t of moves) window.removeEventListener(t, quit, true);
-    };
-    for (const t of moves) window.addEventListener(t, quit, { capture: true, passive: true });
-    timer = window.setTimeout(quit, 10_000);
-    return quit;
-  }, [current]);
+  // A section in the address: scroll to it (also on first load), unless a link on this
+  // page already did. A section filled after the first paint (the directives, read at
+  // run time) can leave the page too short to land on; useRevealTarget holds the
+  // section in place as the page grows, until the reader moves or 10 s pass.
+  useRevealTarget(current ? `${page}-${current}` : undefined);
+
+  // Each term is marked as defined where it first appears on the page.
+  const terms = new Set<string>();
 
   return (
     <div className="k-guide">
       <nav className="k-guide-rail" aria-label={`${title}: sections`}>
         <div className="k-guide-rail-title">{title}</div>
         {sections.map((s, i) => (
-          <a
-            key={s.id}
-            href={href(s.id)}
-            className={active === s.id ? "on" : undefined}
-            aria-current={active === s.id ? "true" : undefined}
-            onClick={(e) => {
-              // The same address again does not fire hashchange: scroll here.
-              if (location.hash === href(s.id)) {
-                e.preventDefault();
-                document.getElementById(`g-${s.id}`)?.scrollIntoView({ block: "start" });
-              }
-            }}
-          >
+          <Link key={s.id} to={href(s.id)} variant="plain" className={active === s.id ? "on" : undefined} aria-current={active === s.id ? "true" : undefined}>
             <span className="n">{guideNumber(i)}</span>
             <span>{s.title}</span>
-          </a>
+          </Link>
         ))}
       </nav>
       <main className="k-guide-main">
         <header className="k-guide-head">
           <h1 className="page-title">{title}</h1>
-          {lede && <p className="page-lede">{inline(lede)}</p>}
+          {lede && <p className="page-lede">{inline(lede, terms)}</p>}
         </header>
         {sections.map((s, i) => (
-          <section key={s.id} id={`g-${s.id}`} className="k-guide-sec" aria-labelledby={`g-${s.id}-h`}>
-            <h2 className="k-guide-h2" id={`g-${s.id}-h`}>
+          <section key={s.id} id={`${page}-${s.id}`} className="k-guide-sec" aria-labelledby={`${page}-${s.id}-h`}>
+            <h2 className="k-guide-h2" id={`${page}-${s.id}-h`}>
               <span className="n" aria-hidden="true">
                 {guideNumber(i)}
               </span>
               {s.title}
             </h2>
             {s.body.map((b, j) => (
-              <Block key={j} b={b} />
+              <Block key={j} b={b} terms={terms} idBase={`${page}-${s.id}`} />
             ))}
           </section>
         ))}

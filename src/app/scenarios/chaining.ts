@@ -118,7 +118,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
     ],
     height: 320,
     annotations: [
-      { kind: "hline", y: 0, text: "no growth", color: "muted", at: "end" },
+      { kind: "hline", y: 0, text: "no growth", color: "ink2", at: "end" },
       ...(d.robust.risk > 0 ? [{ kind: "point" as const, x: d.robust.risk, y: d.robust.growth, text: `robust optimum ${pct(d.robust.risk)}`, color: "ink" as const, at: (d.robust.risk <= d.nightKelly.risk ? "start" : "end") as "start" | "end" }] : []),
       ...(d.nightKelly.risk > 0 ? [{ kind: "point" as const, x: d.nightKelly.risk, y: d.nightKelly.growth, text: `growth-optimal at the deck's rate ${pct(d.nightKelly.risk)}`, color: "ink" as const, at: (d.robust.risk <= d.nightKelly.risk ? "end" : "start") as "start" | "end" }] : []),
       { kind: "vline", x: p.riskPerNight, text: `your risk a night ${pct(p.riskPerNight)}`, color: "c", at: "start" },
@@ -202,7 +202,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
     height: 300,
     annotations: [
       { kind: "vline", x: N, text: `${N} season${N === 1 ? "" : "s"}`, color: "ink", at: "start" },
-      { kind: "hline", y: 1, text: "start", color: "muted", at: "start" },
+      { kind: "hline", y: 1, text: "start", color: "ink2", at: "start" },
     ],
     stories: curveStories,
   };
@@ -231,7 +231,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
     barWidthPx: 5,
     height: 300,
     annotations: [
-      { kind: "vline", x: 1, text: "start", color: "muted", at: "start" },
+      { kind: "vline", x: 1, text: "start", color: "ink2", at: "start" },
       { kind: "vline", x: p.thresholdBelow, text: `below ${x2(p.thresholdBelow)}`, color: "muted", at: "start" },
       { kind: "vline", x: sYours.median, text: `median, ${yours.name} ${x2(sYours.median)}`, color: "c", dash: false },
     ],
@@ -304,7 +304,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
     series: navSeries,
     height: 320,
     annotations: [
-      { kind: "hline", y: 0, text: "no growth", color: "muted", at: "end" },
+      { kind: "hline", y: 0, text: "no growth", color: "ink2", at: "end" },
       ...(fCoin > 0 ? [{ kind: "point" as const, x: fCoin, y: navLogGrowth(fCoin, coinAtDeck), text: `${P.coin.name} at p = ${pct(d.pClean)}: f* ${pct1(fCoin)} · 2p − 1 = ${pct1(twoP)}`, color: "ink" as const, at: "end" as const }] : []),
       ...(fYours > 0 ? [{ kind: "point" as const, x: fYours, y: navLogGrowth(fYours, yoursOutcomes), text: `${yours.name}: f* ${pct(fYours)}`, color: "c" as const, at: (fYours > 0.6 ? "start" : "end") as "start" | "end" }] : []),
     ],
@@ -354,7 +354,7 @@ export function buildChaining(p: Params, d: Derived, _data: Datasets): ScenarioV
     ),
     columns: [{ field: "risk", emphasize: true }, ...qList.map((qq) => ({ field: `q${qq}` })), { field: "robust", emphasize: true }],
     highlightRow: { field: "risk", value: Math.round(p.riskPerNight * 100) / 100 },
-    caption: "Columns are the true per-name loss rate; growth is E[log end | survive] per season. The last column averages over the band of rates you cannot rule out.",
+    caption: "Columns are the true per-name loss rate; growth is E[log end | survive] per season. The last column averages over [the band of rates you cannot rule out](#view/confidence-band).",
   });
 
   const hitFactorFull = 1 + (1 / k) * ((k - 1) * p.gain - 1);

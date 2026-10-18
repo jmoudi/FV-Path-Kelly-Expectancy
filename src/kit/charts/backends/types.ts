@@ -17,8 +17,8 @@ export interface Backend {
   mount(el: HTMLElement, spec: ChartSpec): RenderHandle;
 }
 
-/** Opacity of a band's fill. */
-export const BAND_ALPHA = 0.14;
+/** Opacity of a band's fill: a series band and a shaded annotation (xband, yband) in the colour of what they describe, at 12%. */
+export const BAND_ALPHA = 0.12;
 
 /** d3-format strings used by Plotly and Vega-Lite tick formatting. */
 export function d3Format(fmt?: NumberFormat): string | undefined {

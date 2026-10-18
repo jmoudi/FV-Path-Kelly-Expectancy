@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { hrefFor, parseHash, type RouteConfig } from "@kit/ui/route";
+import { hrefFor, parseHash, partElementId, type RouteConfig } from "@kit/ui/route";
 import { GuideFrame, inline } from "@kit/ui/GuideFrame";
 import { GUIDE_LEDE, GUIDE_SECTIONS } from "@app/data/copy/guide";
 import { clampTyped, effectiveSettings, patchParamSetting, quantize, sanitizeParamSetting, sanitizeParamSettings, schemaSettings, stepOnGrid } from "@kit/inputs/paramSettings";
@@ -200,8 +200,10 @@ describe("the Guide", () => {
   it("covers the ten sections and the directives, in order, and draws every block", () => {
     expect(GUIDE_SECTIONS.map((s) => s.id)).toEqual(["screen", "parameters", "editing", "parameter-settings", "replayer", "charts", "pages", "data", "keys", "builders", "directives"]);
     const html = renderToStaticMarkup(createElement(GuideFrame, { title: "Guide", lede: GUIDE_LEDE, sections: GUIDE_SECTIONS }));
+    // Each section is the element its route's part names (#guide/<id> → guide-<id>), with a heading id.
     for (const s of GUIDE_SECTIONS) {
-      expect(html).toContain(`id="g-${s.id}"`);
+      expect(html).toContain(`id="${partElementId({ page: "guide", section: s.id }, cfg)}"`);
+      expect(html).toContain(`id="guide-${s.id}-h"`);
       expect(html).toContain(`href="#guide/${s.id}"`);
     }
     expect(html).toContain("<kbd>");
@@ -210,6 +212,10 @@ describe("the Guide", () => {
   });
   it("reads inline code, terms and links", () => {
     const html = renderToStaticMarkup(createElement("p", null, inline("Press `Ctrl+Z`, see **stories** and [Keys](#guide/keys).")));
-    expect(html).toBe('<p>Press <code>Ctrl+Z</code>, see <strong>stories</strong> and <a href="#guide/keys">Keys</a>.</p>');
+    expect(html).toBe('<p>Press <code>Ctrl+Z</code>, see <strong>stories</strong> and <a href="#guide/keys" class="k-link">Keys</a>.</p>');
+    // On the page, a term's first appearance is marked as its definition; later ones are plain bold.
+    const terms = new Set<string>();
+    const twice = renderToStaticMarkup(createElement("p", null, inline("**preset** and **Preset**", terms)));
+    expect(twice).toBe('<p><strong class="k-term first">preset</strong> and <strong class="k-term">Preset</strong></p>');
   });
 });

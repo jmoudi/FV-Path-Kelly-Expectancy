@@ -29,6 +29,8 @@ export interface Figure {
   value: string;
   /** Tooltip with the full definition. */
   title?: string;
+  /** Where the figure is explained (a route such as `#view/<id>`): the label becomes a link. */
+  href?: string;
 }
 
 /** What the status row's figures describe: a name, its parameters, its colour. */
@@ -58,6 +60,8 @@ export interface FigureRow {
   color?: string;
   /** Rendered after the label, typically a "?" help. */
   help?: ReactNode;
+  /** Where the figure is explained: the label becomes a link. */
+  href?: string;
 }
 
 export interface Definition {

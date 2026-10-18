@@ -6,10 +6,12 @@ import { useBus } from "@kit/events/react";
  * (#view/<id>) and a section of the sections page (#s-<id>). The app names its other
  * pages, its landing page (also the default for an empty or unknown hash) and any
  * aliases in a RouteConfig, a module constant it passes to useRoute. A page's part is
- * #<page>/<part> (a section of the guide page: #guide/keys).
+ * #<page>/<part> (a section of the guide page: #guide/keys). #el-<id> is not a route:
+ * it is an anchor on the open page, which `Link` (./Link.tsx) scrolls to.
  *
  * The shell calls useRoute once; every move to another route is announced as
  * route:changed on the event bus, so nothing else needs its own hashchange listener.
+ * An #el-<id> in the address is no move: the open page stays and nothing is announced.
  */
 export interface Route {
   page: string;
@@ -32,9 +34,13 @@ export interface RouteConfig {
 
 export const viewHref = (id: string) => `#view/${id}`;
 export const sectionHref = (id: string) => `#s-${id}`;
+/** An in-page anchor: the element with DOM id `id` on whatever page is open (`Link` scrolls to it). */
+export const anchorHref = (id: string) => `#el-${id}`;
 
-export function parseHash(hash: string, cfg: RouteConfig): Route {
+/** The route a hash names, or null when it names none (an unknown word, an in-page anchor). An empty hash is the home page. */
+export function matchHash(hash: string, cfg: RouteConfig): Route | null {
   const h = hash.replace(/^#/, "");
+  if (!h) return { page: cfg.home };
   const v = /^view\/([\w-]+)$/.exec(h);
   if (v) return { page: "view", id: v[1] };
   const s = /^s-([\w-]+)$/.exec(h);
@@ -43,7 +49,35 @@ export function parseHash(hash: string, cfg: RouteConfig): Route {
   const sub = /^([\w-]+)\/([\w-]+)$/.exec(h);
   if (sub && cfg.pages.includes(cfg.aliases?.[sub[1]] ?? sub[1])) return { page: cfg.aliases?.[sub[1]] ?? sub[1], section: sub[2] };
   const name = cfg.aliases?.[h] ?? h;
-  return cfg.pages.includes(name) ? { page: name } : { page: cfg.home };
+  return cfg.pages.includes(name) ? { page: name } : null;
+}
+
+export function parseHash(hash: string, cfg: RouteConfig): Route {
+  return matchHash(hash, cfg) ?? { page: cfg.home };
+}
+
+/**
+ * The DOM id of the element a route's part names: a section of the sections page is
+ * `s-<id>`, the part of another page `<page>-<part>` (the guide's section "keys" is
+ * `guide-keys`). Undefined for a route without a part.
+ */
+export function partElementId(r: Route, cfg: RouteConfig): string | undefined {
+  if (!r.section) return undefined;
+  return r.page === cfg.sectionsPage ? `s-${r.section}` : `${r.page}-${r.section}`;
+}
+
+/*
+ * The app's routes, registered by useRoute (or setRouteConfig), so a Link can tell a
+ * jump within the open page from a switch to another page without being handed them.
+ */
+let activeConfig: RouteConfig | null = null;
+
+export function setRouteConfig(cfg: RouteConfig | null): void {
+  activeConfig = cfg;
+}
+
+export function routeConfig(): RouteConfig | null {
+  return activeConfig;
 }
 
 export function hrefFor(r: Route, cfg: RouteConfig): string {
@@ -58,10 +92,14 @@ const sameRoute = (a: Route, b: Route) => a.page === b.page && a.id === b.id && 
 /** The route in the address, kept current; call it once, in the shell (route:changed tells everyone else). */
 export function useRoute(cfg: RouteConfig): Route {
   const bus = useBus();
+  // Registered during render, so links rendered in the same pass already know the routes.
+  activeConfig = cfg;
   const [route, setRoute] = useState<Route>(() => parseHash(typeof location !== "undefined" ? location.hash : "", cfg));
   const current = useRef(route);
   useEffect(() => {
     const on = () => {
+      // An in-page anchor (#el-<id>) in the address keeps the page that is open.
+      if (/^#el-/.test(location.hash)) return;
       const from = current.current;
       const to = parseHash(location.hash, cfg);
       current.current = to;

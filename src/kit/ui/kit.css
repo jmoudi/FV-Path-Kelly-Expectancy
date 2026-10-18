@@ -4,7 +4,62 @@
    structure is type, spacing and single hairlines. Borders are left to inputs,
    popovers, menus and dialogs. */
 
+/* ---------- links (Link.tsx) ---------- */
+/* Anything a link can scroll to stops below the sticky top bar and deck (--deck-h is 0
+   where the deck is hidden), so a jump never lands a heading under them. */
+[id] {
+  scroll-margin-top: calc(var(--topbar-h) + var(--deck-h) + 20px);
+}
+/* Every in-app text link: underlined always, ink-2 text, the underline in a quiet tone
+   of the accent (it marks where to act), the full accent on hover and focus. Chips,
+   buttons, rails and nav items are not text links and carry no underline. */
+.k-link {
+  color: var(--ink-2);
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  cursor: pointer;
+}
+.k-link:hover,
+.k-link:focus-visible {
+  color: var(--ink);
+  text-decoration-color: var(--accent);
+}
+/* A link inside ink text (a lede, a verdict) keeps the ink; only its underline says link. */
+.k-lede .k-link,
+.desk-verdict .k-link {
+  color: inherit;
+}
+/* The mark a jump leaves on its target for a moment: an accent tint that fades. A
+   section or guide section marks its heading, not its whole body. */
+@keyframes k-flash {
+  0%,
+  35% {
+    background-color: var(--accent-tint);
+    box-shadow: 0 0 0 6px var(--accent-tint);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+.k-flash:not(.k-section):not(.k-guide-sec) {
+  border-radius: 4px;
+  animation: k-flash 1.8s ease-out;
+}
+.k-section.k-flash > .k-section-head,
+.k-guide-sec.k-flash > .k-guide-h2 {
+  border-radius: 4px;
+  animation: k-flash 1.8s ease-out;
+}
+/* A jump target takes focus (keyboard users continue from it); the mark shows where, not a ring. */
+[data-k-target]:focus {
+  outline: none;
+}
+
 /* ---------- shared ---------- */
+/* Buttons that read as links (+N more figures, undo): the link's look. */
 .k-textlink {
   border: 0;
   background: transparent;
@@ -14,8 +69,9 @@
   color: var(--ink-2);
   cursor: pointer;
   text-decoration: underline;
-  text-decoration-color: var(--hairline);
-  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  text-underline-offset: 2px;
 }
 .k-textlink:hover {
   color: var(--ink);
@@ -52,6 +108,10 @@
   vertical-align: middle;
   position: relative;
   top: -0.06em;
+}
+/* A tool's drawn icon inside a sentence (rich's {icon:name}), at the text's size and colour. */
+.k-inline-icon {
+  margin: 0 1px;
 }
 .icon-btn:hover {
   color: var(--ink);
@@ -93,15 +153,17 @@
   background: var(--raised-2);
   color: var(--ink);
 }
+/* A key cap: raised, with an ink-2 rule under it where the key's edge would be. */
 kbd {
   font-family: var(--font-mono);
   font-size: var(--fs-label);
   color: var(--ink);
   border: 1px solid var(--hairline);
-  border-bottom-width: 2px;
+  border-bottom: 2px solid color-mix(in srgb, var(--ink-2) 70%, transparent);
   border-radius: 4px;
-  padding: 0 5px;
-  background: transparent;
+  padding: 0 6px;
+  background: var(--raised);
+  white-space: nowrap;
 }
 
 /* ---------- section skeleton ---------- */
@@ -125,6 +187,12 @@ kbd {
 .k-eyebrow-text {
   font-family: var(--font-ui);
   letter-spacing: 0.02em;
+}
+/* The section's number: the one place the eyebrow takes the accent (the prose refers to sections by it). */
+.k-eyebrow-n {
+  color: var(--accent);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 .k-chips {
   display: inline-flex;
@@ -170,7 +238,7 @@ kbd {
   width: var(--claim-w);
   margin: 2px 0 16px 48px;
   padding-left: 16px;
-  border-left: 2px solid var(--ink-2);
+  border-left: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
   font-size: var(--fs-body);
   line-height: 1.5;
   color: var(--ink-2);
@@ -223,6 +291,17 @@ kbd {
 .k-answers.column {
   margin-top: 0;
 }
+/* "+N more figures" and the link down to the chart, on one line. */
+.k-answers-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 24px;
+  font-size: var(--fs-ui);
+}
+.k-answers-to {
+  font-size: var(--fs-ui);
+}
 .k-fig {
   display: grid;
   gap: 2px;
@@ -265,6 +344,17 @@ kbd {
   margin-top: 40px;
   display: grid;
   gap: 10px;
+}
+/* "Inputs for this section": ink-2 on a short accent rule, the row's handle; a link to how inputs are edited. */
+.k-inputs-caption {
+  justify-self: start;
+  padding-left: 8px;
+  border-left: 2px solid var(--accent);
+  line-height: 1.25;
+  color: var(--ink-2);
+}
+.k-inputs-caption .k-link {
+  font-size: var(--fs-label);
 }
 .k-inputs-row {
   display: flex;
@@ -484,27 +574,34 @@ kbd {
   align-items: baseline;
   min-width: 0;
 }
+/* A story is an action: a chip whose label is underlined like a link; pressed, it takes
+   the active chip's accent border and tint. */
 .k-story {
-  border: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
   background: transparent;
-  padding: 0;
+  padding: 1px 10px 2px;
   font: inherit;
   font-size: var(--fs-ui);
+  line-height: 1.45;
   color: var(--ink-2);
   cursor: pointer;
-  text-decoration: underline dotted;
-  text-decoration-color: var(--muted);
-  text-underline-offset: 4px;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  text-underline-offset: 2px;
   text-align: left;
 }
 .k-story:hover {
+  border-color: var(--muted);
   color: var(--ink);
   text-decoration-color: var(--accent);
 }
 .k-story.on {
+  border-color: var(--accent);
+  background: var(--accent-tint);
   color: var(--ink);
-  text-decoration: underline solid;
-  text-decoration-color: var(--ink);
+  text-decoration-color: var(--accent);
 }
 .k-story.on::before {
   content: "✓ ";
@@ -638,6 +735,9 @@ kbd {
 }
 .k-crumb:hover {
   color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 2px;
 }
 .k-view-title {
   margin: 0;
@@ -650,9 +750,7 @@ kbd {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 24px;
-}
-.k-view-nav a {
-  text-decoration: none;
+  font-size: var(--fs-ui);
 }
 .k-view-body {
   display: grid;
@@ -779,16 +877,7 @@ kbd {
   color: var(--ink-2);
   border-bottom: 1px solid var(--grid);
 }
-.k-grid-label a {
-  color: var(--ink-2);
-  text-decoration: underline;
-  text-decoration-color: transparent;
-  text-underline-offset: 3px;
-}
-.k-grid-label a:hover {
-  color: var(--ink);
-  text-decoration-color: var(--accent);
-}
+/* Row labels are links (.k-link): underlined like every link, in the quiet accent tone. */
 .k-grid-cell {
   text-align: right;
   font-size: var(--fs-kpi);

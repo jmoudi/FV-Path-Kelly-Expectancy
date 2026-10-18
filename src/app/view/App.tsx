@@ -9,7 +9,8 @@ import { DataDialog, DataSettings } from "@app/view/DataDialog";
 import { ImportExportDialog, SettingsDialog } from "@kit/ui/Dialogs";
 import { ErrorBoundary } from "@kit/ui/ErrorBoundary";
 import { Icon } from "@kit/ui/Icon";
-import { useRoute, type Route, type RouteConfig } from "@kit/ui/route";
+import { sectionHref, useRoute, type Route, type RouteConfig } from "@kit/ui/route";
+import { Link, useRevealTarget } from "@kit/ui/Link";
 import { Section } from "@kit/ui/Section";
 import { FullSettings } from "@kit/ui/SettingsBody";
 import { useBuild } from "@kit/build/useBuild";
@@ -120,13 +121,10 @@ export function App() {
   // Imports and stories that move the deck, as notices (the kit's <Notices> shows them).
   useAnnouncements();
 
-  // Scroll to a section when the hash names one (after the sections exist).
+  // Scroll to a section when the hash names one (after the sections exist), unless a link on the page already did.
   const hasResult = !!result;
   const section = route.page === "explain" ? route.section : undefined;
-  useEffect(() => {
-    if (!section || !hasResult) return;
-    document.getElementById(`s-${section}`)?.scrollIntoView({ block: "start" });
-  }, [section, hasResult]);
+  useRevealTarget(section ? `s-${section}` : undefined, hasResult);
   // A section in the address (#s-<id> on Explain, #guide/<id> on the Guide) scrolls there instead.
   useEffect(() => {
     if (!route.section) window.scrollTo(0, 0);
@@ -144,14 +142,14 @@ export function App() {
         <div className="page">
           <h1 className="page-title">Settings</h1>
           <p className="page-lede">
-            How every control on these pages works, parameter settings and the replayer included, is in the <a href="#guide">Guide</a>.
+            How every control on these pages works, <Link to="#guide/parameter-settings">parameter settings</Link> and <Link to="#guide/replayer">the replayer</Link> included, is in the <Link to="#guide">Guide</Link>.
           </p>
           <FullSettings data={<DataSettings />} />
         </div>
       ) : route.page === "guide" ? (
         <GuideFrame title="Guide" lede={GUIDE_LEDE} sections={GUIDE_SECTIONS} current={route.section} page="guide" />
       ) : route.page === "view" ? (
-        <div className="page">{result ? <ViewPage scenarios={scenarios} viewId={route.id ?? ""} notFound={<>Pick one from the Views menu, or go back to the <a href="#desk">Desk</a>.</>} /> : <p className="status-line">Computing…</p>}</div>
+        <div className="page">{result ? <ViewPage scenarios={scenarios} viewId={route.id ?? ""} notFound={<>Pick one from the Views menu, or go back to the <Link to="#desk">Desk</Link>.</>} /> : <p className="status-line">Computing…</p>}</div>
       ) : route.page === "desk" ? (
         <div className="page">{result ? <DeskPage desk={result.desk} scenarios={scenarios} pending={pending} /> : <p className="status-line">Computing the desk…</p>}</div>
       ) : (
@@ -159,10 +157,10 @@ export function App() {
           <nav className="rail" aria-label="Sections">
             <div className="rail-title">Explain</div>
             {scenarios.map((s) => (
-              <a key={s.id} href={`#s-${s.id}`} className={active === s.id ? "on" : undefined}>
+              <Link key={s.id} to={sectionHref(s.id)} variant="plain" className={active === s.id ? "on" : undefined} aria-current={active === s.id ? "true" : undefined}>
                 <span className="n">{sectionNumber(s)}</span>
                 <span>{s.title}</span>
-              </a>
+              </Link>
             ))}
           </nav>
           <main className={`main${pending ? " pending" : ""}`}>{result ? scenarios.map((s) => <Section key={s.id} view={s} />) : !error && <p className="status-line">Computing every section…</p>}</main>

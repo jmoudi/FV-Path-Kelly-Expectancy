@@ -6,7 +6,7 @@ import { BarAccumulator, exposeProbe, inRange, type AxisProbe, type RenderProbe,
 import { formatNumber } from "../format";
 import { LABEL_FONT_PX, LEGEND_ROW_PX, resolveChart, screenPx, type ResolvedAxis, type ResolvedChart, type ScreenAnnotation } from "../resolve";
 import { fieldFormat, fieldLabel, type ChartSpec, type SeriesSpec } from "../spec";
-import { THEME, barFill, barStroke, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
+import { THEME, annotationLabelColor, barFill, barStroke, emphasisOpacity, emphasisWidth, heatPalette, roleColor, withAlpha } from "../theme";
 import { BAND_ALPHA, bandPoints, barPoints, linePoints, markOf, numberOrNull, seriesName, type Backend, type RenderHandle } from "./types";
 
 echarts.use([
@@ -44,11 +44,11 @@ const rgbText = (c: RGB) => `rgb(${c.map((v) => Math.round(v)).join(",")})`;
 /**
  * Area fills and annotation bands draw at these opacities (the halo under a label
  * recomputes their colour): an area's colour at AREA_ALPHA × emphasis, laid at
- * AREA_OPACITY (said here, not left to the library's default), a band at XBAND_ALPHA.
+ * AREA_OPACITY (said here, not left to the library's default), a band (a series band or
+ * an annotation's xband and yband) at BAND_ALPHA, as in the other backends.
  */
 const AREA_ALPHA = 0.16;
 const AREA_OPACITY = 0.7;
-const XBAND_ALPHA = 0.1;
 /** The grid's insets in px; the plot box is what remains of the container. */
 const GRID = { left: 66, right: 22, top: 18, legendTop: 14, bottom: 46 };
 const ANNOTATIONS_ID = "__annotations";
@@ -255,8 +255,8 @@ function annotationSeries(rc: ResolvedChart, grid: { width: number; height: numb
       else lines.push({ xAxis: a.x, lineStyle, label: { show: false } });
     } else if (a.kind === "hline") lines.push({ yAxis: a.y, lineStyle, label: { show: false } });
     else if (a.kind === "point") points.push({ coord: [a.x, a.y], symbol: "circle", symbolSize: 11, itemStyle: { color: roleColor(a.color ?? "ink"), borderColor: THEME.surface, borderWidth: 2 }, label: { show: false } });
-    else if (a.kind === "xband") areas.push([{ xAxis: a.x, itemStyle: { color: withAlpha(color, XBAND_ALPHA) } }, { xAxis: a.x2 }]);
-    else if (a.kind === "yband") areas.push([{ yAxis: a.y, itemStyle: { color: withAlpha(color, XBAND_ALPHA) } }, { yAxis: a.y2 }]);
+    else if (a.kind === "xband") areas.push([{ xAxis: a.x, itemStyle: { color: withAlpha(color, BAND_ALPHA) } }, { xAxis: a.x2 }]);
+    else if (a.kind === "yband") areas.push([{ yAxis: a.y, itemStyle: { color: withAlpha(color, BAND_ALPHA) } }, { yAxis: a.y2 }]);
   }
   const out: EOption = { id: ANNOTATIONS_ID, name: ANNOTATIONS_ID, type: "line", data: [], silent: true, tooltip: { show: false }, z: 5 };
   // precision: ECharts rounds mark-line coordinates to 2 decimals by default, which
@@ -315,7 +315,7 @@ function backgroundAt(spec: ChartSpec, rc: ResolvedChart, grid: { width: number;
     if (a.kind !== "xband") continue;
     const x0 = screenPx(Math.max(Math.min(a.x!, a.x2!), rc.h.min), rc.h, grid.width, false) ?? 0;
     const x1 = screenPx(Math.min(Math.max(a.x!, a.x2!), rc.h.max), rc.h, grid.width, false) ?? grid.width;
-    if (gx >= x0 && gx <= x1) c = over(c, roleColor(a.color ?? "muted"), XBAND_ALPHA);
+    if (gx >= x0 && gx <= x1) c = over(c, roleColor(a.color ?? "muted"), BAND_ALPHA);
   }
   return c;
 }
@@ -344,7 +344,7 @@ function labelGraphics(spec: ChartSpec, rc: ResolvedChart, grid: { left: number;
       x = px(a, "x") ?? 0;
       y = px(a, "y") ?? 0;
     }
-    const color = a.kind === "xband" ? THEME.muted : roleColor(a.color ?? (a.kind === "point" || a.kind === "label" ? "ink" : "muted"));
+    const color = annotationLabelColor(a);
     // The label's centre in grid px, for the colour under it.
     const w = l.box.x1 - l.box.x0;
     const hgt = l.box.y1 - l.box.y0;

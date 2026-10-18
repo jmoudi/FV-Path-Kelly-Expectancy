@@ -78,6 +78,16 @@ export function roleColor(role: ColorRole | undefined): string {
   return role ? THEME.roles[role] : THEME.roles.ink;
 }
 
+/**
+ * An annotation label is drawn in its mark's colour: a reference line's label in the
+ * line's role (break-even red, optimistic green, a policy's mean in the policy's
+ * colour, a guide line in ink-2), a band's label in the band's. Unset, dots and free
+ * labels are ink and lines and bands muted.
+ */
+export function annotationLabelColor(a: { kind: string; color?: ColorRole }): string {
+  return roleColor(a.color ?? (a.kind === "point" || a.kind === "label" ? "ink" : "muted"));
+}
+
 export function emphasisOpacity(e: Emphasis | undefined): number {
   return e === "muted" ? 0.35 : e === "strong" ? 1 : 0.9;
 }

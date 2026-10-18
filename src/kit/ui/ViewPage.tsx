@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { kpiItem, sectionNumber } from "./scenarioProps";
+import { kpiItems, sectionNumber } from "./scenarioProps";
 import { AnswerStrip } from "./AnswerStrip";
 import { TabbedPanel, type PanelTab } from "./TabbedPanel";
 import { ViewFrame } from "./ViewFrame";
@@ -9,9 +9,13 @@ import { allCharts } from "@kit/charts/scenario";
 import { ChartHost } from "./ChartHost";
 import { ParamInput } from "@kit/inputs/ParamInput";
 import { ActionButton, Notes, SourceFigures } from "./Section";
+import { Link, RichText } from "./Link";
+import { InputsCaption } from "./SectionFrame";
+import { useKitCopy } from "@kit/state/context";
 
 /** One responsibility on its own page: the charts large, the context beside them. */
 export function ViewPage({ scenarios, viewId, notFound }: { scenarios: ScenarioView[]; viewId: string; notFound?: ReactNode }) {
+  const copy = useKitCopy();
   const flat = scenarios.flatMap((s) => s.views.map((v) => ({ scenario: s, view: v })));
   const idx = flat.findIndex((x) => x.view.id === viewId);
   if (idx < 0)
@@ -27,7 +31,7 @@ export function ViewPage({ scenarios, viewId, notFound }: { scenarios: ScenarioV
   const prev = flat[(idx - 1 + flat.length) % flat.length];
   const next = flat[(idx + 1) % flat.length];
   const charts = view.charts.map((id) => allCharts(scenario).find((c) => c.id === id)).filter((c): c is NonNullable<typeof c> => !!c);
-  const kpis = (view.kpis ?? []).map((i) => scenario.kpis[i]).filter(Boolean);
+  const kpis = kpiItems(scenario, { indices: view.kpis ?? [], idBase: `view-${view.id}-fig` });
   const params = view.params ?? scenario.localParams;
   const panels: PanelTab[] = [];
   if (scenario.notes.length) panels.push({ id: "notes", label: "Derivations", render: () => <Notes notes={scenario.notes} /> });
@@ -51,12 +55,16 @@ export function ViewPage({ scenarios, viewId, notFound }: { scenarios: ScenarioV
 
   const aside = (
     <>
-      <p className="k-claim static">{scenario.claim}</p>
-      <p className="k-view-blurb">{view.blurb}</p>
-      {kpis.length > 0 && <AnswerStrip items={kpis.map(kpiItem)} shown={kpis.length} layout="column" />}
+      <p className="k-claim static">
+        <RichText text={scenario.claim} />
+      </p>
+      <p className="k-view-blurb">
+        <RichText text={view.blurb} />
+      </p>
+      {kpis.length > 0 && <AnswerStrip items={kpis} shown={kpis.length} layout="column" />}
       {params.length > 0 && (
         <div className="k-inputs column" role="group" aria-label="Inputs for this view">
-          <div className="k-caption">Inputs for this view</div>
+          <InputsCaption text="Inputs for this view" href={copy.links.inputs} />
           <div className="k-inputs-row">
             {params.map((k) => (
               <ParamInput key={k} k={k} compact />
@@ -71,9 +79,9 @@ export function ViewPage({ scenarios, viewId, notFound }: { scenarios: ScenarioV
   return (
     <ViewFrame
       eyebrow={
-        <a href={sectionHref(scenario.id)} className="k-crumb">
-          Section {sectionNumber(scenario)} · {scenario.title}
-        </a>
+        <Link to={sectionHref(scenario.id)} variant="plain" className="k-crumb">
+          Section <span className="k-eyebrow-n">{sectionNumber(scenario)}</span> · {scenario.title}
+        </Link>
       }
       title={view.title}
       prev={{ href: viewHref(prev.view.id), label: prev.view.title, title: `${prev.scenario.title} › ${prev.view.title}` }}

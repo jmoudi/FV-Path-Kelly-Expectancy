@@ -42,8 +42,8 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
     series: ids.map((id) => ({ field: id, color: P[id].color, label: P[id].label, emphasis: id === "coin" ? "normal" : "strong" })),
     height: 330,
     annotations: [
-      { kind: "vline", x: 0.5, text: "median: the middle replay", color: "muted", at: "start" },
-      { kind: "hline", y: coin.mean, text: `mean, ${P.coin.name} and ${P.spread.name} ${x2(coin.mean)}`, color: "muted", at: "start" },
+      { kind: "vline", x: 0.5, text: "median: the middle replay", color: "ink2", at: "start" },
+      { kind: "hline", y: coin.mean, text: `mean, ${P.coin.name} and ${P.spread.name} ${x2(coin.mean)}`, color: "ink2", at: "start" },
       { kind: "hline", y: reserve.mean, text: `mean, ${P.reserve.name} ${x2(reserve.mean)}`, color: "c", at: "end" },
     ],
   };
@@ -72,7 +72,7 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
     y: { field: "coin", label: "Average end of the pool", format: "x", domain: [0, yTop] },
     series: ids.map((id) => ({ field: id, color: P[id].color, label: P[id].label })),
     height: 290,
-    annotations: [{ kind: "hline", y: coin.mean, text: `mean ${x2(coin.mean)}`, color: "muted", at: "end" }],
+    annotations: [{ kind: "hline", y: coin.mean, text: `mean ${x2(coin.mean)}`, color: "ink2", at: "end" }],
   };
 
   // Stems at the exact outcomes of the Spread policy (Spread + reserve in the data for ⚙).
@@ -101,7 +101,7 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
     barWidthPx: 3,
     height: 290,
     annotations: [
-      { kind: "vline", x: spread.mean, text: `mean ${x2(spread.mean)}`, color: "muted" },
+      { kind: "vline", x: spread.mean, text: `mean ${x2(spread.mean)}`, color: "b" },
       { kind: "vline", x: spread.median, text: `median ${x2(spread.median)}`, color: "b", dash: false, at: "start" },
     ],
   };
@@ -153,7 +153,7 @@ export function buildMeanMedian(p: Params, d: Derived, _data: Datasets): Scenari
     notes: [
       {
         title: "Three readings of the same distribution",
-        body: `- Mean: the balance point. Multiply each outcome by its probability and add. It is the number a large pool of independent tranches converges to, and the number that matters if you refill from NAV every season and play for a long time.\n- Median: the middle replay. Half of the replays do better, half worse. For one tranche replayed a few times this is the forecast.\n- Log growth of surviving paths: E[log end | survive]. Geometric growth is roughly the mean minus half the variance, which is why removing variance without touching the mean (diversification) lifts it while leaving the mean alone. It is not the rate the median compounds at; that rate is median_N^(1/N) − 1, listed as median growth per season.`,
+        body: `- Mean: the balance point. Multiply each outcome by its probability and add. It is the number a large pool of independent tranches converges to, and the number that matters if you refill from NAV every season and play for a long time ([section 08](#s-chaining)).\n- Median: the middle replay. Half of the replays do better, half worse. For one tranche replayed a few times this is the forecast.\n- Log growth of surviving paths: E[log end | survive]. Geometric growth is roughly the mean minus half the variance, which is why removing variance without touching the mean (diversification, [section 05](#s-diversification)) lifts it while leaving the mean alone. It is not the rate the median compounds at; that rate is median_N^(1/N) − 1, listed as median growth per season.`,
       },
       {
         title: `Why the ${P.spread.name} median sits below the mean`,

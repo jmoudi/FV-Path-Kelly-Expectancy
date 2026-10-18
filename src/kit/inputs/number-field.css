@@ -25,6 +25,7 @@
   height: 4px;
   min-width: 3px;
   border-radius: 1px;
+  /* The sweep's colour is neutral (no policy, not the accent), so the band stays apart from the accent fill. */
   background: color-mix(in srgb, var(--ink) 30%, transparent);
   pointer-events: none;
 }
@@ -44,10 +45,12 @@
   margin-left: -1px;
   border: 0;
   border-radius: 1px;
-  background: var(--ink);
+  /* The needle is the thumb: the accent's resting tone, the full accent while the field has focus. */
+  background: color-mix(in srgb, var(--accent) 80%, var(--bg));
   box-shadow: none;
 }
-.nf.banded:focus-within .nf-track .nf-thumb {
+.nf.banded:focus-within .nf-track .nf-thumb,
+.nf.banded.active .nf-track .nf-thumb {
   background: var(--accent);
 }
 /* While a sweep drives the field, the moving tick is the needle. */
@@ -68,9 +71,10 @@
 .nf.paused .nf-tick {
   background: var(--ink-2);
 }
+/* While a sweep drives the field, the fill keeps the accent (the value is still the field's); the band and the tick stay neutral. */
 .nf.running .nf-track .nf-fill,
 .nf.paused .nf-track .nf-fill {
-  background: var(--ink-2);
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
 }
 
 /*
