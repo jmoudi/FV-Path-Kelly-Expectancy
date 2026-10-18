@@ -1,5 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+// docs/DIRECTIVES.md → public/directives.md on every build and dev start (read at run time by the Guide).
+import { directivesPlugin } from "./scripts/directives.mjs";
 
 // Two layers: src/kit (generic) and src/app (this explainer). Kept in step with tsconfig "paths".
 const dir = (p: string) => decodeURIComponent(new URL(p, import.meta.url).pathname);
@@ -7,7 +9,7 @@ const dir = (p: string) => decodeURIComponent(new URL(p, import.meta.url).pathna
 // `base: "./"` keeps every asset reference relative, so the built `dist/`
 // can be served from any sub-path (GitHub Pages, a file:// open, an artifact host).
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), directivesPlugin()],
   resolve: {
     alias: {
       "@kit": dir("./src/kit"),

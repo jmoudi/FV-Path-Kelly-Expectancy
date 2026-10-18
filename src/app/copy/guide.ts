@@ -274,4 +274,12 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       { kind: "p", text: "The code is two layers: `src/kit` is generic (charts, the parameter schema and the synthetic input, parameter settings, the replayer, the store, the build worker, the page frames, this page's frame) and `src/app` is this explainer. `src/kit/README.md` lists the kit's areas, where an app plugs in, and a checklist for a second explainer. This page's text is `src/app/copy/guide.ts`, drawn by the kit's `GuideFrame`." },
     ],
   },
+  {
+    id: "directives",
+    title: "Directives",
+    body: [
+      // The document introduces itself; this sentence shows only when it cannot be read.
+      { kind: "markdown", src: "directives.md", idPrefix: "g-directives-", failure: "This section shows the project's directives (the owner's requests, the design they imply, the decisions taken, the open questions). Its source is docs/DIRECTIVES.md in the repository, which the build serves as directives.md next to index.html." },
+    ],
+  },
 ];

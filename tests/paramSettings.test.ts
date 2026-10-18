@@ -197,8 +197,8 @@ describe("the Guide", () => {
     expect(parseHash("#s-wing", cfg)).toEqual({ page: "explain", section: "wing" });
     expect(parseHash("#nowhere/keys", cfg)).toEqual({ page: "desk" });
   });
-  it("covers the ten sections, in order, and draws every block", () => {
-    expect(GUIDE_SECTIONS.map((s) => s.id)).toEqual(["screen", "parameters", "editing", "parameter-settings", "replayer", "charts", "pages", "data", "keys", "builders"]);
+  it("covers the ten sections and the directives, in order, and draws every block", () => {
+    expect(GUIDE_SECTIONS.map((s) => s.id)).toEqual(["screen", "parameters", "editing", "parameter-settings", "replayer", "charts", "pages", "data", "keys", "builders", "directives"]);
     const html = renderToStaticMarkup(createElement(GuideFrame, { title: "Guide", lede: GUIDE_LEDE, sections: GUIDE_SECTIONS }));
     for (const s of GUIDE_SECTIONS) {
       expect(html).toContain(`id="g-${s.id}"`);
