@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
+import { sectionNumber, viewMenu, viewOrder } from "../app/figures";
+import { LinkGroups, MenuButton, MenuItems } from "../kit/ui/Menu";
 import { useStore } from "../state/store";
 import { DeckBar } from "./DeckBar";
+import { DeskPage } from "./DeskPage";
 import { DataDialog, ImportExportDialog, SettingsDialog } from "./Dialogs";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { useRoute } from "./route";
+import { setViewOrder, useRoute, type Route } from "./route";
 import { Section } from "./Section";
-import { SettingsBody } from "./SettingsBody";
+import { FullSettings } from "./SettingsBody";
 import { useBuild } from "./useBuild";
 import { useSweepEngine, useSweepHotkeys } from "./useSweeps";
 import { ViewPage } from "./ViewPage";
+import type { ScenarioView } from "../viewmodel/types";
 
 function useScrollSpy(ids: string[], enabled: boolean): string {
   const [active, setActive] = useState("");
@@ -28,48 +32,110 @@ function useScrollSpy(ids: string[], enabled: boolean): string {
   return active;
 }
 
+type Dialog = "io" | "settings" | "data" | null;
+
+/** The brand mark: the favicon's three bars, for the phone top bar. */
+function BrandMark() {
+  return (
+    <svg className="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+      <rect width="32" height="32" rx="6" fill="var(--surface)" />
+      <path d="M5 24h5v-8H5zM13.5 24h5V12h-5zM22 24h5V6h-5z" fill="var(--b)" />
+    </svg>
+  );
+}
+
+function TopBar({ route, scenarios, onDialog }: { route: Route; scenarios: ScenarioView[]; onDialog: (d: Dialog) => void }) {
+  const currentView = route.page === "view" ? route.id : undefined;
+  const groups = useMemo(() => viewMenu(scenarios, currentView), [scenarios, currentView]);
+  const tools = [
+    { id: "data", label: "Data", hint: "Import a trade log or realized moves", onSelect: () => onDialog("data") },
+    { id: "io", label: "Import / export", hint: "The whole state as JSON", onSelect: () => onDialog("io") },
+    { id: "settings", label: "Quick settings", hint: "Backend, drag, sweep rate, reset", onSelect: () => onDialog("settings") },
+  ];
+  return (
+    <header className="topbar">
+      <a className="brand" href="#desk" aria-label="Tranche Replay, the Desk">
+        <BrandMark />
+        <span className="brand-text">Tranche Replay</span>
+      </a>
+      <nav className="topnav" aria-label="Pages">
+        <a href="#desk" className={`topnav-link${route.page === "desk" ? " on" : ""}`} aria-current={route.page === "desk" ? "page" : undefined}>
+          Desk
+        </a>
+        <a href="#explain" className={`topnav-link${route.page === "explain" ? " on" : ""}`} aria-current={route.page === "explain" ? "page" : undefined}>
+          Explain
+        </a>
+        <MenuButton label="Views ▾" current={route.page === "view"} panelClassName="views-menu" title="Every view, by section">
+          {(close) => (
+            <LinkGroups
+              groups={groups}
+              onPick={close}
+              lead={
+                <div className="k-link-group" role="group" aria-label="Desk">
+                  <div className="k-link-group-title">Landing</div>
+                  <a href="#desk" role="menuitem" className={route.page === "desk" ? "on" : undefined} onClick={close}>
+                    Desk
+                  </a>
+                </div>
+              }
+            />
+          )}
+        </MenuButton>
+        <a href="#settings" className={`topnav-link${route.page === "settings" ? " on" : ""}`} aria-current={route.page === "settings" ? "page" : undefined}>
+          Settings
+        </a>
+      </nav>
+      <div className="topbar-tools">
+        <button type="button" className="btn small quiet" onClick={() => onDialog("data")} title="Import a trade log or realized moves">
+          Data
+        </button>
+        <button type="button" className="btn small quiet" onClick={() => onDialog("io")} title="The whole state as one JSON file">
+          Import / export
+        </button>
+        <button type="button" className="btn small quiet" onClick={() => onDialog("settings")} title="Quick settings" aria-label="Quick settings">
+          ⚙
+        </button>
+      </div>
+      <div className="topbar-more">
+        <MenuButton label="⋯" ariaLabel="More tools" align="end" className="btn small quiet" panelClassName="more-menu">
+          {(close) => <MenuItems items={tools} onPick={close} />}
+        </MenuButton>
+      </div>
+    </header>
+  );
+}
+
 export function App() {
   const params = useStore((s) => s.params);
   const datasets = useStore((s) => s.datasets);
   const resetEverything = useStore((s) => s.resetEverything);
   const { result, pending, error } = useBuild(params, datasets);
-  const [dialog, setDialog] = useState<"io" | "settings" | "data" | null>(null);
+  const [dialog, setDialog] = useState<Dialog>(null);
   const route = useRoute();
-  const ids = useMemo(() => result?.scenarios.map((s) => s.id) ?? [], [result]);
-  const active = useScrollSpy(ids, route.page === "tour");
+  const scenarios = useMemo(() => result?.scenarios ?? [], [result]);
+  const ids = useMemo(() => scenarios.map((s) => s.id), [scenarios]);
+  const active = useScrollSpy(ids, route.page === "explain");
   useSweepEngine();
   useSweepHotkeys();
 
+  // The reading order of the views, for whichever key handler steps through them.
+  useEffect(() => setViewOrder(viewOrder(scenarios)), [scenarios]);
+
   // Scroll to a section when the hash names one (after the sections exist).
+  const hasResult = !!result;
+  const section = route.page === "explain" ? route.section : undefined;
   useEffect(() => {
-    if (route.page !== "tour" || !route.section || !result) return;
-    document.getElementById(`s-${route.section}`)?.scrollIntoView({ block: "start" });
-  }, [route, result]);
+    if (!section || !hasResult) return;
+    document.getElementById(`s-${section}`)?.scrollIntoView({ block: "start" });
+  }, [section, hasResult]);
   useEffect(() => {
-    if (route.page !== "tour") window.scrollTo(0, 0);
+    if (route.page !== "explain" || !route.section) window.scrollTo(0, 0);
   }, [route]);
-
-  const scenarios = result?.scenarios ?? [];
-
-  // Alt+← / Alt+→ walk the views; from the tour they open the first or last one.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
-      const flat = scenarios.flatMap((s) => s.views.map((v) => v.id));
-      if (!flat.length) return;
-      e.preventDefault();
-      const dir = e.key === "ArrowRight" ? 1 : -1;
-      const i = route.page === "view" ? flat.indexOf(route.id) : dir === 1 ? -1 : 0;
-      location.hash = `#view/${flat[(i + dir + flat.length) % flat.length]}`;
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [scenarios, route]);
 
   return (
     <ErrorBoundary
       fallback={(err, retry) => (
-        <div className="shell" style={{ display: "block" }}>
+        <div className="page">
           <div className="dialog" style={{ margin: "40px auto" }}>
             <h3>Something broke</h3>
             <p>{err.message}</p>
@@ -92,71 +158,31 @@ export function App() {
         </div>
       )}
     >
-      <header className="topbar">
-        <a className="brand" href="#tour">
-          Tranche Replay
-        </a>
-        <nav className="topnav" aria-label="Pages">
-          <a href="#tour" className={route.page === "tour" ? "on" : undefined}>
-            Tour
-          </a>
-          <details className="menu">
-            <summary className={route.page === "view" ? "on" : undefined}>Views ▾</summary>
-            <div className="menu-panel">
-              {scenarios.map((s) => (
-                <div key={s.id} className="menu-group">
-                  <div className="menu-title">{s.title}</div>
-                  {s.views.map((v) => (
-                    <a key={v.id} href={`#view/${v.id}`} className={route.page === "view" && route.id === v.id ? "on" : undefined} onClick={(e) => (e.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open")}>
-                      {v.title}
-                    </a>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </details>
-          <a href="#settings" className={route.page === "settings" ? "on" : undefined}>
-            Settings
-          </a>
-        </nav>
-        <div className="topbar-tools">
-          <button type="button" className="btn small quiet" onClick={() => setDialog("data")} title="Import a trade log or realized moves">
-            Data
-          </button>
-          <button type="button" className="btn small quiet" onClick={() => setDialog("io")}>
-            Import / export
-          </button>
-          <button type="button" className="btn small quiet" onClick={() => setDialog("settings")} title="Quick settings">
-            ⚙
-          </button>
-        </div>
-      </header>
+      <TopBar route={route} scenarios={scenarios} onDialog={setDialog} />
       <DeckBar deck={result?.deck ?? null} pending={pending} />
 
+      {error && <div className="page status-line err">The model could not run: {error}</div>}
       {route.page === "settings" ? (
         <div className="page">
-          <h2 className="page-title">Settings</h2>
-          <SettingsBody full />
+          <h1 className="page-title">Settings</h1>
+          <FullSettings />
         </div>
       ) : route.page === "view" ? (
-        <div className="page">{result ? <ViewPage scenarios={scenarios} viewId={route.id} /> : <div className="caption">Computing…</div>}</div>
+        <div className="page">{result ? <ViewPage scenarios={scenarios} viewId={route.id} /> : <p className="status-line">Computing…</p>}</div>
+      ) : route.page === "desk" ? (
+        <div className="page">{result ? <DeskPage desk={result.desk} scenarios={scenarios} pending={pending} /> : <p className="status-line">Computing the desk…</p>}</div>
       ) : (
         <div className="shell">
           <nav className="rail" aria-label="Sections">
-            <div className="rail-title">Tour</div>
+            <div className="rail-title">Explain</div>
             {scenarios.map((s) => (
               <a key={s.id} href={`#s-${s.id}`} className={active === s.id ? "on" : undefined}>
-                <span className="n">{String(s.number).padStart(2, "0")}</span>
+                <span className="n">{sectionNumber(s)}</span>
                 <span>{s.title}</span>
               </a>
             ))}
           </nav>
-          <main className="main">
-            {error && <div className="caption" style={{ color: "var(--loss)" }}>The model could not run: {error}</div>}
-            <div style={{ opacity: pending ? 0.72 : 1, transition: "opacity 0.15s", display: "grid", gap: 56, gridTemplateColumns: "minmax(0,1fr)" }}>
-              {result ? scenarios.map((s) => <Section key={s.id} view={s} />) : !error && <div className="caption">Computing every section…</div>}
-            </div>
-          </main>
+          <main className={`main${pending ? " pending" : ""}`}>{result ? scenarios.map((s) => <Section key={s.id} view={s} />) : !error && <p className="status-line">Computing every section…</p>}</main>
         </div>
       )}
       {dialog === "io" && <ImportExportDialog onClose={() => setDialog(null)} />}

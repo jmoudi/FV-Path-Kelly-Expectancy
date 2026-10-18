@@ -35,90 +35,81 @@ be swapped without touching the others.
 | Layer | Where | What it knows |
 |---|---|---|
 | Model | `src/model/` | Pure math. Season distributions (exact multinomial enumeration, a binned log-space engine, seeded Monte Carlo), the binary reduction, calibration and record statistics, wing rates (Normal, Student-t or an imported sample) with `ratioForLossRate`, correlation, Kelly sizing and the robust optimum averaged over a band of loss rates, the two growth figures (`growth.ts`). The discussion's remaining concepts each have a file: `nav.ts` (NAV log growth and the Kelly share of NAV when the tranche is refilled each season), `railroad.ts` (stations, tracks and track widths of the schematic), `calendar.ts` (names per night from a histogram, Kelly per name with the capital ceiling, the sampled and expected season), `wingSeason.ts` (the season-end distribution the wing's partial payout produces, and the share of bad seasons that are partial), `symmetric.ts` (the 60% symmetric-payoff system's season). `policies.ts` is the single source of the three policies' names and colours. No DOM, no chart library. |
-| Parameters | `src/model/params.ts` | One typed object plus a schema with tiers: primary (control deck), secondary (tuned under a section), advanced (settings dialog). Where each deck input sits is one table (`DECK_PLACEMENT`): its group (the drawer section), whether it is in the reduced deck's first row, and whether a phone keeps it. Seeds, caps and path counts take plain boxes (no slider). Includes the market switch (`market`: fair, discussion, custom) with `marketOf` / `marketPatch`. The wing's default realized ÷ priced sigma is solved at load so the wing's effective loss rate equals the deck's q. Imported datasets sit beside it. |
+| Parameters | `src/model/params.ts` | One typed object plus a schema with tiers: primary (control deck), secondary (tuned under a section), advanced (settings dialog). Includes the market switch (`market`: fair, discussion, custom) with `marketOf` / `marketPatch`. The wing's default realized ÷ priced sigma is solved at load so the wing's effective loss rate equals the deck's q. Imported datasets sit beside it. |
 | View-model | `src/viewmodel/` | Turns model output into renderer-agnostic chart specs (`src/charts/spec.ts`): data table, mark, axes, series, annotations, stories. One file per section, plus `desk.ts` (the Desk's policy grid, sizing line, calibration verdict and market state) and `derived.ts` (shared derived state, the deck's figures, and the one number formatter: U+2212 minus everywhere, milliseconds under a second). Runs in a Web Worker (`worker.ts`) so sliders never block the page. |
 | Axis resolution | `src/charts/resolve.ts` | Computes concrete domains, tick positions and tick labels once, so every backend draws the same ranges and puts reference lines in the same place. |
 | Switchboard | `src/charts/registry.ts`, `src/charts/backends/` | Routes a spec to ECharts, Plotly, Vega-Lite, or an HTML table. Each backend is loaded on first use. |
 | Figures | `src/charts/figures/` | Charts of kind `figure` (the railroad schematic, the season calendar) are drawn by a React SVG component from the registry in `index.ts`, sized to the width the host gives them, in the theme's colours. They are not backend-switchable: ⊞ shows their data table and ⚙ offers only the height. |
 | Authoring | `src/ui/Authoring.tsx`, stories in each spec | A story is a trader's question ("Half my nights have one name", "The chain is right: q = break-even") with a one-line answer; when it moves the deck it carries a badge ("moves deck: q 2.94% → 2.52%"). Display choices (axis scales, backends, zooms) are not stories; they live in ⚙, which edits the spec by hand (backend, mark, axis scale and domain in the axis's own units, x field, series visibility, mark and emphasis, extra columns, legend, height) and stores only the diff, keyed by chart id. |
-| State | `src/state/store.ts` | Parameters, imported data, chart edits, default backend, and the snapshot of parameters a story moved. Only one deck-moving story is active at a time: applying one turns the other off and restores its parameters. Sweep runs are saved as input, preset and pre-sweep value only (ticks are never saved), so a reload mid-sweep puts the input back. Validated on load, persisted locally, exported and imported as one JSON file (version 4). `#reset` in the address clears it. |
-| Sweeps | `src/sweeps/` (presets, plans, sanitizer), `src/kit/sweeps/runner.ts` (the frame-locked clock), `src/app/params/sweepAnchors.ts` (anchor values, unit formatting) | Generic: a preset resolves for any input into a plan of values and holds. Anchors are data on the schema (`anchors` per parameter); the app computes their values (optimistic, deck, break-even for q; robust, Kelly, deck for the risk a night). |
-| Build | `src/kit/build/coalesce.ts`, `src/ui/useBuild.ts` | One request in flight, only the newest waiting; every answer newer than the last one shown is rendered, and each rendered answer is signalled (`buildSettled`) for the sweep clock. During a sweep `buildAll(…, { only })` builds the deck figures, the Desk and the scenarios on screen; a full build follows when it stops. |
-| Inputs | `src/kit/inputs/` | The synthetic number field (`SyntheticNumber`), its display rules, the wheel gate and its CSS; `src/ui/NumberField.tsx` wires it to the store. |
-| UI | `src/ui/` | Control deck, section layout, chart host, tables, dialogs. One dark theme, graphite, with three policy hues and two status colours. |
-| Kit frames | `src/kit/ui/deck/` | The deck bar and drawer as a generic frame: input groups, status figures, legend and drawer sections come in through props, so it knows nothing about tranches (see its README). |
-| App providers | `src/app/deck/` | Turn the parameter schema and the view-model's `DeckView` into the deck frame's props (`layout.ts`, `status.ts` are pure and tested); the clean-season linked figure and the market switch. `src/ui/DeckBar.tsx` composes the two. |
+| State | `src/state/store.ts` | Parameters, imported data, chart edits, default backend, and the snapshot of parameters a story moved. Only one deck-moving story is active at a time: applying one turns the other off and restores its parameters. Validated on load, persisted locally, exported and imported as one JSON file (version 4). `#reset` in the address clears it. |
+| Kit frames | `src/kit/ui/`, `src/kit/charts/` | Generic layout pieces that know nothing about tranches and take what they show through props: the section skeleton (`SectionFrame`), the answer strip, the footer line and its tabbed panel, the view page (`ViewFrame`), the comparison grid (`DeskGrid`), portal menus, settings groups and the hotkey legend, and the chart frame (`ChartFrame`: borderless, fixed plot box). Their CSS is `src/kit/ui/kit.css`; it reads only the theme's tokens. See `src/kit/ui/README.md`. |
+| App adapters | `src/app/` | Turn this app's view-model into the kit's props: KPIs into figures, sections into chips and the Views menu, the DeskView into the grid (`src/app/desk/grid.ts`), a story's snapshot into its "moves deck" badge. |
+| UI | `src/ui/` | The pages (Desk, Explain, view, Settings), the chart host, tables, dialogs, the deck. One dark theme, graphite (`theme.css`: colour tokens and a token-only type scale), with three policy hues and two status colours. |
 
 ## Using the app
 
-- **Deck.** Anchored under the top bar on every page except Settings, two rows when
-  reduced. Row 1: eight fields in three groups set apart by 40px and a hairline (Per
-  event: loss rate q, gain b, optimistic loss rate · Per season: nights n, names a
-  night k, shared-cause nights c · Sizing: at risk a night, seasons chained N), and
-  under the loss rate "= 55% clean season (Coin)": click it to type a clean-season
-  probability and q is solved from it. Row 2: your policy (Spread + reserve) with EV
-  per season, the median after N seasons, P(below the threshold) and ruin in its
-  colour; the Coin's clean season and ruin, muted; the policy legend; the sweep strip
-  of the active input in a slot that is always there; Full deck ▾. Below 1280px the
-  groups wrap whole. On a phone row 1 keeps loss rate, gain, names a night and at risk
-  a night, and "All inputs" opens the full deck as a bottom sheet.
-- **Full deck** is a 460px drawer on the right, from under the top bar to the bottom
-  of the window; it scrolls on its own and the charts stay live beside it. Sections:
-  Event, Season, Sizing, Shared risk, Calibration band (every input with its full
-  name, symbol and help), Market (Fair market · Discussion case · Custom), Figures
-  (every policy named), Definitions. Collapse ▴ or Escape closes it. Sweep presets
-  are edited in Settings.
-- **Tour** is the guided single page: each section has a functional title, a one-line
-  lede, the claim it defends in a boxed aside, an inputs bar, two headline figures, the
-  primary chart, secondary charts, and expanders for tables, notes and the
-  quoted-versus-recomputed figures.
-- **Views** are the same charts split into 19 responsibilities (season outcomes,
-  sizing grid, confidence band, candidate rates, a season by the calendar, refilling
-  from NAV, …), each on its own page with the context beside it. Open them from the Views menu, the chips next to a section title,
-  the ↗ on any chart, or Alt+← / Alt+→.
-- **Inputs** are synthetic number fields: type, use the arrow keys, the wheel
-  (Shift ×10, Alt ×0.1), or drag the track beside the box. A click on the track
-  focuses the field and leaves the value alone; double-click returns to the default.
-  Dragging is relative, in the input's units per 100 px (`input.perHundredPx` in the
-  schema: q and b 0.25 pp, nights 5, names 1, risk a night 10 pp, seasons 1; Shift
-  ×0.1), times the drag speed in Settings. The wheel acts only on a focused field, or
-  after the pointer has rested on it for 400 ms with no page scroll in progress, so
-  scrolling past a field never changes it. Focusing a field makes it the active input.
-- **Sweeps** drive an input automatically from a saved preset, in the input's own
-  units: loop, ping-pong, or spots with hold times; over two named anchors (q:
-  optimistic, deck, break-even; risk a night: robust, Kelly, deck; every input: min,
-  current, max, default), ± around the current value, absolute values or a share of
-  the range; with a step in the input's units ("0.05 pp", "1 name") or a share of the
-  range. The defaults are "Optimistic to break-even" (q, loop, 0.05 pp every 400 ms),
-  "Around the current value" (± 20% of the range, ping-pong) and "Three spots"
-  (optimistic, deck, break-even for q; min, current, max elsewhere; 2 s each). A
-  named anchor an input lacks falls back to min, current or max. Runs are locked to
-  the page's frames: the next value is committed only after the build for the last
-  one has rendered, and each value stays on screen at least its interval. A run
-  starts from the current value; stop keeps the value; "↺ before sweep" or Ctrl+Z
-  puts back the value from before. The track shows the preset's range as a band and
-  the run's position as a moving tick; the deck strip reads "sweeping Loss rate per
-  name 2.97% · step 10 / 18 · Ctrl+. stop". On the active input: Ctrl+Enter runs or
-  pauses, Ctrl+. stops, Ctrl+[ and Ctrl+] switch presets, Ctrl+Shift+Enter pauses
-  everything. Settings has the sweep rate (× every preset's speed). Inputs that make
-  no sense to sweep (seed, engine caps) are marked.
+- **Deck.** Anchored under the top bar on every page, two rows when reduced: the
+  inputs in three groups set apart by distance (per event, per season, sizing), each
+  with its name and symbol; then the six figures as one status line, the sweep strip
+  for the active input, and the toggle. The full deck (Full deck ▾) is two columns:
+  inputs as titled sections with help and the sweep presets on the left, the figures
+  as a table and the definitions on the right.
+- **Desk** (`#desk`, the landing page) answers "given my book, what happens?": the
+  three policies side by side for one season and for N seasons (mean, median, 10th
+  percentile, P(below threshold), ruin; each row links to the view that explains it),
+  the sizing heatmap with your cell outlined beside the robust risk, the one-line
+  calibration verdict, and the market switch.
+- **Explain** (`#explain`; `#tour` and `#s-<section>` still work) is the guided single
+  page. Each section, without boxes: an eyebrow with its number and its views, the
+  title, the question it answers with the claim as a narrow aside beside it, two or
+  three numbers inline, the section's own inputs as an open row above the chart they
+  drive, the primary chart, the secondary charts in two columns, and one footer line
+  ("Table · Derivations · Quoted vs recomputed (5)") that opens a fixed-height tabbed
+  panel in place.
+- **Views** are the same charts split into 19 responsibilities, each titled with the
+  trader's question it answers ("How long until my record proves q", "How much to risk
+  a night", …), on its own page with the context beside it. Open them from the Views
+  menu, the links next to a section's number, or the ↗ on any chart; `[` and `]` step
+  through them outside a text field.
+- **Inputs** are synthetic number fields: type, use the wheel (Shift ×10, Alt ×0.1),
+  arrow keys, or drag the slider underneath. Dragging is relative and its feel is a
+  per-parameter distance in pixels (`input.sensitivityPx` in the schema), scaled by a
+  global sensitivity in Settings. Double-click a slider for the default. Focusing a
+  field makes it the active input.
+- **Sweeps** drive an input automatically from a saved preset: loop, ping-pong, or a
+  list of spots with hold times; over the whole range, a fraction of it, or absolute
+  values; with any step and interval, gliding or stepping. Presets are generic and
+  linked per input; links are saved with the state. On the active input: Ctrl+Enter
+  runs or pauses, Ctrl+. stops, Ctrl+[ and Ctrl+] switch presets, Ctrl+Shift+Enter
+  pauses everything. Inputs that make no sense to sweep (seed, engine caps) are marked.
 - **Undo.** Ctrl+Z / Ctrl+Shift+Z step through parameter changes, including the state
-  before a sweep started; inside an editable text field they are the field's own undo.
-- **Story chips** under a chart title ask a trader's question in one click ("What if
-  q is really 3.2%?", "I widen the wing to 1σ") and answer it in one line. Clicking an
-  active chip undoes it, including the deck parameters it moved.
+  before a sweep started.
+- **Stories** under a chart title ask a trader's question in one click ("What if
+  q is really 3.2%?", "I widen the wing to 1σ") and answer it in one line; when one
+  moves the deck the line says so ("moves deck: q 2.94% → 2.52% · undo"). Clicking an
+  active story, or undo, turns it off and puts back the deck parameters it moved.
 - **Market.** "Fair market" sets q = b/(1+b) (zero premium; the growth-optimal risk is
   then 0 and sizing only changes the median, P(below threshold) and ruin). "Discussion
   case" sets q so that a clean coin season has probability 55%. Typing q makes it
   custom.
-- **⚙ on any chart** opens the chart definition as a popover that leaves the layout
-  alone and closes when the pointer moves away; **⊞** shows the numbers behind it.
+- **Charts** are borderless; their tools (↗ ⊞ ⚙) show on hover or keyboard focus.
+  The plot box has the spec's height whatever it shows: **⊞** puts the numbers in the
+  same box (sticky header, scrolling inside), and errors render there too. **⚙** opens
+  the chart definition (display first: linear or log axes, mark, legend, reference
+  lines; then ranges, series, backend, height) as a popover beside the chart on the
+  side with more room, or above or below the plot when neither side has room, never
+  over the plot; at 900px and below it is a bottom sheet. It leaves the layout alone
+  and closes when the pointer moves away. The backend shows as a tag only when it is
+  not the default or the chart is edited.
 - **Data** imports a trade log (0/1 losses or P&L per unit of max loss) and realized
   moves in priced sigmas. The record feeds calibration and the robust sizing curve;
   the moves can replace the Normal in the effective-loss-rate section.
-- **Settings** exist as a quick dialog (⚙ in the top bar) and as a full page: default
-  backend, sweep presets, engine, resets. **Import / export** moves the whole state as
-  JSON.
+- **Settings.** The quick dialog (⚙ in the top bar) holds exactly the default
+  backend, drag sensitivity, sweep rate and the resets. The full page (`#settings`)
+  adds the sweep presets, the engine (engine, enumeration cap, Monte Carlo paths, seed,
+  fan paths, as plain number boxes), your data, import and export, and the hotkey
+  legend. **Import / export** moves the whole state as JSON. At 700px and below the
+  top bar's Data, Import / export and ⚙ fold into one "⋯" menu.
 
 ## Conventions worth knowing
 
