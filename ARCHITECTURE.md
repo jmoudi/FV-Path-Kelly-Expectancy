@@ -13,9 +13,9 @@ typed **event bus** and nowhere else.
 |---|---|---|---|
 | kit | `src/kit/` | charts, inputs and the parameter schema's types, sweeps, the store factory, the build worker, the event bus, the page frames. Its own README lists the areas | nothing from `src/app` |
 | model | `src/app/model/` | contracts and pure functions: `Params`, `Market` and the market functions (`params.ts`), `Datasets`, `PolicyId` and the night each policy plays (`policies.ts`), the season, Kelly, calibration, wing, NAV, calendar and railroad maths. No values a person would tune | model, `@kit/math` |
-| data | `src/app/data/` | instances: `DEFAULT_PARAMS` and `DISCUSSION_P_CLEAN` (`params.ts`), the schema (`schema.ts`: `PARAM_DEFS`, `GROUP_LABELS`, `SCHEMA`), the datasets' empty value and sanitizer, the sweep presets, the policies' names, colours and labels (`policies.ts`), the discussion's setup and the quoted-vs-recomputed row (`discussion.ts`), and the copy (`copy/`: `guide.ts`, `kitCopy.ts`, `market.ts`, `notices.ts`, `paramText.ts`) | model, data, the kit's worker-safe modules |
+| data | `src/app/data/` | instances: `DEFAULT_PARAMS` and `DISCUSSION_P_CLEAN` (`params.ts`), the schema (`schema.ts`: `PARAM_DEFS`, `GROUP_LABELS`, `SCHEMA`), the datasets' empty value and sanitizer, the sweep presets, the policies' names, colours and labels (`policies.ts`), the discussion's setup and the quoted-vs-recomputed row (`discussion.ts`), the relations among the parameters while some are locked (`constraints.ts`: `CONSTRAINTS`, the linked key `pClean`), and the copy (`copy/`: `guide.ts`, `guideLocks.ts`, `kitCopy.ts`, `locks.ts`, `market.ts`, `notices.ts`, `paramText.ts`) | model, data, the kit's worker-safe modules |
 | scenarios | `src/app/scenarios/` | view-models: one builder per section returning a `ScenarioView`, the shared derived state (`derived.ts`), the deck's and the Desk's figures (`deck.ts`, `desk.ts`), the app's own controls (`controls.ts`: the clean-season link, the market switch, the dataset captions), and `buildAll` (`index.ts`). Built in the worker | model, data, scenarios, the kit's worker-safe modules |
-| view | `src/app/view/` | everything that renders: `App.tsx` (the shell and the pages), the deck and Desk adapters and components (`deck/`, `desk/`), the SVG figures (`figures/`), `DataDialog.tsx`, the notices policy (`announce.ts`) and the typed bus hooks (`bus.ts`) | everything above; from model, types only |
+| view | `src/app/view/` | everything that renders: `App.tsx` (the shell and the pages), the deck and Desk adapters and components (`deck/`, `desk/`), the SVG figures (`figures/`), `DataDialog.tsx`, the notices policy (`announce.ts`, with `announceLocks.ts` for the locks) and the typed bus hooks (`bus.ts`) | everything above; from model, types only |
 | wiring | `src/app/*.ts` | `store.ts` (the one store), `build.ts` and `worker.ts` (the build, inline and off-thread; the worker URL stays the relative literal `new URL("./worker.ts", import.meta.url)`), `sweeps.ts` and `sweepAnchors.ts` (the sweep adapter), `events.ts` (`AppEvents`) | any app layer |
 | root | `src/main.tsx` | the composition root: stylesheets, `applyThemeVars`, `registerFigures`, `createBus`, `<KitProvider store schema sweeps copy bus>` | anything |
 
@@ -72,11 +72,11 @@ subscription order, each in its own try/catch.
 | Event | Payload | Emitted by |
 |---|---|---|
 | `param:changed` | `key, from, to, source` (`hand`, `sweep`, `story`, `action`, `import`, `link`, `switch`, `undo`, `redo`, `reset`) | the store, once per parameter that moved, from `setParam`, `setParams`, `undo`, `redo`, `resetParams`, `applyStory`, `clearOverride(s)`, `restoreSweep`, `importState`, `resetEverything` |
-| `param:locked` | `key, locked` | reserved for the lock actions |
-| `param:refused` | `key, reason, source, attempted?` | reserved for refused changes (locks, constraints) |
+| `param:locked` | `key, locked` | the store: `lockParam`, `unlockAll`, `importState` (each lock the file adds), `resetEverything` (each lock it clears) |
+| `param:refused` | `key, reason, source, attempted?, by?, detail?` (`reason` is `locked` or the relation's id; `by` the locked key that blocks it) | the store, for each change the locks or the relations refuse, after what holds is applied: `setParam` (also a call that would not move a locked key: someone tried), `setParams`, a sweep tick, `startSweep` and `toggleSweep`, `applyStory`, `clearOverride(s)`, `restoreSweep`, `undo`, `redo`, `resetParams`, `importState` |
 | `sweep:started` | `key, presetId, resumed` | the store: `startSweep`, `toggleSweep` (resume), `pauseAll` |
 | `sweep:paused` | `key` | the store: `pauseSweep`, `pauseAll` |
-| `sweep:stopped` | `key, reason` (`stop`, `restore`, `edit`, `undo`, `preset`, `import`, `reset`, `lock`) | the store, whenever a run ends |
+| `sweep:stopped` | `key, reason` (`stop`, `restore`, `edit`, `undo`, `preset`, `import`, `reset`, `lock`) | the store, whenever a run ends; `lock` when its parameter is locked, or a lock refuses its next value |
 | `sweep:stepped` | `key, index, value` | the replayer (`useSweepEngine`), per committed value |
 | `story:applied` | `chartId, storyId, label?, before, after` | the store: `applyStory` |
 | `story:cleared` | `chartId, storyId, before, after` | the store: a story clicked off, replaced, reset or displaced |
@@ -88,7 +88,7 @@ subscription order, each in its own try/catch.
 | `build:settled` | `at, ok, partial, error?` | `useBuild`, after an answer rendered |
 | `route:changed` | `from, to` | `useRoute` (the shell calls it once), when the address names another route: a page, a view, or another part of a page (`#s-<id>`, `#guide/<part>`), whether typed, from history or from a `Link`. Never for an in-page anchor (`#el-<id>`): the route stays, nothing is announced |
 | `route:jumped` | `to, elementId` | `Link` (`followLink`), when a click scrolled the open page to one of its elements without a page switch: an `#el-<id>` anchor (the address stays; this is the only event) or another part of the open page (the address moves first, so `route:changed` comes before it). A page that opens on a part (`useRevealTarget`) is announced by `route:changed` alone |
-| `notice` | `kind` (`info`, `warn`, `error`), `text, ttlMs?, id?` | anyone; `src/app/view/announce.ts` for imports and stories |
+| `notice` | `kind` (`info`, `warn`, `error`), `text, ttlMs?, id?` | anyone; `src/app/view/announce.ts` for imports and stories, `announceLocks.ts` for the locks |
 | `market:switched` (app) | `from, to` | the market switch |
 
 **Notices.** `<Notices />` (`src/kit/ui/Notices.tsx`, mounted once by `App`) shows
@@ -98,12 +98,63 @@ the only motion is opacity. Which events become notices, and in what words, is t
 app's: `useAnnouncements()` (`src/app/view/announce.ts`) with the lines in
 `src/app/data/copy/notices.ts`.
 
-**For the locks.** The lock actions set `locks` in the store and emit `param:locked`;
-a refused change emits `param:refused` (with `source`, so the line can say what was
-refused) and a `notice` with `id: "lock-<key>"` (a wheel or a sweep hitting a locked
-field then shows one notice, not thirty); a field shakes on
-`useBusEvent("param:refused", …)` for its own key; a run whose parameter becomes
-locked ends with `sweep:stopped` and reason `lock`.
+## Locks and constraints
+
+The owner: "add 'lock' mechanisms to the parameters … sometimes this limits the allowed
+movements of the other parameters". A **lock** is state, and every change of the
+parameters goes through one step that reads it.
+
+- **State.** `locks: Record<key, true>` in the store: persisted under the storage key,
+  exported (version 6), sanitized on load and import (known keys only, each `true`).
+  A key is a parameter of the schema, or a **linked key** the app names: a figure
+  computed from parameters that a person can hold fixed (here `pClean`, the Coin's
+  clean-season probability p = (1 − q)^n). `lockParam(key, on)` and `unlockAll()` set
+  it and emit `param:locked`.
+- **The one step.** Every path that changes the parameters (`setParam`, `setParams`, a
+  sweep tick, `applyStory`, `clearOverride(s)`, `restoreSweep`, `undo`, `redo`,
+  `resetParams`, `importState`) calls
+  `applyConstraints(prev, patch, locks, source, { set: CONSTRAINTS, byKey, atomic, via })`
+  (`src/kit/state/constraints.ts`) and applies only what it returns: `{ patch, refusals,
+  adjusted }`. Then `param:changed` per key that moved and `param:refused` per refusal.
+  `setParams` returns `{ refused }`, so a widget knows its change did not hold.
+- **The solver** (kit, pure, worker-safe). A locked key drops out of the patch (refused,
+  reason `locked`); a patch solved from a locked linked key (`via`) is refused whole.
+  Then the relations run in table order, each one whose keys moved: it may `set` other
+  keys, `refuse` requested ones (the solve restarts without them) or report a
+  `conflict`. A key one relation set is pinned for the others, and a locked key for all;
+  passes repeat until nothing moves, and a change that has not settled after
+  `maxPasses` (8) is refused (the cycle guard). `atomic` (a switch, a story, the linked
+  field, a section's action, each value of a sweep) makes it all or nothing, also when a
+  relation would put a requested key elsewhere than asked.
+- **The table** (app, data: `src/app/data/constraints.ts`). `CONSTRAINTS = { relations,
+  linked }`; a relation is `{ id, label, keys, describe, solve(ctx) }` and applies only
+  while a lock makes it a rule: (1) **clean season**, p = (1 − q)^n: with p locked, a
+  change of n re-solves q, and a change of q moves n by whole nights; with q locked
+  too, n cannot move; typing p while q is locked is refused; (2) **market**: Fair
+  means q = b/(1+b), the Discussion case p = 55% at n; with q locked either choice is
+  refused; with the market locked on Fair a change of b re-solves q and a change of q
+  by hand is refused; (3) **calendar shares**: with one share locked the six still sum
+  to 1, the edited share takes at most what the locked ones leave and the other
+  unlocked shares are rescaled. The Guide's Locks table prints `label` and `describe`.
+- **The sweep rule** (the store). `startSweep` never calls the planner for a locked key
+  (`param:refused`, source `sweep`), nor starts a run whose first value the locks
+  refuse; `lockParam` stops every run on the key, or whose next value the new locks
+  refuse; a tick whose value is refused stops its own run and leaves the others moving.
+  Each ends with `sweep:stopped` and reason `lock`.
+- **Queries.** `checkChange(patch)` and `storyRefusals(chartId, story)` say what a change
+  would come to without making it or emitting anything (the story chips' "blocked:").
+- **The view.** `src/kit/inputs/locks.tsx`: `LockToggle` (the padlock on a field, on
+  hover or focus, staying in the accent while locked; `onlyWhenLocked` in the reduced
+  deck, `withText` in the ⚙ popover and the Settings table), `LocksChip` (row 2's
+  "Locks (n)", given to the deck as `chips`), `useRefusalShake`, `useStoryBlocks`.
+  `SyntheticNumber` takes `locked` (read-only box, hatched track; a keystroke, a notch,
+  an arrow, a drag or a double-click still asks once, so the refusal is loud) and
+  `refusals` (each puts the kept value back and shakes the field once: `shake.ts`, a
+  200 ms translate, at most once in 600 ms). The strip shows `locked` with Unlock.
+  `src/app/view/announceLocks.ts` turns `param:locked`, `param:refused` and
+  `sweep:stopped` (`lock`) into notices, worded in `src/app/data/copy/locks.ts` ("Loss
+  rate per name is locked. Unlock it in the deck to change it."), with `id:
+  "lock-<key>"`, so a wheel or a sweep that hits a lock shows one notice, not thirty.
 
 ## How to add …
 
@@ -115,7 +166,7 @@ locked ends with `sweep:stopped` and reason `lock`.
 5. Scenarios: read it in the builder that needs it; list it in that scenario's `localParams` (or a view's `params`) when it is a section input.
 6. If `derive` (`src/app/scenarios/derived.ts`) depends on it, add it to `keyOf`, the memo key.
 7. A computed sweep anchor: a case in `anchorValue` (`src/app/sweepAnchors.ts`).
-8. Nothing in the view: `ParamInput` draws it from the schema; settings, sweeps, undo, persistence and export come with it.
+8. Nothing in the view: `ParamInput` draws it from the schema; settings, its padlock, sweeps, undo, persistence and export come with it.
 9. An old saved state without it gets the default from the schema's sanitizer; bump the store's `version` only when the export format changes.
 10. Test the maths in `tests/model.test.ts`; run `npm run boundaries`.
 
@@ -154,6 +205,18 @@ locked ends with `sweep:stopped` and reason `lock`.
 8. Anything else that needs to know listens to `route:changed`; nothing adds a hashchange listener.
 9. Document it in the Guide's Pages section (`src/app/data/copy/guide.ts`).
 10. Check it at 1380×900 and 400×800.
+
+**A constraint** (a relation a lock turns into a rule)
+1. Name the keys it ties: parameters, or a linked key for a figure computed from them (`CONSTRAINTS.linked`: label, symbol, `text` for the Locks list).
+2. The maths it needs lives in `src/app/model`; the relation in `src/app/data/constraints.ts`: `{ id, label, keys, describe, solve(ctx) }`.
+3. In `solve`, return `null` unless a lock makes it a rule (`ctx.locked(k)`): without locks every change is taken as asked.
+4. `{ set, by, note? }` moves other keys with the change; `{ refuse, by, detail }` drops requested keys; `{ conflict, by }` refuses a change that cannot hold.
+5. Never move a pinned key (`ctx.pinned(k)`: locked, or set by another relation); return a conflict. Check ranges with `ctx.inRange`.
+6. Word `detail` and `note` for the notice: "Loss rate per name cannot move: Market is locked (<detail>)."
+7. Add it to `relations` in the order it should run; the Guide's Locks table lists it by itself.
+8. A widget that sets several keys from one value calls `setParams(patch, { source, via })` and reads `refused` from the result.
+9. Test it with `applyConstraints` and in a store (`tests/locks.test.ts`): the patch, the refusals, the events.
+10. In the browser: lock the key, try each change path, and read the notice and the Locks chip.
 
 **An event**
 1. Generic, said by the kit: add it to `KitEvents` (`src/kit/events/types.ts`); the app's own: to `AppEvents` (`src/app/events.ts`).

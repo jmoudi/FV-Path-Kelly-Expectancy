@@ -11,7 +11,14 @@ The instances: the values of this explainer, typed by the model.
 - `policies.ts`: the policies' names, colours and labels, `YOUR_POLICY`, `policies(p)`.
 - `discussion.ts`: the discussion's setup (`DISCUSSION`) and `fig`, the
   quoted-vs-recomputed row with its reason.
-- `copy/`: `guide.ts` (the Guide), `kitCopy.ts` (the kit frames' sentences),
+- `constraints.ts`: `CONSTRAINTS`, the relations the model implies among the
+  parameters, as data for the kit's solver (`kit/state/constraints.ts`), each a rule
+  only while a lock makes it one: the clean-season identity p = (1 − q)^n among q, p and
+  n, the market identity (Fair: q = b/(1+b); Discussion case: p = 55% at n), the six
+  calendar shares summing to 1; the linked key `P_CLEAN` ("pClean", lockable though not
+  a parameter), `effectiveMarket`, and `SWEEP_RULE` (the store's own rule, for the Guide).
+- `copy/`: `guide.ts` (the Guide; its Locks part is `guideLocks.ts`), `kitCopy.ts` (the
+  kit frames' sentences), `locks.ts` (what the lock notices say, `lockValueText`),
   `market.ts`, `notices.ts` (what the notices say), `paramText.ts` (a parameter value
   in words, what a story moved).
 

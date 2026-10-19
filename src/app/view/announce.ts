@@ -6,9 +6,12 @@
  */
 import { NOTICE_COPY } from "@app/data/copy/notices";
 import { useAppBus, useAppEvent } from "./bus";
+import { useLockAnnouncements } from "./announceLocks";
 
 export function useAnnouncements(): void {
   const bus = useAppBus();
+  // Locks, refusals and the sweeps they stop (announceLocks.ts).
+  useLockAnnouncements();
   useAppEvent("state:imported", (e) => {
     bus.emit("notice", e.ok ? { kind: "info", id: "import", text: NOTICE_COPY.imported } : { kind: "error", id: "import", text: NOTICE_COPY.importFailed(e.error ?? "") });
   });

@@ -252,7 +252,7 @@ export const Link = forwardRef<HTMLAnchorElement, LinkProps>(function Link({ to,
 const INLINE = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)\s]+\)|\{\{(?:a|b|c|good|loss):[^}]+\}\}|\{icon:[a-z]+\})/g;
 
 /** What a screen reader says for an icon in the text (the drawn icon itself is decorative). */
-const ICON_WORD: Partial<Record<IconName, string>> = { open: "open in its view", table: "show the numbers", settings: "settings", play: "run", pause: "pause", stop: "stop", restore: "back to the value before", next: "next", more: "more" };
+const ICON_WORD: Partial<Record<IconName, string>> = { open: "open in its view", table: "show the numbers", settings: "settings", play: "run", pause: "pause", stop: "stop", restore: "back to the value before", next: "next", more: "more", lock: "padlock (locked)", unlock: "padlock" };
 
 export interface RichOptions {
   /**

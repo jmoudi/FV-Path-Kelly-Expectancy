@@ -15,6 +15,7 @@ import { Num } from "./Num";
 import { effectiveSettings, hasSettings, schemaSettings, type ParamSettingKey, type ParamSettings as Settings } from "./paramSettings";
 import { Segmented } from "@kit/ui/Settings";
 import type { ParamDef } from "./schema";
+import { LockToggle } from "./locks";
 import "./param-settings.css";
 
 type NumericKey = Exclude<ParamSettingKey, "slider">;
@@ -148,6 +149,7 @@ export function ParamSettingsFields({ k, onClose }: { k: string; onClose?: () =>
           Settings for {def.label}
           {def.short && <span className="sym"> {def.short}</span>}
         </h4>
+        <LockToggle k={k} withText />
         {onClose && (
           <button type="button" className="btn small quiet" onClick={onClose}>
             Close
@@ -275,6 +277,7 @@ export function ParamSettingsTable() {
           <tr>
             <th scope="col">Parameter</th>
             <th scope="col">Range and defaults</th>
+            <th scope="col">Lock</th>
             {cols.map((c) => (
               <th key={c} scope="col">
                 {SETTING_TEXT[c].label}
@@ -298,6 +301,9 @@ export function ParamSettingsTable() {
                 <td className="k-ps-range">
                   <span>{rangeText(def)}</span>
                   <span className="k-ps-defaults">{defaultsText(def)}</span>
+                </td>
+                <td className="k-ps-lock" data-label="Lock">
+                  <LockToggle k={def.key} withText />
                 </td>
                 {cols.map((c) => (
                   <td key={c} data-label={SETTING_TEXT[c].label} className={c === "slider" ? "k-ps-slider" : undefined}>

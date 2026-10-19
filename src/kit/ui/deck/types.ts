@@ -104,6 +104,8 @@ export interface DeckProps {
   note?: string;
   /** Row 2: the persistent mini-legend. */
   legend: LegendItem[];
+  /** Row 2: chips before the strip slot (e.g. "Locks (2)"); nothing is reserved for them. */
+  chips?: ReactNode;
   /** Row 2: a slot that is always reserved (e.g. the active input's sweep strip). */
   strip?: ReactNode;
   /** The strip holds only a placeholder: on a phone its line is not drawn. */

@@ -52,10 +52,15 @@ export interface Notice {
 export interface KitEvents {
   /** One per parameter whose value changed, after the store holds the new value. */
   "param:changed": { key: string; from: unknown; to: unknown; source: ParamSource };
-  /** A parameter was locked or unlocked (emitted by the lock actions). */
+  /** A parameter (or a linked key) was locked or unlocked: the store's lockParam, unlockAll, an import that adds locks, resetEverything. */
   "param:locked": { key: string; locked: boolean };
-  /** A change was refused (a locked parameter, a constraint); `attempted` is the value asked for. */
-  "param:refused": { key: string; reason: string; source: ParamSource; attempted?: unknown };
+  /**
+   * A change was refused (a locked parameter, a relation among locked ones); `attempted`
+   * is the value asked for. `reason` is "locked" when the key itself is locked, otherwise
+   * the id of the relation that refused it; `by` names the locked key that blocks it and
+   * `detail` says why in one line (kit/state/constraints.ts).
+   */
+  "param:refused": { key: string; reason: string; source: ParamSource; attempted?: unknown; by?: string; detail?: string };
   /** A run started, switched preset, or (`resumed`) continued after a pause. */
   "sweep:started": { key: string; presetId: string; resumed: boolean };
   "sweep:paused": { key: string };

@@ -108,7 +108,7 @@ describe("store: parameter settings", () => {
     vi.resetModules();
   });
 
-  it("are saved, exported with the state (version 5) and come back on import", async () => {
+  it("are saved, exported with the state (version 5, now 6 with the locks) and come back on import", async () => {
     const storage = memoryStorage();
     vi.stubGlobal("localStorage", storage);
     const { useStore } = await import("@app/store");
@@ -119,7 +119,7 @@ describe("store: parameter settings", () => {
     expect(s().paramSettings).toEqual({ lossRate: { step: 0.005, slider: false }, nights: { wheelStep: 5 } });
     expect(JSON.parse(storage.getItem(KEY)!).paramSettings).toEqual(s().paramSettings);
     const exported = s().exportState();
-    expect(exported.version).toBe(5);
+    expect(exported.version).toBe(6);
     expect(exported.paramSettings).toEqual({ lossRate: { step: 0.005, slider: false }, nights: { wheelStep: 5 } });
 
     // Reset one, then every one; parameter values are a separate thing.

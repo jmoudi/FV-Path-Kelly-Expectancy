@@ -130,7 +130,7 @@ export function FullSettings({ data }: { data?: ReactNode } = {}) {
         <KeyLegend bindings={KEYS} />
       </SettingsGroup>
       {/* Parameter settings: how each parameter is edited by hand. Separate from the presets below, which keep their own step. */}
-      <SettingsGroup id="set-params" title="Parameters" blurb="How each parameter moves when you edit it by hand: the step (the wheel, the arrow keys and the drag land on its multiples), the fine step with Shift, one wheel notch, the drag speed, the decimals shown and the slider. A blank box is the default: the line under the range gives it, and the box shows it while you work in its row. Sweep presets keep their own step and timing." wide>
+      <SettingsGroup id="set-params" title="Parameters" blurb="How each parameter moves when you edit it by hand: the step (the wheel, the arrow keys and the drag land on its multiples), the fine step with Shift, one wheel notch, the drag speed, the decimals shown and the slider. A blank box is the default: the line under the range gives it, and the box shows it while you work in its row. Sweep presets keep their own step and timing. Lock holds a parameter's value against every change until you unlock it." wide>
         <ParamSettingsTable />
       </SettingsGroup>
       <SettingsGroup id="set-presets" title="Sweep presets" blurb="A preset drives the active input on its own, in the input's own units. Link one to an input, then run it from the deck's strip or with the hotkeys above." wide>

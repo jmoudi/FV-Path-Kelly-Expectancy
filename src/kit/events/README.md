@@ -20,7 +20,8 @@ The one channel cross-cutting features talk through: notices, locks, logging.
   same two hooks typed with an app's map.
 
 Who emits: the store's actions (`kit/state/createAppStore.ts`, after the new state is
-set), the replayer (`useSweepEngine`: `sweep:stepped`), the router (`useRoute`:
+set; `param:locked` from the lock actions, `param:refused` for each change the locks or
+the relations refuse, with `by` and `detail`), the replayer (`useSweepEngine`: `sweep:stepped`), the router (`useRoute`:
 `route:changed`, never for an `#el-` anchor), the links (`Link`: `route:jumped`, a scroll
 within the open page) and the build (`useBuild`: `build:settled`). `kit/ui/Notices.tsx`
 shows every `notice`.

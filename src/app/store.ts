@@ -5,6 +5,7 @@ import type { Datasets } from "@app/model/datasets";
 import { EMPTY_DATASETS, sanitizeDatasets } from "@app/data/datasets";
 import type { Params } from "@app/model/params";
 import { PRESET_CATALOG } from "@app/data/presets";
+import { CONSTRAINTS } from "@app/data/constraints";
 import { SCHEMA } from "@app/data/schema";
 import { SWEEPS } from "@app/sweeps";
 
@@ -17,7 +18,10 @@ export const useStore = createAppStore<Params, Datasets>({
   storageKey: "tranche-replay:v1",
   // 4: the snapshot of parameters a story moved (storyPrev) travels with the state.
   // 5: parameter settings (paramSettings: step, fine step, wheel step, drag, decimals, slider per parameter).
-  version: 5,
+  // 6: parameter locks (locks: key -> true, the clean-season probability "pClean" among them).
+  version: 6,
   presets: PRESET_CATALOG,
   planner: plannerFor(SWEEPS),
+  // The relations among the parameters while some are locked (src/app/data/constraints.ts).
+  constraints: CONSTRAINTS,
 });

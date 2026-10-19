@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
  * ⊞ ⚙ ↗ ❚❚ ▸ come in as many weights as fonts). Decorative: the button carries the
  * accessible name.
  */
-export type IconName = "open" | "table" | "settings" | "play" | "pause" | "stop" | "restore" | "next" | "more";
+export type IconName = "open" | "table" | "settings" | "play" | "pause" | "stop" | "restore" | "next" | "more" | "lock" | "unlock";
 
 const PATHS: Record<IconName, ReactNode> = {
   // An arrow out of the box, up and to the right.
@@ -31,6 +31,20 @@ const PATHS: Record<IconName, ReactNode> = {
       <circle cx="3.5" cy="8" r="0.6" fill="currentColor" />
       <circle cx="8" cy="8" r="0.6" fill="currentColor" />
       <circle cx="12.5" cy="8" r="0.6" fill="currentColor" />
+    </>
+  ),
+  // A closed padlock (a locked parameter): the shackle down, the body filled.
+  lock: (
+    <>
+      <path d="M5 7.5V5.25a3 3 0 0 1 6 0V7.5" />
+      <rect x="3.25" y="7.5" width="9.5" height="6.5" rx="1.5" fill="currentColor" />
+    </>
+  ),
+  // An open padlock (lock it): the shackle swung up on one side, the body outlined.
+  unlock: (
+    <>
+      <path d="M5 7.5V5.25a3 3 0 0 1 5.8-1.1" />
+      <rect x="3.25" y="7.5" width="9.5" height="6.5" rx="1.5" />
     </>
   ),
 };

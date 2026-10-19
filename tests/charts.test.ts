@@ -444,7 +444,8 @@ describe("story rules in the store", () => {
     const q0 = useStore.getState().params.lossRate;
     s.applyStory("binary-outcomes", opt);
     const exported = useStore.getState().exportState();
-    expect(exported.version).toBe(5);
+    // 6 since parameter locks travel with the state.
+    expect(exported.version).toBe(6);
     expect(exported.storyPrev).toEqual({ "binary-outcomes": { lossRate: q0 } });
     // Round trip: the snapshot comes back and undo still works.
     s.resetEverything();

@@ -11,6 +11,7 @@ import { Authoring } from "./Authoring";
 import { saveText } from "./download";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { Num } from "@kit/inputs/Num";
+import { useStoryBlocks } from "@kit/inputs/locks";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 import { TableView } from "./TableView";
@@ -182,6 +183,8 @@ function ChartCard({ base, viewId, legendPeer }: { base: ChartSpec; viewId?: str
   const story = activeStory ? activeStoryOf(activeStory, offered, override, !!before) : undefined;
   // The active story stays listed (pressed) even when the rebuilt spec no longer offers it.
   const stories = story ? (offered.some((st) => st.id === story.id) ? offered.map((st) => (st.id === story.id ? story : st)) : [...offered, story]) : offered;
+  // A story that would move a locked parameter says so instead of applying (kit/inputs/locks.tsx).
+  const blocked = useStoryBlocks(base.id, stories);
   // The backend tag shows only when it says something: another backend than the default, or edits.
   const offDefault = !isFigure && !isTable && backendId !== defaultBackend;
   const tag = edited || offDefault ? `${isFigure ? "Figure" : BACKEND_INFO[backendId].label}${edited ? " · edited" : ""}` : null;
@@ -208,8 +211,9 @@ function ChartCard({ base, viewId, legendPeer }: { base: ChartSpec; viewId?: str
     stories.length > 0 ? (
       <div className="k-stories" role="group" aria-label="Questions this chart answers">
         {stories.map((st) => (
-          <button key={st.id} type="button" className={`k-story${activeStory === st.id ? " on" : ""}`} aria-pressed={activeStory === st.id} onClick={() => applyStory(base.id, st)} title={(activeStory === st.id ? st.narrative : [st.narrative, st.badge].filter(Boolean).join(" · ")) || undefined}>
+          <button key={st.id} type="button" className={`k-story${activeStory === st.id ? " on" : ""}${blocked[st.id] ? " blocked" : ""}`} aria-pressed={activeStory === st.id} onClick={() => applyStory(base.id, st)} title={(blocked[st.id] ? `${blocked[st.id]}: unlock it in the deck to apply this story` : activeStory === st.id ? st.narrative : [st.narrative, st.badge].filter(Boolean).join(" · ")) || undefined}>
             {st.label}
+            {blocked[st.id] && <span className="k-story-blocked">{blocked[st.id]}</span>}
           </button>
         ))}
       </div>

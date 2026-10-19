@@ -111,7 +111,7 @@ function SectionBody({ s }: { s: DrawerSection }): ReactNode {
  * bottom sheet opened by "All inputs". Escape closes.
  */
 export function Deck(props: DeckProps) {
-  const { groups, lead, status, note, legend, strip, stripIdle = false, drawer, drawerTop, expanded, onExpandedChange, hidden = false, pending = false, heightVar = "--deck-h", phoneQuery = "(max-width: 700px)" } = props;
+  const { groups, lead, status, note, legend, chips, strip, stripIdle = false, drawer, drawerTop, expanded, onExpandedChange, hidden = false, pending = false, heightVar = "--deck-h", phoneQuery = "(max-width: 700px)" } = props;
   const t = { ...DEFAULT_TEXT, ...props.text };
   const phone = useMedia(phoneQuery);
   const barRef = useRef<HTMLDivElement>(null);
@@ -196,6 +196,7 @@ export function Deck(props: DeckProps) {
               )}
             </div>
           )}
+          {chips && <div className="dkb-chips">{chips}</div>}
           <div className="dkb-strip" data-idle={stripIdle ? "" : undefined}>
             {strip}
           </div>

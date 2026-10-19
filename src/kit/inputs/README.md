@@ -52,6 +52,31 @@ these; the two share only the schema's range).
 - The store keeps them (`kit/state`: `paramSettings`, `setParamSettings`,
   `resetParamSettings`), persisted and exported with the state.
 
+## Locks
+
+The GUI of parameter locks (the state and the solver are `kit/state`'s:
+`locks`, `lockParam`, `applyConstraints`).
+
+- `locks.tsx`: `LockToggle` (the padlock button of a parameter or a linked key: beside
+  the label on hover or focus, always on a touch screen, and staying in the accent
+  while locked; `onlyWhenLocked` draws it only then, `withText` adds Lock / Locked),
+  `Padlock` (the kit's `lock` / `unlock` icons), `useLocked`, `useRefusalShake(match)`
+  (a ref whose element shakes on a matching `param:refused`), `useStoryBlocks(chartId,
+  stories)` (the "blocked: <name> is locked" label of each story the locks would
+  refuse) and `LocksChip` ("Locks (n)": the list with values, Unlock, Unlock all).
+- `shake.ts`: `shakeElement`, one 200 ms translate (`.k-shake`), at most once in 600 ms
+  per element, none with reduced motion.
+- `locks.css`: the padlock, a locked field (accent label, hatched track, a thumb drawn
+  as a bar, a dashed read-only box), the shake, the strip's `locked`, the chip and its
+  list, the hosts of a linked value or a switch with a padlock, a blocked story.
+- `SyntheticNumber` takes `locked` (read-only box, hatched track; a keystroke, a wheel
+  notch, an arrow, a drag or a double-click still calls `onChange` once with what it
+  asked for, so the store refuses it out loud, and nothing moves) and `refusals` (a
+  count: each one puts the value the store kept back in the box and shakes the field).
+  `NumberField` passes both from the store and the bus; `ParamInput` adds the padlock
+  (in the bare form of the reduced deck, only while locked); `ParamSettingsFields`
+  and `ParamSettingsTable` carry Lock / Locked.
+
 What `SyntheticNumber` needs: value, bounds, unit, `onChange`, and optionally `active`,
 `onActivate`, `run`, `band`, `tick`, `dragScale`. What the app supplies for the rest:
 one `Schema<P>`, given to `<KitProvider schema>` (in this app `src/app/data/schema.ts`).

@@ -228,6 +228,13 @@
 .dkb-drawer-top .sweep-strip {
   padding-top: 0;
 }
+/* Chips before the strip slot ("Locks (2)"): their own width, nothing reserved while empty. */
+.dkb-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
 
 .dkb-btn {
   flex-shrink: 0;
@@ -637,6 +644,13 @@
     min-width: 0;
     margin-left: 0;
     height: 24px;
+  }
+  /* The chips share the strip's line, so the lead keeps its line with All inputs. */
+  .dkb-chips {
+    order: 4;
+  }
+  .dkb-chips + .dkb-strip {
+    flex: 1 1 0;
   }
   .dkb-strip[data-idle] {
     display: none;

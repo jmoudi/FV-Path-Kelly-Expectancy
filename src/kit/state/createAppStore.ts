@@ -13,6 +13,15 @@
  * state:imported, state:reset, settings:changed. The bus comes in the config or, from
  * <KitProvider bus>, through connectBus.
  *
+ * Locks (`locks`, persisted and exported): a locked parameter, or a linked key the
+ * app's constraints name, holds its value. Every change of the parameters, whoever
+ * makes it (a hand edit, a sweep tick, a story, a switch, a linked value, an action,
+ * undo and redo, a reset, an import), runs through one step, `applyConstraints`
+ * (kit/state/constraints.ts) with the app's relations: what holds is applied, what a
+ * lock refuses is announced as param:refused (with the lock that blocks it). A run on a
+ * parameter that becomes locked stops with sweep:stopped reason "lock", and a locked
+ * parameter is never swept. lockParam emits param:locked.
+ *
  * This file is the former src/state/store.ts with Params -> P, Datasets -> D and its module-level
  * constants moved into the config. Behaviour is unchanged.
  */
@@ -24,8 +33,18 @@ import { migratePresetId, sanitizePreset, sanitizePresets } from "@kit/sweeps/sa
 import { clonePreset, type PersistedRun, type PresetCatalog, type SweepPlan, type SweepPreset, type SweepRun } from "@kit/sweeps/types";
 import type { Bus } from "@kit/events/bus";
 import type { KitEvents, ParamSource, SweepStopReason } from "@kit/events/types";
+import { applyConstraints, keyLabel, sanitizeLocks, type ConstraintOutcome, type ConstraintSet, type LinkedKey, type Locks, type Refusal } from "./constraints";
 
 export { sanitizePreset };
+export type { Locks, Refusal };
+
+/**
+ * Sources whose change is all or nothing under the locks: one click that sets several
+ * parameters, a value solved into them, or a sweep's next value (the replayer moves its
+ * parameter to the preset's value or not at all; what a relation moves beside it, such
+ * as q re-solved while n is swept with p locked, is fine).
+ */
+const ATOMIC_SOURCES: ReadonlySet<ParamSource> = new Set<ParamSource>(["switch", "story", "link", "action", "sweep"]);
 
 export interface UiSettings {
   /** The most values a second a running sweep commits, whatever its presets ask for. */
@@ -54,6 +73,8 @@ export interface ExportedState<P extends object, D extends object> {
   storyPrev: Record<string, Partial<P>>;
   /** parameter key -> the parameter settings a person changed (kit/inputs/paramSettings.ts). Absent in older exports. */
   paramSettings?: Record<string, ParamSettings>;
+  /** The locked parameters and linked keys, key -> true. Absent in older exports. */
+  locks?: Locks;
 }
 
 /** What local storage holds: the exported state plus the sweeps that were running, with each input's pre-sweep value. */
@@ -87,6 +108,13 @@ export interface AppStoreConfig<P extends object, D extends object> {
   ui?: Partial<UiSettings>;
   /** The event bus the actions emit on; <KitProvider bus> connects one too (connectBus). */
   bus?: Bus<any>;
+  /** The relations among the parameters and the linked keys a lock can hold (kit/state/constraints.ts). Without them only the locks themselves apply. */
+  constraints?: ConstraintSet<P>;
+}
+
+/** What a change came to: the refusals (empty when everything asked for holds). */
+export interface ChangeResult {
+  refused: Refusal[];
 }
 
 export interface KitState<P extends object, D extends object> {
@@ -119,10 +147,39 @@ export interface KitState<P extends object, D extends object> {
    * Persisted and exported; never read by the sweeps.
    */
   paramSettings: Record<string, ParamSettings>;
-  /** `source` (default "hand") is what param:changed reports. */
+  /**
+   * Locks: key -> true for each locked parameter or linked key (the app's constraints
+   * name the linked ones). Persisted and exported; every change runs through them.
+   */
+  locks: Locks;
+  /** The linked keys a lock can hold besides the parameters (from the app's constraints), with their labels. */
+  linked: Record<string, LinkedKey<P>>;
+  /**
+   * `source` (default "hand") is what param:changed reports. A locked parameter refuses
+   * every call (param:refused), even one that would leave it where it is: someone tried.
+   */
   setParam: <K extends Extract<keyof P, string>>(key: K, value: P[K], source?: ParamSource) => void;
-  /** history: false skips the undo stack; sweep: true is a sweep tick (no history, not saved); source defaults to "sweep" for a tick and "hand" otherwise. */
-  setParams: (patch: Partial<P>, opts?: { history?: boolean; sweep?: boolean; source?: ParamSource }) => void;
+  /**
+   * history: false skips the undo stack; sweep: true is a sweep tick (no history, not
+   * saved); source defaults to "sweep" for a tick and "hand" otherwise. The change runs
+   * through the locks and the relations first (applyConstraints): what holds is applied
+   * and what is refused comes back (and goes out as param:refused). `via` names the
+   * linked key the patch was solved from (its lock refuses it); `atomic` makes it all or
+   * nothing (the default for a switch, a story, a linked value, an action and each value
+   * of a sweep tick, which runs through the step one parameter at a time; a refused
+   * value stops its run with sweep:stopped "lock").
+   */
+  setParams: (patch: Partial<P>, opts?: { history?: boolean; sweep?: boolean; source?: ParamSource; via?: string; atomic?: boolean }) => ChangeResult;
+  /** Lock or unlock a parameter or linked key: emits param:locked; locking stops a run on it (sweep:stopped "lock"). */
+  lockParam: (key: string, on: boolean) => void;
+  /** Unlock every key. */
+  unlockAll: () => void;
+  /** What a change would come to under the locks, without making it or saying anything. */
+  checkChange: (patch: Partial<P>, opts?: { source?: ParamSource; via?: string; atomic?: boolean }) => ConstraintOutcome<P>;
+  /** Why clicking this story would be refused under the locks now (empty: it would apply). */
+  storyRefusals: (id: string, story: Story) => Refusal[];
+  /** A parameter's or linked key's name, for notices and lists. */
+  lockLabel: (key: string) => string;
   undo: () => void;
   redo: () => void;
   resetParams: () => void;
@@ -209,7 +266,7 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
     }
   }
 
-  type Persisted = Pick<KitState<P, D>, "params" | "overrides" | "defaultBackend" | "datasets" | "presets" | "links" | "ui" | "storyPrev" | "paramSettings"> & { runs?: PersistedRun[] };
+  type Persisted = Pick<KitState<P, D>, "params" | "overrides" | "defaultBackend" | "datasets" | "presets" | "links" | "ui" | "storyPrev" | "paramSettings" | "locks"> & { runs?: PersistedRun[] };
 
   function save(state: Persisted) {
     try {
@@ -311,10 +368,57 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
   /** The values of these parameters now. */
   const valuesOf = (params: P, keys: string[]) => Object.fromEntries(keys.map((k) => [k, valueOf(params, k)]));
 
+  // ---- locks and the relations (kit/state/constraints.ts) ----
+  const linked: Record<string, LinkedKey<P>> = cfg.constraints?.linked ?? {};
+  const lockable = (key: string) => !!schema.byKey[key] || key in linked;
+  const labelOf = (key: string) => keyLabel(key, { set: cfg.constraints, byKey: schema.byKey });
+  /** The keys whose value differs between the two. */
+  const diff = (from: P, to: P): Partial<P> => {
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(to)) if (!Object.is(valueOf(from, key), valueOf(to, key))) out[key] = valueOf(to, key);
+    return out as Partial<P>;
+  };
+  /** A change as the store would take it: sanitized, then through the locks and the relations. */
+  const solveWith = (locks: Locks, prev: P, patch: Partial<P>, source: ParamSource, o: { via?: string; atomic?: boolean } = {}): ConstraintOutcome<P> => {
+    const asked = diff(prev, sanitizeParams({ ...prev, ...patch }));
+    return applyConstraints(prev, asked, locks, source, { set: cfg.constraints, byKey: schema.byKey, via: o.via, atomic: o.atomic ?? ATOMIC_SOURCES.has(source) });
+  };
+  /** The parameters with a solved patch applied (the same object when it is empty). */
+  const applied = (prev: P, patch: Partial<P>): P => (Object.keys(patch).length ? sanitizeParams({ ...prev, ...patch }) : prev);
+  /** The first value of a run's plan, from where it stands, that differs from the current one. */
+  const nextMove = (run: SweepRun, current: unknown): number | null => {
+    const plan = run.plan;
+    if (!plan || !plan.values.length) return null;
+    if (plan.jumpTo != null && plan.jumpTo !== current) return plan.jumpTo;
+    for (let i = 1; i <= plan.values.length; i++) {
+      const v = plan.values[(Math.max(-1, run.index) + i + plan.values.length) % plan.values.length];
+      if (v !== current) return v;
+    }
+    return null;
+  };
+
   return create<KitState<P, D>>()((set, get) => {
     const persist = (patch: Partial<Persisted>) => {
       const s = get();
-      save({ params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui, storyPrev: s.storyPrev, paramSettings: s.paramSettings, runs: persistedRuns(s.runs), ...patch });
+      save({ params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui, storyPrev: s.storyPrev, paramSettings: s.paramSettings, locks: s.locks, runs: persistedRuns(s.runs), ...patch });
+    };
+    const solve = (prev: P, patch: Partial<P>, source: ParamSource, o: { via?: string; atomic?: boolean } = {}) => solveWith(get().locks, prev, patch, source, o);
+    /**
+     * param:refused for each refusal, once the state holds what was applied. The refusals
+     * of a locked key itself go last, so a listener that keeps one line per lock (the
+     * notices) ends on the plainest one.
+     */
+    const emitRefusals = (refusals: Refusal[], source: ParamSource) => {
+      const ordered = [...refusals.filter((r) => r.key !== r.by), ...refusals.filter((r) => r.key === r.by)];
+      for (const r of ordered) emit("param:refused", { key: r.key, reason: r.reason, source, attempted: r.attempted, by: r.by, ...(r.detail ? { detail: r.detail } : {}) });
+    };
+    /** A run whose next value the locks refuse (its parameter locked, or a relation that cannot follow). */
+    const runBlocked = (key: string, locks: Locks): boolean => {
+      if (locks[key]) return true;
+      const s = get();
+      const run = s.runs[key];
+      const v = run ? nextMove(run, valueOf(s.params, key)) : null;
+      return v != null && solveWith(locks, s.params, { [key]: v } as Partial<P>, "sweep").refusals.length > 0;
     };
     /** A hand edit of a swept input stops its run and forgets its pre-sweep value. */
     const releaseSweeps = (keys: string[]) => {
@@ -327,6 +431,74 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         delete nextOrigins[k];
       }
       return { runs: nextRuns, sweepOrigins: nextOrigins };
+    };
+    /**
+     * What clicking a story asks for, before the locks: the chart edits, the parameters
+     * it would leave (`params`; `clean` is them with the other stories put back first),
+     * the snapshots, and what to announce.
+     */
+    const planStory = (id: string, story: Story) => {
+      const current = get().overrides[id];
+      const active = current?.story === story.id;
+      // A story replaces the chart's edits; clicking the active story turns it off. Its label
+      // and answer are saved with it, so a reload shows the chip pressed with its answer line
+      // even when the rebuilt chart no longer offers the story.
+      const text: SpecOverride = {};
+      if (story.label) text.storyLabel = story.label.slice(0, STORY_LABEL_MAX);
+      if (story.narrative) text.storyNarrative = story.narrative.slice(0, STORY_NARRATIVE_MAX);
+      const next: SpecOverride | null = active ? null : { ...(story.patch ?? {}), story: story.id, ...text };
+      const overrides = { ...get().overrides };
+      if (next) overrides[id] = next;
+      else delete overrides[id];
+      const storyPrev = { ...get().storyPrev };
+      let params = get().params;
+      let clean = params;
+      let moves = false;
+      // What to announce once the new state is set.
+      const cleared: KitEvents["story:cleared"][] = [];
+      let applied: KitEvents["story:applied"] | null = null;
+      if (active) {
+        // Turning a story off puts back the parameters it moved.
+        const back = storyPrev[id];
+        const keys = Object.keys(back ?? {});
+        const on = valuesOf(params, keys);
+        if (back) params = sanitizeParams({ ...params, ...back });
+        cleared.push({ chartId: id, storyId: story.id, before: on, after: valuesOf(params, keys) });
+        delete storyPrev[id];
+      } else if (story.params) {
+        moves = true;
+        if (current?.story) cleared.push({ chartId: id, storyId: current.story, before: {}, after: {} });
+        // Only one deck-moving story is active at a time: turn the others off first and
+        // restore what they moved, so the new snapshot is taken from clean parameters.
+        for (const otherId of Object.keys(storyPrev)) {
+          if (otherId === id) continue;
+          const back = storyPrev[otherId];
+          const keys = Object.keys(back);
+          const on = valuesOf(params, keys);
+          params = sanitizeParams({ ...params, ...back });
+          const otherStory = get().overrides[otherId]?.story;
+          if (otherStory) cleared.push({ chartId: otherId, storyId: otherStory, before: on, after: valuesOf(params, keys) });
+          delete storyPrev[otherId];
+          delete overrides[otherId];
+        }
+        clean = params;
+        // Snapshot what it is about to move, unless an earlier story on this chart already did.
+        const snap: Partial<P> = { ...(storyPrev[id] ?? {}) };
+        for (const k of Object.keys(story.params)) if (!(k in snap)) (snap as Record<string, unknown>)[k] = valueOf(params, k);
+        storyPrev[id] = snap;
+        params = sanitizeParams({ ...params, ...story.params });
+        applied = { chartId: id, storyId: story.id, label: story.label, before: { ...snap }, after: valuesOf(params, Object.keys(snap)) };
+      } else {
+        // A story that only re-defines the chart replaces a deck-moving one on the same chart.
+        const back = storyPrev[id];
+        const keys = Object.keys(back ?? {});
+        const on = valuesOf(params, keys);
+        if (back) params = sanitizeParams({ ...params, ...back });
+        if (current?.story) cleared.push({ chartId: id, storyId: current.story, before: on, after: valuesOf(params, keys) });
+        delete storyPrev[id];
+        applied = { chartId: id, storyId: story.id, label: story.label, before: {}, after: {} };
+      }
+      return { overrides, params, clean, storyPrev, cleared, applied, moves };
     };
     return {
       params: initialParams,
@@ -344,64 +516,97 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
       past: [],
       future: [],
       paramSettings: sanitizeParamSettings(initial.paramSettings, schema),
+      locks: sanitizeLocks(initial.locks, lockable),
+      linked,
       setParam: (key, value, source = "hand") => {
         const v = schema.coerce(key, value);
-        const prev = get().params;
-        if (prev[key] === v) return;
-        const params = { ...prev, [key]: v } as P;
-        const runsBefore = get().runs;
-        const released = releaseSweeps([key]) ?? {};
-        set({ params, past: pushHistory(get().past, prev), future: [], ...released });
-        persist({ params });
-        emitStopped(runsBefore, get().runs, "edit");
-        emitChanges(prev, params, source);
+        // A locked parameter refuses even a call that would leave it where it is: someone tried to move it.
+        if (get().locks[key]) {
+          emitRefusals([{ key, reason: "locked", by: key, attempted: v }], source);
+          return;
+        }
+        if (get().params[key] === v) return;
+        get().setParams({ [key]: v } as unknown as Partial<P>, { source });
       },
       setParams: (patch, opts) => {
         const prev = get().params;
-        const params = sanitizeParams({ ...prev, ...patch });
         const source: ParamSource = opts?.source ?? (opts?.sweep ? "sweep" : "hand");
         // A sweep tick is neither history nor saved: a reload restores the pre-sweep value instead.
         if (opts?.sweep) {
-          set({ params });
+          // One step per run's value (the engine sends every running sweep's tick at once), so
+          // a value the locks refuse stops its own run and leaves the others moving.
+          let params = prev;
+          const refused: Refusal[] = [];
+          for (const [k, v] of Object.entries(patch as Record<string, unknown>)) {
+            const one = solve(params, { [k]: v } as Partial<P>, source, { via: opts?.via, atomic: opts?.atomic });
+            refused.push(...one.refusals);
+            params = applied(params, one.patch);
+          }
+          const runsBefore = get().runs;
+          // A run whose value a lock refuses stops where it is.
+          const blocked = refused.map((r) => r.key).filter((k) => k in runsBefore);
+          const runs = blocked.length ? Object.fromEntries(Object.entries(runsBefore).filter(([k]) => !blocked.includes(k))) : runsBefore;
+          if (params !== prev || runs !== runsBefore) set({ params, runs });
+          if (runs !== runsBefore) persist({});
+          emitStopped(runsBefore, runs, "lock");
+          emitRefusals(refused, source);
           emitChanges(prev, params, source);
-          return;
+          return { refused };
+        }
+        // The one step every change takes: the locks and the relations among the parameters.
+        const out = solve(prev, patch, source, { via: opts?.via, atomic: opts?.atomic });
+        const params = applied(prev, out.patch);
+        if (params === prev) {
+          emitRefusals(out.refusals, source);
+          return { refused: out.refusals };
         }
         const runsBefore = get().runs;
         if (opts?.history === false) {
           set({ params });
         } else {
-          const released = releaseSweeps(Object.keys(patch)) ?? {};
+          const released = releaseSweeps([...new Set([...Object.keys(patch), ...Object.keys(out.patch)])]) ?? {};
           set({ params, past: pushHistory(get().past, prev), future: [], ...released });
         }
         persist({ params });
         emitStopped(runsBefore, get().runs, "edit");
+        emitRefusals(out.refusals, source);
         emitChanges(prev, params, source);
+        return { refused: out.refusals };
       },
       undo: () => {
         const { past, params, future } = get();
         if (!past.length) return;
-        const prev = past[past.length - 1];
+        // A locked parameter keeps its value; the rest goes back (through the relations).
+        const out = solve(params, past[past.length - 1], "undo");
+        const prev = applied(params, out.patch);
         // Undo takes the wheel: any sweep stops where history puts its input.
         const runsBefore = get().runs;
         set({ params: prev, past: past.slice(0, -1), future: [params, ...future].slice(0, 100), runs: {} });
         persist({ params: prev });
         emitStopped(runsBefore, {}, "undo");
+        emitRefusals(out.refusals, "undo");
         emitChanges(params, prev, "undo");
       },
       redo: () => {
         const { past, params, future } = get();
         if (!future.length) return;
-        const next = future[0];
+        const out = solve(params, future[0], "redo");
+        const next = applied(params, out.patch);
         const runsBefore = get().runs;
         set({ params: next, past: pushHistory(past, params), future: future.slice(1), runs: {} });
         persist({ params: next });
         emitStopped(runsBefore, {}, "undo");
+        emitRefusals(out.refusals, "redo");
         emitChanges(params, next, "redo");
       },
       resetParams: () => {
         const prev = get().params;
-        persist({ params: defaults });
-        set({ params: { ...defaults }, past: pushHistory(get().past, prev), future: [] });
+        // Locked parameters keep their values (and the relations hold around them).
+        const out = solve(prev, defaults, "reset");
+        const params = applied(prev, out.patch);
+        persist({ params });
+        set({ params, past: pushHistory(get().past, prev), future: [] });
+        emitRefusals(out.refusals, "reset");
         emitChanges(prev, get().params, "reset");
       },
       setDataset: (kind, values) => {
@@ -420,69 +625,30 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         emit("chart:edited", { chartId: id });
       },
       applyStory: (id, story) => {
-        const current = get().overrides[id];
-        const active = current?.story === story.id;
-        // A story replaces the chart's edits; clicking the active story turns it off. Its label
-        // and answer are saved with it, so a reload shows the chip pressed with its answer line
-        // even when the rebuilt chart no longer offers the story.
-        const text: SpecOverride = {};
-        if (story.label) text.storyLabel = story.label.slice(0, STORY_LABEL_MAX);
-        if (story.narrative) text.storyNarrative = story.narrative.slice(0, STORY_NARRATIVE_MAX);
-        const next: SpecOverride | null = active ? null : { ...(story.patch ?? {}), story: story.id, ...text };
-        const overrides = { ...get().overrides };
-        if (next) overrides[id] = next;
-        else delete overrides[id];
+        const plan = planStory(id, story);
         const prev = get().params;
-        const storyPrev = { ...get().storyPrev };
-        let params = prev;
-        // What to announce once the new state is set.
-        const cleared: KitEvents["story:cleared"][] = [];
-        let applied: KitEvents["story:applied"] | null = null;
-        if (active) {
-          // Turning a story off puts back the parameters it moved.
-          const back = storyPrev[id];
-          const keys = Object.keys(back ?? {});
-          const on = valuesOf(params, keys);
-          if (back) params = sanitizeParams({ ...params, ...back });
-          cleared.push({ chartId: id, storyId: story.id, before: on, after: valuesOf(params, keys) });
-          delete storyPrev[id];
-        } else if (story.params) {
-          if (current?.story) cleared.push({ chartId: id, storyId: current.story, before: {}, after: {} });
-          // Only one deck-moving story is active at a time: turn the others off first and
-          // restore what they moved, so the new snapshot is taken from clean parameters.
-          for (const otherId of Object.keys(storyPrev)) {
-            if (otherId === id) continue;
-            const back = storyPrev[otherId];
-            const keys = Object.keys(back);
-            const on = valuesOf(params, keys);
-            params = sanitizeParams({ ...params, ...back });
-            const otherStory = get().overrides[otherId]?.story;
-            if (otherStory) cleared.push({ chartId: otherId, storyId: otherStory, before: on, after: valuesOf(params, keys) });
-            delete storyPrev[otherId];
-            delete overrides[otherId];
-          }
-          // Snapshot what it is about to move, unless an earlier story on this chart already did.
-          const snap: Partial<P> = storyPrev[id] ?? {};
-          for (const k of Object.keys(story.params)) if (!(k in snap)) (snap as Record<string, unknown>)[k] = valueOf(params, k);
-          storyPrev[id] = snap;
-          params = sanitizeParams({ ...params, ...story.params });
-          applied = { chartId: id, storyId: story.id, label: story.label, before: { ...snap }, after: valuesOf(params, Object.keys(snap)) };
-        } else {
-          // A story that only re-defines the chart replaces a deck-moving one on the same chart.
-          const back = storyPrev[id];
-          const keys = Object.keys(back ?? {});
-          const on = valuesOf(params, keys);
-          if (back) params = sanitizeParams({ ...params, ...back });
-          if (current?.story) cleared.push({ chartId: id, storyId: current.story, before: on, after: valuesOf(params, keys) });
-          delete storyPrev[id];
-          applied = { chartId: id, storyId: story.id, label: story.label, before: {}, after: {} };
+        // All or nothing: a story that would move a locked parameter is refused, and the deck stays.
+        const out = solve(prev, plan.params, "story");
+        if (out.refusals.length) {
+          emitRefusals(out.refusals, "story");
+          return;
+        }
+        const params = applied(prev, out.patch);
+        const { overrides, storyPrev, cleared } = plan;
+        let applyEvent = plan.applied;
+        // What the relations moved with the story is part of what it moved: undo puts it back too.
+        const snap = storyPrev[id];
+        if (snap && plan.moves) {
+          for (const a of out.adjusted) if (!(a.key in snap)) (snap as Record<string, unknown>)[a.key] = valueOf(plan.clean, a.key);
+          if (applyEvent) applyEvent = { ...applyEvent, before: { ...snap }, after: valuesOf(params, Object.keys(snap)) };
         }
         persist({ overrides, params, storyPrev });
         set({ overrides, params, storyPrev, ...(params !== prev ? { past: pushHistory(get().past, prev), future: [] } : {}) });
         for (const c of cleared) emit("story:cleared", c);
-        if (applied) emit("story:applied", applied);
+        if (applyEvent) emit("story:applied", applyEvent);
         emitChanges(prev, params, "story");
       },
+      storyRefusals: (id, story) => solve(get().params, planStory(id, story).params, "story").refusals,
       clearOverride: (id) => {
         const was = get().overrides[id];
         const overrides = { ...get().overrides };
@@ -491,26 +657,31 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         const back = storyPrev[id];
         delete storyPrev[id];
         const prev = get().params;
-        const params = back ? sanitizeParams({ ...prev, ...back }) : prev;
+        // A reset of the chart: what the story moved goes back, except what is locked now.
+        const out = back ? solve(prev, back, "story", { atomic: false }) : null;
+        const params = out ? applied(prev, out.patch) : prev;
         persist({ overrides, params, storyPrev });
         set({ overrides, params, storyPrev, ...(params !== prev ? { past: pushHistory(get().past, prev), future: [] } : {}) });
         if (was?.story) emit("story:cleared", { chartId: id, storyId: was.story, before: valuesOf(prev, Object.keys(back ?? {})), after: valuesOf(params, Object.keys(back ?? {})) });
         if (was) emit("chart:edited", { chartId: id, reset: true });
+        if (out) emitRefusals(out.refusals, "story");
         emitChanges(prev, params, "story");
       },
       clearAllOverrides: () => {
         const prev = get().params;
         const was = get().overrides;
         const snaps = get().storyPrev;
-        let params = prev;
-        for (const back of Object.values(snaps)) params = { ...params, ...back };
-        params = params === prev ? prev : sanitizeParams(params);
+        let target: Partial<P> = {};
+        for (const back of Object.values(snaps)) target = { ...target, ...back };
+        const out = Object.keys(target).length ? solve(prev, target, "story", { atomic: false }) : null;
+        const params = out ? applied(prev, out.patch) : prev;
         persist({ overrides: {}, params, storyPrev: {} });
         set({ overrides: {}, params, storyPrev: {}, ...(params !== prev ? { past: pushHistory(get().past, prev), future: [] } : {}) });
         for (const [chartId, o] of Object.entries(was)) {
           if (o.story) emit("story:cleared", { chartId, storyId: o.story, before: valuesOf(prev, Object.keys(snaps[chartId] ?? {})), after: valuesOf(params, Object.keys(snaps[chartId] ?? {})) });
           emit("chart:edited", { chartId, reset: true });
         }
+        if (out) emitRefusals(out.refusals, "story");
         emitChanges(prev, params, "story");
       },
       setDefaultBackend: (b) => {
@@ -572,6 +743,11 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         const id = presetId ?? s.links[key] ?? s.presets[0]?.id;
         const preset = s.presets.find((p) => p.id === id);
         const value = valueOf(s.params, key);
+        // The engine never plans a locked parameter: the attempt is refused (and says so).
+        if (s.locks[key]) {
+          emitRefusals([{ key, reason: "locked", by: key, attempted: undefined }], "sweep");
+          return;
+        }
         if (!id || !preset || typeof value !== "number") return;
         const links = s.links[key] === id ? s.links : { ...s.links, [key]: id };
         const existing = s.runs[key];
@@ -579,6 +755,13 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         const origin = existing?.origin ?? value;
         const plan = cfg.planner ? cfg.planner(key, preset, { origin, current: value }, s.params) : null;
         const run: SweepRun = { key, presetId: id, origin, startedAt: now(), plan, index: plan ? plan.start : -1 };
+        // Nor a run whose first move a lock elsewhere refuses (a relation that cannot follow).
+        const first = nextMove(run, value);
+        const check = first != null ? solve(s.params, { [key]: first } as Partial<P>, "sweep") : null;
+        if (check?.refusals.length) {
+          emitRefusals(check.refusals, "sweep");
+          return;
+        }
         const runs = { ...s.runs, [key]: run };
         const sweepOrigins = { ...s.sweepOrigins, [key]: origin };
         // The ticks are not history, but where the input stood before the run is: Ctrl+Z goes back to it.
@@ -627,11 +810,14 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
           delete sweepOrigins[k];
         }
         const prev = s.params;
-        const params = Object.keys(patch).length ? sanitizeParams({ ...prev, ...patch }) : prev;
-        const moved = keys.some((k) => valueOf(params, k) !== valueOf(prev, k));
+        // ↺ before sweep goes through the locks too: what a lock now holds stays, each parameter on its own.
+        const out = Object.keys(patch).length ? solve(prev, patch as Partial<P>, "sweep", { atomic: false }) : null;
+        const params = out ? applied(prev, out.patch) : prev;
+        const moved = params !== prev && Object.keys(diff(prev, params)).length > 0;
         set({ runs, sweepOrigins, params, ...(moved ? { past: [...s.past, prev].slice(-100), future: [] } : {}) });
         persist({ params });
         emitStopped(s.runs, runs, "restore");
+        if (out) emitRefusals(out.refusals, "sweep");
         emitChanges(prev, params, "sweep");
       },
       setRunIndex: (key, index) => {
@@ -656,7 +842,7 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
       },
       exportState: () => {
         const s = get();
-        return { version: cfg.version, exportedAt: new Date().toISOString(), params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui, storyPrev: s.storyPrev, paramSettings: s.paramSettings };
+        return { version: cfg.version, exportedAt: new Date().toISOString(), params: s.params, overrides: s.overrides, defaultBackend: s.defaultBackend, datasets: s.datasets, presets: s.presets, links: s.links, ui: s.ui, storyPrev: s.storyPrev, paramSettings: s.paramSettings, locks: s.locks };
       },
       importState: (text) => {
         const refuse = (error: string) => {
@@ -672,7 +858,13 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         if (!parsed || typeof parsed !== "object") return refuse("Expected a JSON object.");
         const obj = parsed as Partial<ExportedState<P, D>>;
         if (!obj.params || typeof obj.params !== "object") return refuse('Missing a "params" object.');
-        const params = sanitizeParams(obj.params);
+        const prev = get().params;
+        // A parameter locked now keeps its value (and the relations hold around it); the rest is the file's.
+        const solved = solve(prev, sanitizeParams(obj.params), "import");
+        const params = applied(prev, solved.patch);
+        // The file's locks join the ones in place: an import never unlocks. An older export has none.
+        const locksBefore = get().locks;
+        const locks = obj.locks !== undefined ? { ...locksBefore, ...sanitizeLocks(obj.locks, lockable) } : locksBefore;
         const overrides = sanitizeOverrides(obj.overrides);
         const datasets = cfg.datasets.sanitize(obj.datasets ?? get().datasets);
         const presets = obj.presets ? sanitizePresets(obj.presets, cfg.presets) : get().presets;
@@ -682,11 +874,12 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         const storyPrev = sanitizeStoryPrev(obj.storyPrev, overrides);
         // An export from before parameter settings existed keeps the current ones.
         const paramSettings = obj.paramSettings !== undefined ? sanitizeParamSettings(obj.paramSettings, schema) : get().paramSettings;
-        const prev = get().params;
         const runsBefore = get().runs;
-        set({ params, overrides, defaultBackend: backend, datasets, presets, links, ui, storyPrev, paramSettings, runs: {}, sweepOrigins: {} });
-        save({ params, overrides, defaultBackend: backend, datasets, presets, links, ui, storyPrev, paramSettings, runs: [] });
+        set({ params, overrides, defaultBackend: backend, datasets, presets, links, ui, storyPrev, paramSettings, locks, runs: {}, sweepOrigins: {} });
+        save({ params, overrides, defaultBackend: backend, datasets, presets, links, ui, storyPrev, paramSettings, locks, runs: [] });
         emitStopped(runsBefore, {}, "import");
+        emitRefusals(solved.refusals, "import");
+        for (const key of Object.keys(locks)) if (!locksBefore[key]) emit("param:locked", { key, locked: true });
         emitChanges(prev, params, "import");
         emit("state:imported", { ok: true });
         return { ok: true };
@@ -699,11 +892,38 @@ export function createAppStore<P extends object, D extends object>(cfg: AppStore
         }
         const prev = get().params;
         const runsBefore = get().runs;
-        set({ params: { ...defaults }, overrides: {}, defaultBackend, datasets: cfg.datasets.empty, presets: defaultPresets(), links: {}, runs: {}, sweepOrigins: {}, storyPrev: {}, ui: { ...defaultUi }, paramSettings: {} });
+        const locksBefore = get().locks;
+        set({ params: { ...defaults }, overrides: {}, defaultBackend, datasets: cfg.datasets.empty, presets: defaultPresets(), links: {}, runs: {}, sweepOrigins: {}, storyPrev: {}, ui: { ...defaultUi }, paramSettings: {}, locks: {} });
         emitStopped(runsBefore, {}, "reset");
+        for (const key of Object.keys(locksBefore)) emit("param:locked", { key, locked: false });
         emitChanges(prev, get().params, "reset");
         emit("state:reset", {});
       },
+
+      // ---- locks (kit/state/constraints.ts) ----
+      lockParam: (key, on) => {
+        if (!lockable(key) || !!get().locks[key] === on) return;
+        const locks = { ...get().locks };
+        if (on) locks[key] = true;
+        else delete locks[key];
+        // The sweep rule: a run on the key, or one whose next value the new locks refuse, stops where it is.
+        const runsBefore = get().runs;
+        const stop = on ? Object.keys(runsBefore).filter((k) => runBlocked(k, locks)) : [];
+        const runs = stop.length ? Object.fromEntries(Object.entries(runsBefore).filter(([k]) => !stop.includes(k))) : runsBefore;
+        set({ locks, runs });
+        persist({ locks });
+        emit("param:locked", { key, locked: on });
+        emitStopped(runsBefore, runs, "lock");
+      },
+      unlockAll: () => {
+        const was = Object.keys(get().locks);
+        if (!was.length) return;
+        set({ locks: {} });
+        persist({ locks: {} });
+        for (const key of was) emit("param:locked", { key, locked: false });
+      },
+      checkChange: (patch, opts) => solve(get().params, patch, opts?.source ?? "hand", { via: opts?.via, atomic: opts?.atomic }),
+      lockLabel: labelOf,
 
       // ---- parameter settings (kit/inputs/paramSettings.ts): the manual feel, not the replayer's ----
       setParamSettings: (key, patch) => {

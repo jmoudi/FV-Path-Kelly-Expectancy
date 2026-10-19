@@ -156,7 +156,8 @@ export interface SweepTrack {
 export function useSweepTrack(inputKey: string | undefined, active: boolean): SweepTrack {
   const sweeps = useKitSweeps();
   const run = useKit((s) => (inputKey ? s.runs[inputKey] : undefined));
-  const linked = useKit((s) => (inputKey && active && !s.runs[inputKey] ? s.links[inputKey] : undefined));
+  // A locked parameter is never swept, so it shows no preview of a preset's band either.
+  const linked = useKit((s) => (inputKey && active && !s.runs[inputKey] && !s.locks?.[inputKey] ? s.links[inputKey] : undefined));
   const preset = useKit((s) => (linked ? s.presets.find((p) => p.id === linked) : undefined));
   const params = useKit((s) => (preset ? s.params : null));
   const value = useKit((s) => (inputKey ? s.params[inputKey] : undefined));

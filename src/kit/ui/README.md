@@ -47,7 +47,8 @@ stays neutral), the section number in an eyebrow and the guide's section numbers
 rule of the claim aside (60%) and of the inputs caption, the story chips' underline
 and pressed state; never a figure. `applyThemeVars()` (`applyTheme.ts`) writes the
 palette into the variables. Icons are drawn (`Icon.tsx`: one 16-unit grid, one
-1.5px stroke), never font glyphs.
+1.5px stroke; `lock` and `unlock` are the padlocks of `kit/inputs/locks.tsx`), never
+font glyphs; copy names them as `{icon:<name>}`.
 
 `theme.css` and `deck/deck.css` still carry a few rules for this app's own classes
 (`desk-*`, `dkb-market*`, `topbar-*`, `topnav*`, `brand-*`, `rail-title`,

@@ -4,6 +4,7 @@ import { Icon } from "@kit/ui/Icon";
 import { Link } from "@kit/ui/Link";
 import { describeWith } from "./adapter";
 import { HOTKEY_HINTS } from "./useSweeps";
+import { Padlock } from "@kit/inputs/locks";
 
 /**
  * The sweep strip: one line, in the deck's reserved slot (compact) or under a field.
@@ -35,6 +36,8 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
   const stopSweep = useKit((s) => s.stopSweep);
   const restoreSweep = useKit((s) => s.restoreSweep);
   const setParam = useKit((s) => s.setParam);
+  const locks = useKit((s) => s.locks);
+  const lockParam = useKit((s) => s.lockParam);
 
   const cls = `sweep-strip sw${compact ? " compact" : ""}`;
   const runningKey = Object.values(runs).find((r) => r.startedAt != null)?.key;
@@ -68,6 +71,25 @@ export function SweepStrip({ inputKey, compact }: { inputKey: string | null; com
       <span className="sw-narrow">{def.short ?? def.shortLabel ?? def.label}</span>
     </span>
   );
+
+  // A locked parameter is never swept: the strip says so and offers Unlock.
+  if (locks?.[key] && !run) {
+    return (
+      <div className={`${cls} named locked`} role="group" aria-label={`${def.label}: locked`}>
+        <span className="sw-name" title={def.label}>
+          <span className="sw-wide">{compact ? (def.shortLabel ?? def.label) : def.label}</span>
+          <span className="sw-narrow">{def.short ?? def.shortLabel ?? def.label}</span>
+        </span>{" "}
+        <span className="sw-locked" title={`${def.label} is locked: sweeps, hand edits, stories and imports leave it where it is`}>
+          <Padlock closed size={11} /> locked
+        </span>{" "}
+        <span className="sw-value">{typeof value === "number" ? fmt(value) : String(value)}</span>{" "}
+        <button type="button" className="chip tiny" onClick={() => lockParam(key, false)} aria-label={`Unlock ${def.label}`}>
+          Unlock
+        </button>
+      </div>
+    );
+  }
 
   if (!isSweepable(def)) {
     return (

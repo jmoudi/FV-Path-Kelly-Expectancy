@@ -1,6 +1,6 @@
 /**
  * The Guide (#guide): how this app's GUI works, in the owner's words: parameter,
- * parameter settings, replayer, preset, deck, drawer, Desk, Explain, view, story,
+ * parameter settings, lock, replayer, preset, deck, drawer, Desk, Explain, view, story,
  * chart editor. It names things and leaves their meaning to Explain and the views.
  * Rendered by the kit's GuideFrame (src/kit/ui/GuideFrame.tsx).
  *
@@ -9,6 +9,7 @@
 import type { GuideSection } from "@kit/ui/GuideFrame";
 import type { KeyBinding } from "@kit/ui/Settings";
 import { HOTKEY_HINTS as K } from "@kit/sweeps/hotkeys";
+import { LOCKS_GUIDE } from "./guideLocks";
 
 const MAC = K.undo.startsWith("⌘");
 const CTRL = MAC ? "⌘" : "Ctrl";
@@ -51,7 +52,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           ["Views", "`#view/<id>`", "One responsibility per page: a few charts with their context beside them ([section 7](#guide/pages))."],
           ["[Settings](#settings)", "`#settings`, and quick settings behind {icon:settings}", "Everything that is not a parameter's value."],
           ["Guide", "`#guide`", "This page."],
-          ["Notices", "bottom right, for a few seconds", "A line when an import worked or was refused, and when a story moved the deck or put it back, with the values that moved."],
+          ["Notices", "bottom right, for a few seconds", "A line when an import worked or was refused, when a story moved the deck or put it back, with the values that moved, and when a parameter is locked or a lock refuses a change."],
         ],
       },
       { kind: "p", text: "Menus, popovers and dialogs draw above everything, so nothing clips them; Esc closes them. Underlined text is a link; [Links](#el-guide-pages-links), under [section 7](#guide/pages), says what each kind does." },
@@ -80,6 +81,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       { kind: "h", text: "The market switch" },
       { kind: "p", text: "The market switch, in the drawer's Market section and the [Desk](#desk)'s Market block, sets the loss rate to one of two named cases, Fair market or Discussion case; typing the loss rate by hand makes it Custom." },
       { kind: "p", text: "Some sections and views also offer an action that sets parameters in one click; undo puts them back." },
+      // Locks: what a lock does, where the padlock is, which parameters the constraints tie (guideLocks.ts).
+      ...LOCKS_GUIDE,
     ],
   },
   {
@@ -100,6 +103,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         ],
       },
       { kind: "p", text: "The wheel, the arrow keys and the drag land on multiples of the step (with Shift, of the fine step), counted from zero and kept inside the range. From a value between two multiples, the first move lands on the nearest one in its direction. The step, the fine step, the wheel step and the drag are each parameter's own [parameter settings](#guide/parameter-settings)." },
+      { kind: "p", text: "A locked parameter ([Locks](#el-guide-parameters-locks)) takes none of these: its box reads only, and a keystroke, a wheel notch, an arrow, a drag or a double-click is refused with a notice and one shake of the field." },
       { kind: "h", text: "Undo and redo" },
       { kind: "p", text: `${K.undo} steps back through parameter changes and ${K.redo}${MAC ? "" : " (or Ctrl+Y)"} forward, while focus is not in a text box; inside a box they are the box's own undo. Changes less than 400 ms apart count as one step, and the last 100 are kept. While a sweep runs or is paused, ${K.undo} first puts its parameter back where it was before the sweep.` },
     ],
@@ -162,6 +166,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           `Stop keeps the value where it is; {icon:restore} before sweep or ${K.undo} restores the value from before; editing the swept parameter by hand stops the run; a reload during a run puts the value back ([section 8](#guide/data)).`,
           "During a run the app rebuilds only the deck, the Desk and the sections or view on screen; everything else catches up when it stops.",
           "Parameters that make no sense to sweep (the seed, engine caps, path counts) read not swept in the strip.",
+          `A locked parameter is never swept: the strip reads \`locked\` with Unlock, ${K.toggle} on it only says so in a notice, and locking it during a run stops the run where it is ([Locks](#el-guide-parameters-locks)).`,
         ],
       },
       {
@@ -197,6 +202,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         items: [
           "Only one deck-moving story is active at a time: starting another turns the first off and puts its parameters back first.",
           "Clicking the active story, or undo, turns it off and restores what it moved, also after a reload.",
+          "A story that would move a locked parameter reads `blocked: <name> is locked` and stays off when clicked; a notice names the lock ([Locks](#el-guide-parameters-locks)).",
         ],
       },
       { kind: "callout", tone: "careful", text: "A story replaces the chart's own edits: what you set in the chart editor for that chart is gone while the story is on." },
@@ -228,7 +234,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       { kind: "h", text: "Views" },
       { kind: "p", text: "The same charts split into responsibilities, one per page (`#view/<id>`), with the context beside them: the claim, a line on the view, its figures, Inputs for this view and the derivations. Open one from the Views menu, from the links next to a section's number or from {icon:open} on a chart. [ and ] step to the previous or next view from any page while focus is not in a box; the links under the title do the same." },
       { kind: "h", text: "Settings" },
-      { kind: "p", text: "{icon:settings} in the top bar opens quick settings: the default backend, the drag sensitivity, the sweep rate and the resets. The [Settings page](#settings) (`#settings`) adds the cap in values a second, the engine parameters, the hotkeys, Parameters (the parameter settings), Sweep presets, your data, and import and export." },
+      { kind: "p", text: "{icon:settings} in the top bar opens quick settings: the default backend, the drag sensitivity, the sweep rate and the resets. The [Settings page](#settings) (`#settings`) adds the cap in values a second, the engine parameters, the hotkeys, Parameters (the parameter settings, and a Lock per parameter), Sweep presets, your data, and import and export." },
       { kind: "h", text: "Guide" },
       { kind: "p", text: "This page. Each section has its own address, `#guide/<section>`; [Keys](#guide/keys) is `#guide/keys`." },
       { kind: "h", text: "Links" },
@@ -249,17 +255,18 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         ],
       },
       { kind: "h", text: "What is saved, and where" },
-      { kind: "p", text: "Everything you change is saved in this browser as you go (localStorage, key `tranche-replay:v1`): parameter values, parameter settings, chart edits and active stories with what they moved, presets and links, your data, the default backend and the settings. Values a sweep passes through are not saved; a reload during a sweep puts the parameter back where it was before." },
-      { kind: "p", text: "Import / export (top bar, or Settings → Import and export) saves or copies the whole state as one JSON file and loads one back. A loaded file is checked and anything invalid is dropped; a file from before parameter settings existed keeps the current ones." },
+      { kind: "p", text: "Everything you change is saved in this browser as you go (localStorage, key `tranche-replay:v1`): parameter values, parameter settings, locks, chart edits and active stories with what they moved, presets and links, your data, the default backend and the settings. Values a sweep passes through are not saved; a reload during a sweep puts the parameter back where it was before." },
+      { kind: "p", text: "Import / export (top bar, or Settings → Import and export) saves or copies the whole state as one JSON file and loads one back. A loaded file is checked and anything invalid is dropped; a file from before parameter settings existed keeps the current ones. A parameter locked now keeps its value whatever the file says, the file's locks join yours, and a file from before locks existed leaves yours as they are ([Locks](#el-guide-parameters-locks))." },
       { kind: "h", text: "Resets" },
       {
         kind: "table",
         head: ["Reset", "What it clears"],
         rows: [
-          ["Reset every parameter (Settings → Reset)", "parameter values only"],
-          ["Reset chart edits", "every chart's edits and stories; stories put their parameters back"],
+          ["Reset every parameter (Settings → Reset)", "parameter values only; a locked parameter keeps its value"],
+          ["Reset chart edits", "every chart's edits and stories; stories put their parameters back, except locked ones"],
           ["Reset / Reset all (Settings → Parameters)", "one parameter's settings, or every parameter's"],
-          ["Forget everything saved", "all of the above, presets and data included"],
+          ["Unlock all (Locks in the deck)", "every lock; the values stay"],
+          ["Forget everything saved", "all of the above, presets, data and locks included"],
           ["`#reset` in the address", "the saved state, when the app opens"],
         ],
       },

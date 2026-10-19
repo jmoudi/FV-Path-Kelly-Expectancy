@@ -17,7 +17,9 @@ lays them out.
   drawn as an 8px dot before the title), `status: Figure[]` (`{ id, label, value,
   title? }`, value over label, always in ink),
   `note?: string` (a muted comparison), `legend: LegendItem[]`
-  (`{ id, label, color }`), and `strip?: ReactNode` for a slot that is always
+  (`{ id, label, color }`), `chips?: ReactNode` before the strip, at their own width
+  and nothing reserved while empty (this app's "Locks (n)"; on a phone they share the
+  strip's line), and `strip?: ReactNode` for a slot that is always
   reserved (`stripIdle` when it only holds a placeholder: hidden on a phone).
 - `drawer: DrawerSection[]`, each `{ id, title, blurb?, note? }` and one of
   `{ kind: "fields", fields }`, `{ kind: "figures", rows: FigureRow[] }`,

@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { SyntheticNumber, type SyntheticEmpty } from "./SyntheticNumber";
 import type { InputConfig, Unit } from "./schema";
 import { perHundredPxOf } from "./paramSettings";
 import { useKit, useKitApi } from "@kit/state/context";
+import { useBusEvent } from "@kit/events/react";
 import { useSweepTrack } from "@kit/sweeps/useSweeps";
 
 export { perHundredPxOf };
@@ -44,6 +45,12 @@ export function NumberField(p: NumberFieldProps) {
   const isActive = useKit((s) => !!p.inputKey && s.activeInput === p.inputKey);
   const setActiveInput = useKit((s) => s.setActiveInput);
   const track = useSweepTrack(p.inputKey, isActive);
+  // Locks: a locked parameter's field is read-only; every refusal of its changes shows the kept value and shakes it.
+  const locked = useKit((s) => !!p.inputKey && !!s.locks?.[p.inputKey]);
+  const [refusals, setRefusals] = useState(0);
+  useBusEvent("param:refused", (e) => {
+    if (p.inputKey && e.key === p.inputKey) setRefusals((n) => n + 1);
+  });
   const activate = () => {
     if (p.inputKey && api.getState().activeInput !== p.inputKey) setActiveInput(p.inputKey);
   };
@@ -72,6 +79,8 @@ export function NumberField(p: NumberFieldProps) {
       band={track.band}
       tick={track.tick}
       dragScale={dragSensitivity}
+      locked={locked}
+      refusals={refusals}
     />
   );
 }

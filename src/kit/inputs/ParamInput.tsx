@@ -5,6 +5,7 @@ import { Help } from "@kit/ui/Help";
 import { NumberField } from "./NumberField";
 import { effectiveSettings } from "./paramSettings";
 import { ParamSettingsButton } from "./ParamSettings";
+import { LockToggle, useLocked, useRefusalShake } from "./locks";
 
 /**
  * One parameter from the schema, rendered as the synthetic number input (or a select).
@@ -15,6 +16,9 @@ import { ParamSettingsButton } from "./ParamSettings";
  *
  * The field reads the parameter's effective settings: the person's own (the store's
  * `paramSettings`) over the schema's `input` defaults.
+ *
+ * Every field carries its padlock (kit/inputs/locks.tsx): on hover or focus, and in the
+ * accent while the parameter is locked; the bare form shows it only then.
  */
 export function ParamInput({ k, compact, bare, id, withSettings }: { k: string; compact?: boolean; bare?: boolean; id?: string; withSettings?: boolean }) {
   const schema = useSchema();
@@ -24,20 +28,23 @@ export function ParamInput({ k, compact, bare, id, withSettings }: { k: string; 
   const value = useKit((s) => s.params[k]);
   const setParam = useKit((s) => s.setParam);
   const user = useKit((s) => s.paramSettings?.[k]);
+  const locked = useLocked(k);
   const feel = useMemo(() => (def.unit === "choice" ? null : effectiveSettings(def, user)), [def, user]);
   const badge = def.affectsAll && !bare ? <span className="badge-all" title={copy.affectsAllTitle}>{copy.affectsAllBadge}</span> : null;
+  const selectRef = useRefusalShake<HTMLDivElement>((e) => e.key === k);
 
   if (def.unit === "choice" || !feel) {
     return (
-      <div className={`param${compact ? " compact" : ""}`}>
+      <div ref={selectRef} className={`param${compact ? " compact" : ""}${locked ? " locked" : ""}`}>
         {!bare && (
           <div className="param-label">
             <span>{def.label}</span>
             {badge}
             <Help text={def.help} />
+            <LockToggle k={k} />
           </div>
         )}
-        <select id={boxId} value={String(value)} onChange={(e) => setParam(k, e.target.value)} aria-label={def.label}>
+        <select id={boxId} value={String(value)} onChange={(e) => setParam(k, e.target.value)} aria-label={def.label} title={locked ? "Locked: unlock it to change it" : undefined}>
           {def.choices?.map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}
@@ -71,10 +78,13 @@ export function ParamInput({ k, compact, bare, id, withSettings }: { k: string; 
       defaultValue={typeof schema.defaults[k] === "number" ? (schema.defaults[k] as number) : undefined}
       compact={compact || bare}
       extra={
-        bare ? undefined : (
+        bare ? (
+          <LockToggle k={k} onlyWhenLocked />
+        ) : (
           <>
             {badge}
             <Help text={def.help} />
+            <LockToggle k={k} />
             {withSettings && <ParamSettingsButton k={k} />}
           </>
         )

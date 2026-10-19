@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent as RKeyboardEvent, type
 import { decimalsFor, fractionOf, fromDisplay, suffix, toDisplay } from "./display";
 import { clampTyped, quantize, stepOnGrid } from "./paramSettings";
 import { lastPageScrollAt, watchPageScroll, WheelAccumulator, wheelAllowed } from "./wheelGate";
+import { shakeElement } from "./shake";
 import "./number-field.css";
 
 /** How one synthetic number field feels. */
@@ -72,6 +73,16 @@ export interface SyntheticNumberProps {
   empty?: SyntheticEmpty;
   /** The sign after the number instead of the unit's ("pp" for a step of a percentage). */
   suffix?: string;
+
+  // Locks (kit/inputs/locks.tsx).
+  /**
+   * The parameter is locked: the box is read-only and the track hatched; the wheel, the
+   * arrows, a drag, a double-click and a keystroke still call onChange once (with the
+   * value they asked for), so the store can refuse it out loud, but nothing moves.
+   */
+  locked?: boolean;
+  /** Counts the refusals of this field's changes: each one puts the shown value back and shakes the field once. */
+  refusals?: number;
 }
 
 const DRAG_THRESHOLD_PX = 3;
@@ -127,6 +138,23 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
     [],
   );
 
+  // A refused change: show the value the store kept, and shake once.
+  const refusals = p.refusals ?? 0;
+  useEffect(() => {
+    if (!refusals) return;
+    if (pendingCommit.current) {
+      cancelAnimationFrame(pendingCommit.current.raf);
+      pendingCommit.current = null;
+    }
+    const q = latest.current;
+    setLive(null);
+    const t = q.empty?.active ? "" : toDisplay(q.value, q.unit, decimals);
+    setText(t);
+    committedText.current = t;
+    shakeElement(rootRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refusals]);
+
   /** The quantum the wheel, the arrows and the drag land on: the step, or the fine step with Shift. */
   const gridOf = (fine: boolean) => {
     const q = latest.current;
@@ -174,7 +202,9 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
       // One notch is the wheel step; with Shift, the fine step. Either lands on its grid.
       const grid = gridOf(e.shiftKey);
       const notch = e.shiftKey ? grid : (q.config.wheelStep ?? q.step);
-      commitLive(stepOnGrid(liveRef.current ?? q.value, steps * notch, grid, q.min, q.max));
+      // Locked: ask once per notch, show nothing moving; the store refuses it out loud.
+      if (q.locked) q.onChange(stepOnGrid(q.value, steps * notch, grid, q.min, q.max));
+      else commitLive(stepOnGrid(liveRef.current ?? q.value, steps * notch, grid, q.min, q.max));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
@@ -198,6 +228,15 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
     const d = drag.current;
     if (!d || d.pointer !== e.pointerId) return;
     if (!d.moved && Math.abs(e.clientX - d.x) <= DRAG_THRESHOLD_PX) return;
+    if (latest.current.locked) {
+      // Locked: one attempt per drag, at the first step it would take; nothing moves.
+      if (!d.moved) {
+        d.moved = true;
+        const q = latest.current;
+        q.onChange(quantize(d.v + Math.sign(e.clientX - d.x) * gridOf(false), gridOf(false), q.min, q.max));
+      }
+      return;
+    }
     if (!d.moved) {
       // Start measuring from where the drag began to move, so the threshold is not a jump.
       d.moved = true;
@@ -227,7 +266,7 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
     setLive(null);
     // The default is exact (it need not sit on the step grid), so it bypasses the snap.
     const v = Math.max(q.min, Math.min(q.max, q.defaultValue));
-    if (v !== q.value) q.onChange(v);
+    if (v !== q.value || q.locked) q.onChange(v);
   };
 
   /**
@@ -245,18 +284,26 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
     else if (e.key === "PageDown") d = -p.step * 10;
     else if (onTrack && (e.key === "Home" || e.key === "End")) {
       e.preventDefault();
-      commitNow(e.key === "Home" ? p.min : p.max);
+      if (p.locked) p.onChange(e.key === "Home" ? p.min : p.max);
+      else commitNow(e.key === "Home" ? p.min : p.max);
       return true;
     }
     if (d === 0) return false;
     e.preventDefault();
-    commitLive(stepOnGrid(live ?? p.value, d, grid, p.min, p.max));
+    if (p.locked) p.onChange(stepOnGrid(p.value, d, grid, p.min, p.max));
+    else commitLive(stepOnGrid(live ?? p.value, d, grid, p.min, p.max));
     return true;
   };
   // Escape abandons the edit: the blur it causes must not commit the typed text.
   const cancelEdit = useRef(false);
   const onBoxKey = (e: RKeyboardEvent<HTMLInputElement>) => {
     if (stepKey(e, false)) return;
+    // Locked: a keystroke that would type asks once (the store refuses it); the box stays as it is.
+    if (p.locked && ((e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) || e.key === "Backspace" || e.key === "Delete")) {
+      e.preventDefault();
+      if (!e.repeat) p.onChange(p.value);
+      return;
+    }
     if (e.key === "Enter") (e.target as HTMLInputElement).blur();
     else if (e.key === "Escape") {
       cancelEdit.current = true;
@@ -266,6 +313,7 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
   };
   const onBlur = () => {
     setEditing(false);
+    if (p.locked) return;
     if (cancelEdit.current) {
       cancelEdit.current = false;
       setText(committedText.current);
@@ -291,7 +339,7 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
   const bandHi = band ? fractionOf(Math.max(band.lo, band.hi), p.min, p.max) : 0;
   const running = p.run === "running";
   const paused = p.run === "paused";
-  const cls = ["nf", p.compact && "compact", p.active && "active", running && "running", paused && "paused", band && "banded"].filter(Boolean).join(" ");
+  const cls = ["nf", p.compact && "compact", p.active && "active", running && "running", paused && "paused", band && "banded", p.locked && "locked"].filter(Boolean).join(" ");
   const sign = p.suffix ?? suffix(p.unit);
 
   return (
@@ -333,7 +381,8 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
             onPointerCancel={endDrag}
             onLostPointerCapture={endDrag}
             onDoubleClick={onDoubleClick}
-            title={p.defaultValue != null ? "Drag to change (Shift for fine), double-click for the default" : "Drag to change (Shift for fine)"}
+            aria-readonly={p.locked || undefined}
+            title={p.locked ? "Locked: unlock it to change it" : p.defaultValue != null ? "Drag to change (Shift for fine), double-click for the default" : "Drag to change (Shift for fine)"}
           >
             {band && (
               <div className="nf-band" style={{ left: `${bandLo * 100}%`, width: `${Math.max(0, bandHi - bandLo) * 100}%` }} aria-hidden="true">
@@ -355,9 +404,12 @@ export function SyntheticNumber(p: SyntheticNumberProps) {
             spellCheck={false}
             value={editing || text === "" ? text : text + sign}
             placeholder={p.empty?.placeholder}
+            readOnly={p.locked}
+            aria-readonly={p.locked || undefined}
+            title={p.locked ? "Locked: unlock it to change it" : undefined}
             onFocus={() => {
               activate();
-              setEditing(true);
+              if (!p.locked) setEditing(true);
             }}
             onChange={(e) => setText(e.target.value)}
             onBlur={onBlur}

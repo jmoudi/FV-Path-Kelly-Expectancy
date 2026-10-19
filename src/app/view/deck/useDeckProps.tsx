@@ -9,6 +9,7 @@ import type { Params } from "@app/model/params";
 import { useStore } from "@app/store";
 import { Help } from "@kit/ui/Help";
 import { ParamInput } from "@kit/inputs/ParamInput";
+import { LocksChip } from "@kit/inputs/locks";
 import type { DeckView } from "@app/scenarios/deck";
 import { CleanSeasonField, CleanSeasonText } from "./CleanSeason";
 import { DeckStrip } from "./DeckStrip";
@@ -26,6 +27,8 @@ export function useDeckProps(deck: DeckView | null): DeckContent {
   const active = useStore((s) => s.activeInput);
   // The strip follows a running or paused sweep even when no input is active.
   const swept = useStore((s) => Object.keys(s.runs).length > 0);
+  // "Locks (n)" in row 2 while anything is locked.
+  const locked = useStore((s) => Object.keys(s.locks).length > 0);
   const layout = useMemo(() => deckLayout(), []);
 
   const groups: InputGroup[] = useMemo(
@@ -80,6 +83,7 @@ export function useDeckProps(deck: DeckView | null): DeckContent {
     status: status.status,
     note: status.note,
     legend: deckLegend,
+    chips: locked ? <LocksChip /> : undefined,
     strip: <DeckStrip />,
     stripIdle: !active && !swept,
     drawer,
